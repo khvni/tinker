@@ -1,0 +1,47 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    'Inter', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+html,
+body,
+#root,
+.glass-app,
+.glass-workspace {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.glass-workspace {
+  position: relative;
+  background: #0f1115;
+  color: #e6e8eb;
+}
+
+.glass-pane {
+  padding: 1.25rem 1.5rem;
+  overflow: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.glass-pane--placeholder {
+  color: #aab0b8;
+  font-size: 13px;
+}
+
+.glass-pane--placeholder h2 {
+  margin: 0 0 0.5rem;
+  font-size: 16px;
+  color: #e6e8eb;
+}
+
+.glass-empty-pane {
+  padding: 1rem;
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

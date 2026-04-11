@@ -1,0 +1,19 @@
+appId: com.ramp-glass.desktop
+productName: Glass
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+win:
+  target: nsis
+linux:
+  target:
+    - AppImage
+    - deb

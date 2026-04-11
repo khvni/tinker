@@ -1,0 +1,28 @@
+{
+  "name": "ramp-glass",
+  "description": "Local-first AI workspace cloning Ramp's internal Glass suite. One package per parallel agent.",
+  "scripts": {
+    "setup": "./.conductor/scripts/setup.sh",
+    "run": "./.conductor/scripts/run.sh",
+    "archive": ""
+  },
+  "worktree": {
+    "default_branch": "main"
+  },
+  "environment": {
+    "NODE_ENV": "development"
+  },
+  "runScriptMode": "nonconcurrent",
+  "enterpriseDataPrivacy": false,
+  "recommendations": {
+    "parallel_agents": 6,
+    "notes": [
+      "One package per agent. Each agent works in its own worktree against main.",
+      "Wave 1 packages (parallelizable): agent-runtime, memory, skills, integrations, auth, dojo-web. Dispatch these first.",
+      "Wave 2 packages (sequential, need Wave 1 merged): scheduler, slack-bot, workspace-polish, mobile-approvals, e2e.",
+      "Hand each agent the matching tasks/<package>.md brief via @file reference in Conductor chat.",
+      "shared-types is frozen; agents must NOT edit packages/shared-types — open a PR via a coordinator instead.",
+      "Only one agent may touch pnpm-lock.yaml at a time. Rebase before adding deps."
+    ]
+  }
+}

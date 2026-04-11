@@ -1,0 +1,23 @@
+{
+  "name": "ramp-glass",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Local-first AI workspace — 1:1 clone of Ramp's internal Glass suite.",
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" --filter \"./apps/*\" build",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "pnpm -r --parallel lint",
+    "test": "pnpm -r --parallel test",
+    "dev:desktop": "pnpm --filter @ramp-glass/desktop dev",
+    "dev:dojo-web": "pnpm --filter @ramp-glass/dojo-web dev",
+    "clean": "pnpm -r exec rm -rf dist out .turbo node_modules && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@ramp-glass/mobile-approvals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'mobile-approvals: not yet scaffolded — see tasks/scheduler.md' && exit 0",
+    "build": "echo 'mobile-approvals: not yet scaffolded' && exit 0",
+    "typecheck": "echo 'mobile-approvals: not yet scaffolded' && exit 0",
+    "lint": "echo 'mobile-approvals: not yet scaffolded' && exit 0",
+    "test": "echo 'mobile-approvals: not yet scaffolded' && exit 0"
+  }
+}

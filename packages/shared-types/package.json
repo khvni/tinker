@@ -1,0 +1,28 @@
+{
+  "name": "@ramp-glass/shared-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agent": "./src/agent.ts",
+    "./auth": "./src/auth.ts",
+    "./integrations": "./src/integrations.ts",
+    "./layout": "./src/layout.ts",
+    "./memory": "./src/memory.ts",
+    "./scheduler": "./src/scheduler.ts",
+    "./skills": "./src/skills.ts",
+    "./slack": "./src/slack.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "echo 'no tests'"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

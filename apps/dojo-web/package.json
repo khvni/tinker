@@ -1,0 +1,13 @@
+{
+  "name": "@ramp-glass/dojo-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'dojo-web: not yet scaffolded — see tasks/dojo-web.md' && exit 0",
+    "build": "echo 'dojo-web: not yet scaffolded — see tasks/dojo-web.md' && exit 0",
+    "typecheck": "echo 'dojo-web: not yet scaffolded' && exit 0",
+    "lint": "echo 'dojo-web: not yet scaffolded' && exit 0",
+    "test": "echo 'dojo-web: not yet scaffolded' && exit 0"
+  }
+}
