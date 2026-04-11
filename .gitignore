@@ -1,0 +1,40 @@
+# Tooling / agent scratch
+.claude/
+.remember/
+.DS_Store
+.vscode/
+.idea/
+
+# Node / pnpm
+node_modules/
+pnpm-lock.yaml.bak
+.pnpm-store/
+dist/
+build/
+out/
+.turbo/
+.next/
+.vercel/
+.vite/
+coverage/
+
+# Electron
+apps/desktop/release/
+apps/desktop/out/
+apps/desktop/dist-electron/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local databases
+*.sqlite
+*.sqlite-journal
+*.db
+
+# Logs
+*.log
+logs/
