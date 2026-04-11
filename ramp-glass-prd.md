@@ -6,21 +6,13 @@
 
 ---
 
-## 0. Guiding Principles (non-negotiable)
+## 0. Guiding Principles (from the article, non-negotiable)
 
-These principles **must** shape every technical and product decision. If a feature fights them, the feature is wrong.
-
-**From the article:**
+These three principles **must** shape every technical and product decision. If a feature fights these principles, the feature is wrong.
 
 1. **Don't limit anyone's upside.** No "dumbed-down mode." Power-user capability (multi-window workflows, deep integrations, scheduled automations, persistent memory, reusable skills) must be preserved in full. The goal is to make complexity *invisible*, not to remove it.
 2. **One person's breakthrough becomes everyone's baseline.** Every workflow, skill, or insight one user discovers must be shareable so the whole org levels up. The floor rises; the ceiling does not fall.
 3. **The product is the enablement.** The product itself teaches people to be AI power-users by suggesting the right skill at the right time and showing what "good" looks like in the moment. No workshops required.
-
-**From Rahul (head of applied AI @ Ramp), on the core architectural shape:**
-
-4. **Every successful LLM app is an LLM in a for loop with tools and prompts.** That's the shape. Do not try to innovate over it. Products built on this pattern scale with model intelligence and keep improving exponentially as the underlying models improve. Translation for Glass: the agent runtime is a thin loop — `while (!done) { llm.step(messages, tools, systemPrompt) }` — and everything interesting (skills, memory, integrations, Sensei, triage) feeds into that loop as tools or as prompt context. No clever orchestration frameworks. No bespoke multi-agent choreography. Just the loop.
-
-**Supporting insight from the accompanying discussion:** the biggest value unlock for users is **installing a workflow on day one and getting an immediate result**. The product teaches faster than any training. This is why Sensei pins top-5 skills on first launch and why the onboarding arc is `SSO → memory bootstrap → first successful skill run`, with no steps between.
 
 ---
 
@@ -309,53 +301,6 @@ type LayoutState = FlexLayoutJsonModel; // flexlayout-react model JSON
 1. User configures an assistant (channel, system prompt, skills, integrations).
 2. A `@slack/bolt` handler is registered for that channel.
 3. On each message, the assistant runs a Claude turn with the user's full Glass context (memory + skills + MCP) and replies in-thread.
-
-### 3.5 The Core Loop (architectural heart)
-
-Per Principle 4: **every successful LLM app is an LLM in a for loop with tools and prompts.** The entire Glass agent runtime reduces to the following shape. Do not complicate it.
-
-```ts
-// packages/agent-runtime/src/loop.ts
-export async function runTurn(ctx: TurnContext): Promise<TurnResult> {
-  const messages: Message[] = [...ctx.history, ctx.userMessage];
-  const systemPrompt = await buildSystemPrompt(ctx); // memory + skills + role
-  const tools = await resolveTools(ctx);             // MCP clients + local tools
-
-  while (true) {
-    const step = await claude.step({
-      model: ctx.model ?? 'claude-sonnet-4-6',
-      system: systemPrompt,
-      messages,
-      tools,
-      stream: ctx.onToken,
-    });
-
-    messages.push(step.assistantMessage);
-
-    if (step.stopReason === 'end_turn') return { messages };
-    if (step.stopReason === 'tool_use') {
-      const results = await executeTools(step.toolCalls, ctx);
-      messages.push({ role: 'user', content: results });
-      continue;
-    }
-    if (step.stopReason === 'max_tokens') return { messages, truncated: true };
-    assertNever(step.stopReason);
-  }
-}
-```
-
-Everything else in the PRD is a tool, a piece of prompt context, or UI around this loop:
-
-- **Skills** → injected into `systemPrompt` on demand.
-- **Memory** → injected into `systemPrompt` as pre-loaded entity context; updated after each turn.
-- **Integrations (MCP)** → registered as `tools`.
-- **Sensei** → a separate call of the same loop with a different prompt and the Dojo index as a tool.
-- **Triage agent** → a separate call of the same loop with Slack message content as input and GitHub Issues as a tool.
-- **Scheduled automations** → the same loop invoked by cron with a stored prompt.
-- **Headless mode** → the same loop, detached from the UI, with approval-gated tool execution.
-- **Slack assistants** → the same loop bound to a Slack channel handler.
-
-**One loop. Many invocations. No framework.** If you catch yourself building an agent orchestrator, a graph runner, or a state machine on top of this, stop and delete it.
 
 ---
 

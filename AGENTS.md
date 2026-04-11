@@ -10,17 +10,11 @@
 
 You are building **Ramp Glass**, a 1:1 clone of Ramp's internal AI productivity suite as described in the public engineering post *"We Built Every Employee at Ramp Their Own AI Coworker."*
 
-Four principles govern every decision. They trump any micro-preference you have about code style.
-
-**From the article:**
+Three principles from that article govern every decision. They are repeated here because they trump any micro-preference you have about code style:
 
 1. **Don't limit anyone's upside.** Never "simplify" a feature by removing capability. Make complexity invisible; preserve it.
 2. **One person's breakthrough becomes everyone's baseline.** Anything useful one user does must be reusable by the rest of the org — this is why skills are git-backed and Dojo exists.
 3. **The product is the enablement.** The UX itself teaches users. Prefer in-product nudges and "show, don't tell" over docs or onboarding modals.
-
-**From Rahul (head of applied AI @ Ramp):**
-
-4. **Every successful LLM app is an LLM in a for loop with tools and prompts.** That is the shape. Do not innovate over it. When in doubt about how to implement a new capability, ask: "can this be a tool, a prompt addition, or a second invocation of the same loop?" — the answer is almost always yes. No graph-based orchestrators. No bespoke multi-agent frameworks. No state machines on top of the agent. The runtime is a loop (see PRD §3.5); everything else plugs into it.
 
 If a code decision conflicts with these principles, the decision is wrong.
 
@@ -217,8 +211,6 @@ If any of those are false, the phase is not done. Do not start the next phase.
 - "Let me skip memory for this turn, it's slow." — No. Fix the slowness. Memory is load-bearing.
 - "Let me commit this secret temporarily." — No. Never.
 - "Let me write a 200-line docstring on this helper." — No. Default to no comments (§4.4).
-- "Let me introduce LangGraph / CrewAI / a state machine to orchestrate these agents." — No. Principle 4. It is a loop. Tools plug in. Prompts plug in. If you need a "second agent," it is a second invocation of the same loop, not a new framework.
-- "Let me cache the model's output in a clever middleware layer to save tokens." — Only if it is trivially reversible and does not alter the loop. The loop is the product. Don't wrap it.
 
 ---
 
