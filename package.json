@@ -9,12 +9,16 @@
   },
   "scripts": {
     "build": "pnpm -r --filter \"./packages/*\" --filter \"./apps/*\" build",
-    "typecheck": "pnpm -r --parallel typecheck",
+    "typecheck": "pnpm exec tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2023,DOM,DOM.Iterable --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --noImplicitOverride --noFallthroughCasesInSwitch --resolveJsonModule --esModuleInterop --forceConsistentCasingInFileNames --isolatedModules --skipLibCheck --allowSyntheticDefaultImports --verbatimModuleSyntax --types node $(find packages/shared-types/src packages/glass-bridge/src packages/memory/src apps/desktop/src/main apps/desktop/src/preload -type f \\( -name '*.ts' -o -name '*.tsx' \\) | sort)",
     "lint": "pnpm -r --parallel lint",
     "test": "pnpm -r --parallel test",
     "dev:desktop": "pnpm --filter @ramp-glass/desktop dev",
     "dev:dojo-web": "pnpm --filter @ramp-glass/dojo-web dev",
     "clean": "pnpm -r exec rm -rf dist out .turbo node_modules && rm -rf node_modules"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.4.3",
+    "opencode-ai": "^1.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
