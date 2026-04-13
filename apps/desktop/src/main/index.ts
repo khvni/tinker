@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { bootstrapOpencodeOnAppLaunch } from './opencode.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,6 +30,8 @@ const createMainWindow = (): BrowserWindow => {
 
   return win;
 };
+
+bootstrapOpencodeOnAppLaunch();
 
 void app.whenReady().then(() => {
   createMainWindow();
