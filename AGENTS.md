@@ -6,6 +6,29 @@
 
 ---
 
+## 0. What This Project Is
+
+**Ramp Glass** is a local-first Electron desktop AI workspace inspired by Ramp's internal "Glass" suite (described in the public article *"We Built Every Employee at Ramp Their Own AI Coworker"*). It is NOT a 1:1 clone — it adapts the article's principles to our stack.
+
+**The big idea:** open the app, sign in with Google (or Microsoft Entra ID at work), and everything connects on day one. The LLM is GPT-5.4 via your ChatGPT subscription (no API billing). Your knowledge base is an Obsidian-compatible vault on disk. The workspace has split panes, inline renderers, and persistent layout. If nothing is connected, it still works as a coding agent.
+
+**How it works under the hood:**
+- **OpenCode** (`anomalyco/opencode`, MIT license) runs as a bundled headless backend, started via `createOpencode()` from `@opencode-ai/sdk`. It handles the agent loop, Vercel AI SDK, Codex OAuth, 25+ tools, MCP servers, and session management. Glass never bypasses it.
+- **Glass Bridge** (`packages/glass-bridge`) wraps `@opencode-ai/sdk` and adds memory injection, streaming event relay, SSO token forwarding, and model selection.
+- **Memory** (`packages/memory`) is a SQLite + vector index backed by an Obsidian-compatible vault (local markdown folder). The vault is the source of truth; SQLite is the index.
+- **Desktop UI** (`apps/desktop`) is Electron + React 19 + Dockview + Tailwind.
+
+**Key files to read first:**
+1. `ramp-glass-prd.md` — full product spec with architecture diagram, data model, runtime flows.
+2. This file — coding standards and conventions.
+3. `tasks/<your-brief>.md` — your specific assignment if you're a parallel Conductor agent.
+4. `opencode.json` — MCP server config for integrations.
+5. `packages/shared-types/src/` — frozen type contracts.
+
+**OpenCode SDK reference:** https://opencode.ai/docs/sdk/
+
+---
+
 ## 1. Principles
 
 From the article. They override everything else.
@@ -79,12 +102,19 @@ From the article. They override everything else.
 
 ## 5. OpenCode Integration
 
-- OpenCode is a **bundled dependency**, spawned as `opencode serve` by Electron's main process.
-- Glass connects via `@opencode-ai/sdk`. All agent interactions go through this SDK.
-- **Do not bypass the SDK** to call OpenAI directly. Everything goes through OpenCode.
+- OpenCode is a **bundled dependency**. On app launch, Electron main process calls `createOpencode()` from `@opencode-ai/sdk` — this starts the server AND returns a connected client. No manual server spawning.
+- **All agent interactions go through the SDK client.** Do not call OpenAI directly. Do not import Vercel AI SDK directly. Everything goes through `client.session.prompt()`, `client.event.subscribe()`, etc.
+- **SDK reference:** https://opencode.ai/docs/sdk/ — read before writing any bridge code.
+- **Key SDK methods:**
+  - `createOpencode()` → `{ client }` (start server + connect)
+  - `client.session.create()` / `.prompt()` / `.abort()` / `.messages()` — chat
+  - `client.event.subscribe()` — SSE streaming (token deltas, tool calls, file writes)
+  - `client.config.providers()` — list models
+  - `client.auth.set()` — forward SSO credentials to OpenCode so MCP servers authenticate
+  - `session.prompt({ body: { noReply: true, parts: [...] } })` — inject context without triggering a response
 - **MCP servers** are the integration layer. New integration = new entry in `opencode.json`. No code change.
 - **Codex OAuth** is handled by OpenCode's built-in codex plugin. Glass embeds the browser popup in Electron.
-- **Model selection** uses OpenCode's provider system. Glass exposes a dropdown in the UI.
+- **Model selection:** `session.prompt({ body: { model: { providerID, modelID } } })` — per-chat.
 
 ---
 

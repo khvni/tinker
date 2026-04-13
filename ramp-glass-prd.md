@@ -28,9 +28,14 @@ The user opens the app, signs in with Google (or Entra ID at work), and everythi
 
 ### 2.1 OpenCode Backend (bundled, invisible)
 
-- **Bundled inside the Electron app** as a dependency. Electron main process spawns `opencode serve` as a child process on launch. The user never sees a terminal.
+- **Bundled inside the Electron app** as a dependency. On launch, Glass calls `createOpencode()` from `@opencode-ai/sdk` — this starts the server AND returns a connected client in one call. The user never sees a terminal.
 - Provides: agent loop, Vercel AI SDK, Codex OAuth, GitHub Copilot auth, model selection, 25+ tools (bash, file read/write/edit, grep, glob, web search, web fetch, LSP, etc.), MCP server support, session management.
-- Glass connects via `@opencode-ai/sdk` (HTTP + SSE). All tool output, streaming tokens, and session state flow through this SDK.
+- Glass interacts entirely through the `@opencode-ai/sdk` client. Key methods:
+  - `client.session.create()` / `.prompt()` / `.abort()` / `.messages()` for chat.
+  - `client.event.subscribe()` for SSE streaming (token deltas, tool calls, file writes).
+  - `client.auth.set()` to forward SSO tokens so MCP servers can authenticate.
+  - `client.config.providers()` for model listing.
+  - `session.prompt({ body: { model: { providerID, modelID } } })` for per-chat model selection.
 - **Model selector:** GPT-5.4 default. User can switch per-chat via a dropdown. Models fetched from `models.dev/api.json` (same as OpenCode). Supports GPT-5.4, 5.4-mini, 5.4-pro, 5.4-nano, and any future models.
 - **Codex OAuth flow:** Embedded in an Electron BrowserWindow popup (not a terminal). Forked from OpenCode's `packages/opencode/src/plugin/codex.ts`. PKCE against `auth.openai.com`, rewrites requests to `chatgpt.com/backend-api/codex/responses`. Tokens stored locally.
 
@@ -212,24 +217,23 @@ type LayoutState = {
 ### 3.3 Runtime flows
 
 **a) First launch**
-1. Glass opens → spawns `opencode serve` on a random local port.
-2. Glass Bridge connects via `@opencode-ai/sdk`.
-3. SSO screen: "Sign in with Google" (or "Sign in with Microsoft" if configured).
-4. On Google sign-in: OAuth popup → tokens stored in OS keychain → Glass auto-configures Gmail/Calendar/Drive MCP servers in the OpenCode instance.
-5. Vault setup: "Connect existing Obsidian vault" or "Create new knowledge base at ~/Glass/knowledge/".
-6. Codex OAuth: popup for LLM access → "Sign in with ChatGPT" → tokens stored by OpenCode.
+1. Glass opens → calls `createOpencode()` from `@opencode-ai/sdk` (starts server + returns client).
+2. SSO screen: "Sign in with Google" (or "Sign in with Microsoft" if configured).
+3. On Google sign-in: OAuth popup → tokens stored in OS keychain → Glass calls `client.auth.set()` to forward Google tokens to OpenCode → MCP servers (Gmail/Calendar/Drive) can now authenticate automatically.
+4. Vault setup: "Connect existing Obsidian vault" or "Create new knowledge base at ~/Glass/knowledge/".
+5. Codex OAuth: popup for LLM access → "Sign in with ChatGPT" → tokens stored by OpenCode.
 7. Memory bootstrap: index the vault + pull initial data from connected Google apps → populate entities.
 8. Workspace opens: Chat (60%) + Today (40%) with memory entities.
 
 **b) Sending a message**
 1. User types in Chat pane.
-2. Glass Bridge injects top-k memory entities into the system prompt.
-3. Bridge sends message to OpenCode server via SDK.
+2. Glass Bridge injects top-k memory entities via `session.prompt({ body: { noReply: true, parts: [memoryContext] } })`.
+3. Bridge sends the user message via `session.prompt({ body: { model: { providerID, modelID }, parts: [{ type: "text", text }] } })`.
 4. OpenCode runs the agent turn (Vercel AI SDK + GPT-5.4 + tools).
-5. SSE streams token deltas back → Glass renders in Chat pane.
+5. `client.event.subscribe()` streams events back → Glass renders token deltas in Chat pane.
 6. Tool calls (file writes, web fetches, etc.) execute on the server; results stream back.
-7. Any file written by the agent auto-opens as a tab.
-8. Post-turn: Bridge extracts new entities from the conversation and updates memory + vault.
+7. Any `file_written` event auto-opens the file as a tab.
+8. Post-turn: Bridge extracts new entities from `session.messages()` and updates memory + vault.
 
 **c) Daily synthesis (background, every 24h)**
 1. Iterate sessions from last 24h → summarize → extract entities.
