@@ -173,7 +173,6 @@ These are not style preferences; they are product requirements:
 - Push to `main` after each phase in PRD §5 completes and runs.
 - Never force-push `main`. Never `git reset --hard` on `main`.
 - Never `--no-verify` past a failing hook — fix the underlying issue.
-- **Do not add a `Co-Authored-By: Claude …` trailer to commits.** The user's repo, the user's attribution.
 
 ---
 
