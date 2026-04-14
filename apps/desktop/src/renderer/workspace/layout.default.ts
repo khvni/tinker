@@ -1,11 +1,43 @@
+import type { MemoryStore } from '@tinker/shared-types';
 import type { DockviewApi } from 'dockview-react';
 
-export const applyDefaultLayout = (api: DockviewApi): void => {
-  api.addPanel({
+type DefaultLayoutOptions = {
+  memoryStore: MemoryStore;
+  vaultPath: string | null;
+};
+
+export const applyDefaultLayout = (api: DockviewApi, options: DefaultLayoutOptions): void => {
+  if (options.vaultPath) {
+    api.addPanel({
+      id: 'vault-browser',
+      component: 'vault-browser',
+      title: 'Vault',
+      params: {
+        memoryStore: options.memoryStore,
+        vaultPath: options.vaultPath,
+      },
+      initialWidth: 280,
+      position: {
+        direction: 'left',
+      },
+    });
+  }
+
+  const chatPanel = {
     id: 'chat',
     component: 'chat',
     title: 'Chat',
-  });
+    ...(options.vaultPath
+      ? {
+          position: {
+            referencePanel: 'vault-browser',
+            direction: 'right' as const,
+          },
+        }
+      : {}),
+  };
+
+  api.addPanel(chatPanel);
 
   api.addPanel({
     id: 'today',

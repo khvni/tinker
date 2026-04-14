@@ -1,12 +1,20 @@
-import { useMemo, type JSX } from 'react';
-import { DockviewReact, type DockviewReadyEvent } from 'dockview-react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { DockviewReact, type DockviewApi, type DockviewReadyEvent } from 'dockview-react';
 import type { LayoutStore, MemoryStore, SSOSession } from '@tinker/shared-types';
 import { DEFAULT_USER_ID } from '../../bindings.js';
 import { Chat } from '../panes/Chat.js';
 import { Settings } from '../panes/Settings.js';
 import { Today } from '../panes/Today.js';
+import { VaultBrowser } from '../panes/VaultBrowser.js';
+import { CodeRenderer } from '../renderers/CodeRenderer.js';
+import { CsvRenderer } from '../renderers/CsvRenderer.js';
+import { HtmlRenderer } from '../renderers/HtmlRenderer.js';
+import { ImageRenderer } from '../renderers/ImageRenderer.js';
+import { MarkdownEditor } from '../renderers/MarkdownEditor.js';
+import { MarkdownRenderer } from '../renderers/MarkdownRenderer.js';
 import { applyDefaultLayout } from './layout.default.js';
 import { createPaneRegistry } from './pane-registry.js';
+import { DockviewApiContext } from './DockviewContext.js';
 
 type WorkspaceProps = {
   layoutStore: LayoutStore;
@@ -31,9 +39,12 @@ export const Workspace = ({
   session,
   vaultPath,
 }: WorkspaceProps): JSX.Element => {
+  const dockviewApiRef = useRef<DockviewApi | null>(null);
+  const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const components = useMemo(
     () =>
       createPaneRegistry({
+        'vault-browser': (props) => <VaultBrowser {...props} />,
         chat: () => <Chat memoryStore={memoryStore} opencodeUrl={opencodeUrl} />,
         today: () => <Today memoryStore={memoryStore} vaultPath={vaultPath} />,
         settings: () => (
@@ -46,26 +57,41 @@ export const Workspace = ({
             onSelectVault={onSelectVault}
           />
         ),
-        file: () => <section className="tinker-pane">File panes land here.</section>,
-        markdown: () => <section className="tinker-pane">Markdown panes land here.</section>,
-        html: () => <section className="tinker-pane">HTML panes land here.</section>,
-        csv: () => <section className="tinker-pane">CSV panes land here.</section>,
-        image: () => <section className="tinker-pane">Image panes land here.</section>,
-        code: () => <section className="tinker-pane">Code panes land here.</section>,
-        'markdown-editor': () => <section className="tinker-pane">Markdown editor lands here.</section>,
+        file: (props) => <CodeRenderer {...props} />,
+        markdown: (props) => <MarkdownRenderer {...props} />,
+        html: (props) => <HtmlRenderer {...props} />,
+        csv: (props) => <CsvRenderer {...props} />,
+        image: (props) => <ImageRenderer {...props} />,
+        code: (props) => <CodeRenderer {...props} />,
+        'markdown-editor': (props) => <MarkdownEditor {...props} />,
       }),
     [memoryStore, onConnectGoogle, onCreateVault, onDisconnectGoogle, onSelectVault, opencodeUrl, session, vaultPath],
   );
 
   const onReady = (event: DockviewReadyEvent): void => {
+    dockviewApiRef.current = event.api;
+    setDockviewApi(event.api);
+
     void (async () => {
       const savedLayout = await layoutStore.load(DEFAULT_USER_ID);
 
       if (savedLayout?.dockviewModel) {
         event.api.fromJSON(savedLayout.dockviewModel as ReturnType<typeof event.api.toJSON>);
       } else {
-        applyDefaultLayout(event.api);
+        applyDefaultLayout(event.api, {
+          memoryStore,
+          vaultPath,
+        });
       }
+
+      event.api.panels
+        .filter((panel) => panel.id === 'vault-browser')
+        .forEach((panel) => {
+          panel.api.updateParameters({
+            memoryStore,
+            vaultPath,
+          });
+        });
 
       event.api.onDidLayoutChange(() => {
         void layoutStore.save(DEFAULT_USER_ID, {
@@ -76,6 +102,42 @@ export const Workspace = ({
       });
     })();
   };
+
+  useEffect(() => {
+    const api = dockviewApiRef.current;
+    if (!api) {
+      return;
+    }
+
+    api.panels
+      .filter((panel) => panel.id === 'vault-browser')
+      .forEach((panel) => {
+        panel.api.updateParameters({
+          memoryStore,
+          vaultPath,
+        });
+      });
+
+    if (!vaultPath || api.panels.some((panel) => panel.id === 'vault-browser')) {
+      return;
+    }
+
+    api.addPanel({
+      id: 'vault-browser',
+      component: 'vault-browser',
+      title: 'Vault',
+      params: {
+        memoryStore,
+        vaultPath,
+      },
+      initialWidth: 280,
+      inactive: true,
+      position: {
+        referencePanel: 'chat',
+        direction: 'left',
+      },
+    });
+  }, [memoryStore, vaultPath]);
 
   return (
     <main className="tinker-workspace-shell">
@@ -90,7 +152,9 @@ export const Workspace = ({
         </div>
       </header>
 
-      <DockviewReact className="dockview-theme-abyss tinker-dockview" components={components} onReady={onReady} />
+      <DockviewApiContext.Provider value={dockviewApi}>
+        <DockviewReact className="dockview-theme-abyss tinker-dockview" components={components} onReady={onReady} />
+      </DockviewApiContext.Provider>
     </main>
   );
 };

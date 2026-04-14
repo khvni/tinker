@@ -134,6 +134,7 @@ pub fn run() {
     .manage(OpencodeState::default())
     .invoke_handler(tauri::generate_handler![
       get_opencode_url,
+      commands::codex_oauth::codex_oauth_flow,
       commands::oauth::oauth_flow
     ])
     .setup(|app| {

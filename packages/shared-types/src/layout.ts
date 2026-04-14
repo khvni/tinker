@@ -1,4 +1,5 @@
 export type PaneKind =
+  | 'vault-browser'
   | 'chat'
   | 'today'
   | 'settings'
