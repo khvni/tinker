@@ -1,10 +1,16 @@
-import { exists, mkdir, readTextFile, stat, watch, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readDir, readTextFile, stat, watch, writeTextFile } from '@tauri-apps/plugin-fs';
 import type { VaultConfig, VaultNote, VaultService } from '@tinker/shared-types';
-import { deriveNoteTitle, parseFrontmatter, resolveVaultPath, serializeFrontmatter, walkMarkdownFiles } from './vault-utils.js';
+import {
+  deriveNoteTitle,
+  parseFrontmatter,
+  relativeVaultPath,
+  resolveVaultPath,
+  serializeFrontmatter,
+  walkMarkdownFiles,
+} from './vault-utils.js';
 
 type StoredVaultState = {
   path: string;
-  isNew: boolean;
 };
 
 const DEFAULT_WELCOME_BODY = ['# Welcome', '', 'Your vault is ready.'].join('\n');
@@ -31,14 +37,15 @@ export const createVaultService = (): VaultService => {
 
   return {
     async init(config: VaultConfig): Promise<void> {
-      state = { ...config };
+      state = { path: config.path };
 
-      if (!(await exists(config.path))) {
+      const existed = await exists(config.path);
+      if (!existed) {
         await mkdir(config.path, { recursive: true });
       }
 
-      const notePaths = await walkMarkdownFiles(config.path);
-      if (notePaths.length > 0) {
+      const entries = await readDir(config.path);
+      if (entries.length > 0) {
         return;
       }
 
@@ -70,6 +77,10 @@ export const createVaultService = (): VaultService => {
 
     async writeNote(relativePath: string, frontmatter: Record<string, unknown>, body: string): Promise<void> {
       const vaultPath = requireVaultPath();
+      const lastSlash = relativePath.lastIndexOf('/');
+      if (lastSlash > 0) {
+        await mkdir(resolveVaultPath(vaultPath, relativePath.slice(0, lastSlash)), { recursive: true });
+      }
       await writeTextFile(resolveVaultPath(vaultPath, relativePath), serializeFrontmatter(frontmatter, body));
     },
 
@@ -79,24 +90,42 @@ export const createVaultService = (): VaultService => {
       const markdownFiles = await walkMarkdownFiles(vaultPath);
 
       return markdownFiles
-        .map((absolutePath) => absolutePath.slice(vaultPath.replace(/\/+$/u, '').length + 1))
+        .map((absolutePath) => relativeVaultPath(vaultPath, absolutePath))
         .filter((relativePath) => (suffix ? relativePath.endsWith(suffix) : true));
     },
 
     watch(onChange: (path: string) => void): () => void {
       const vaultPath = requireVaultPath();
-      let unsubscribe: (() => void) | null = null;
+      let cancelled = false;
 
-      void watch(vaultPath, (event) => {
-        for (const path of event.paths) {
-          onChange(path);
-        }
-      }, { recursive: true }).then((nextUnsubscribe) => {
-        unsubscribe = nextUnsubscribe;
-      });
+      const pendingUnwatch = watch(
+        vaultPath,
+        (event) => {
+          for (const path of event.paths) {
+            onChange(path);
+          }
+        },
+        { recursive: true },
+      )
+        .then((unsubscribe) => {
+          if (cancelled) {
+            unsubscribe();
+          }
+
+          return unsubscribe;
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            console.warn('Vault watch registration failed.', error);
+          }
+          return () => undefined;
+        });
 
       return () => {
-        unsubscribe?.();
+        cancelled = true;
+        void pendingUnwatch.then((unsubscribe) => {
+          unsubscribe();
+        });
       };
     },
   };

@@ -8,7 +8,7 @@
     "dialog:default",
     "sql:default",
     "keyring:default",
-    "allow-get-opencode-url",
+    "allow-get-opencode-connection",
     "allow-oauth-flow",
     "fs:default",
     "fs:allow-home-read-recursive",

@@ -10,10 +10,14 @@ export const GOOGLE_SCOPES = [
 ] as const;
 
 export const KEYRING_SERVICE = 'tinker';
-export const CODEX_TOKEN_ACCOUNT = 'codex-token';
 export const GOOGLE_SESSION_ACCOUNT = 'google-session';
 export const ONBOARDING_KEY = 'tinker:onboarded';
 export const VAULT_PATH_KEY = 'tinker:vault-path';
 export const DEFAULT_USER_ID = 'local-user';
 
 export type GoogleOAuthSession = SSOSession;
+export type OpencodeConnection = {
+  baseUrl: string;
+  username: string;
+  password: string;
+};

@@ -1,22 +1,50 @@
 import { readDir } from '@tauri-apps/plugin-fs';
 import { dump, load } from 'js-yaml';
 
-const normalizeRoot = (root: string): string => root.replace(/\/+$/u, '');
+const PATH_SEPARATOR_PATTERN = /[\\/]+/u;
+const TRAILING_SEPARATOR_PATTERN = /[\\/]+$/u;
+const LEADING_SEPARATOR_PATTERN = /^[\\/]+/u;
+
+const getPathSeparator = (path: string): '/' | '\\' => {
+  return path.includes('\\') ? '\\' : '/';
+};
+
+const normalizeRoot = (root: string): string => root.replace(TRAILING_SEPARATOR_PATTERN, '');
+
+const normalizeRelativePath = (value: string): string => {
+  return value
+    .replace(LEADING_SEPARATOR_PATTERN, '')
+    .split(PATH_SEPARATOR_PATTERN)
+    .filter((segment) => segment.length > 0)
+    .join('/');
+};
 
 const toAbsolutePath = (directory: string, name: string): string => {
+  const separator = getPathSeparator(directory);
   const normalizedDirectory = normalizeRoot(directory);
-  return normalizedDirectory.length > 0 ? `${normalizedDirectory}/${name}` : name;
+  return normalizedDirectory.length > 0 ? `${normalizedDirectory}${separator}${name}` : name;
 };
 
 export const relativeVaultPath = (root: string, absolutePath: string): string => {
   const normalizedRoot = normalizeRoot(root);
-  return absolutePath.startsWith(`${normalizedRoot}/`) ? absolutePath.slice(normalizedRoot.length + 1) : absolutePath;
+  const normalizedRootPath = normalizedRoot.split(PATH_SEPARATOR_PATTERN).join('/');
+  const normalizedAbsolutePath = absolutePath.split(PATH_SEPARATOR_PATTERN).join('/');
+
+  if (normalizedAbsolutePath === normalizedRootPath) {
+    return '';
+  }
+
+  const rootPrefix = `${normalizedRootPath}/`;
+  return normalizedAbsolutePath.startsWith(rootPrefix)
+    ? normalizedAbsolutePath.slice(rootPrefix.length)
+    : normalizeRelativePath(absolutePath);
 };
 
 export const resolveVaultPath = (root: string, relativePath: string): string => {
+  const separator = getPathSeparator(root);
   const normalizedRoot = normalizeRoot(root);
-  const normalizedRelativePath = relativePath.replace(/^\/+/u, '');
-  return normalizedRelativePath.length > 0 ? `${normalizedRoot}/${normalizedRelativePath}` : normalizedRoot;
+  const normalizedRelativePath = normalizeRelativePath(relativePath).replaceAll('/', separator);
+  return normalizedRelativePath.length > 0 ? `${normalizedRoot}${separator}${normalizedRelativePath}` : normalizedRoot;
 };
 
 export const walkVaultFiles = async (
@@ -35,6 +63,10 @@ export const walkVaultFiles = async (
     const entries = await readDir(directory);
 
     for (const entry of entries) {
+      if (entry.isSymlink) {
+        continue;
+      }
+
       const absolutePath = toAbsolutePath(directory, entry.name);
 
       if (entry.isDirectory) {
@@ -56,23 +88,23 @@ export const walkMarkdownFiles = async (root: string): Promise<string[]> => {
 };
 
 export const parseFrontmatter = (text: string): { frontmatter: Record<string, unknown>; body: string } => {
-  if (!text.startsWith('---\n')) {
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u);
+
+  if (!match) {
     return { frontmatter: {}, body: text };
   }
 
-  const boundary = text.indexOf('\n---\n', 4);
-  if (boundary < 0) {
+  const [, rawFrontmatter = '', body = ''] = match;
+
+  try {
+    const parsed = load(rawFrontmatter);
+    return {
+      frontmatter: parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? { ...parsed } : {},
+      body,
+    };
+  } catch {
     return { frontmatter: {}, body: text };
   }
-
-  const rawFrontmatter = text.slice(4, boundary);
-  const body = text.slice(boundary + 5);
-  const parsed = load(rawFrontmatter);
-
-  return {
-    frontmatter: parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? { ...parsed } : {},
-    body,
-  };
 };
 
 export const serializeFrontmatter = (frontmatter: Record<string, unknown>, body: string): string => {
@@ -88,7 +120,7 @@ export const serializeFrontmatter = (frontmatter: Record<string, unknown>, body:
     sortKeys: true,
   }).trimEnd();
 
-  return `---\n${serialized}\n---\n\n${body.replace(/^\n+/u, '')}`;
+  return body.length > 0 ? `---\n${serialized}\n---\n${body}` : `---\n${serialized}\n---\n`;
 };
 
 export const deriveNoteTitle = (relativePath: string, frontmatter: Record<string, unknown>, body: string): string => {

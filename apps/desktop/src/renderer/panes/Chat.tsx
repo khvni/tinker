@@ -1,7 +1,9 @@
-import { useMemo, useState, type JSX } from 'react';
-import { createOpencodeClient, type Message, type Part } from '@opencode-ai/sdk/v2/client';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import type { Message, Part } from '@opencode-ai/sdk/v2/client';
 import { injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import type { MemoryStore } from '@tinker/shared-types';
+import type { OpencodeConnection } from '../../bindings.js';
+import { createWorkspaceClient, getOpencodeDirectory } from '../opencode.js';
 
 type ChatMessage = {
   id: string;
@@ -10,8 +12,10 @@ type ChatMessage = {
 };
 
 type ChatProps = {
-  opencodeUrl: string;
   memoryStore: MemoryStore;
+  modelConnected: boolean;
+  opencode: OpencodeConnection;
+  vaultPath: string | null;
 };
 
 const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessage[] => {
@@ -29,18 +33,38 @@ const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): Chat
   });
 };
 
-export const Chat = ({ memoryStore, opencodeUrl }: ChatProps): JSX.Element => {
-  const client = useMemo(() => createOpencodeClient({ baseUrl: opencodeUrl }), [opencodeUrl]);
-  const [sessionID, setSessionID] = useState<string | null>(null);
+export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath }: ChatProps): JSX.Element => {
+  const client = useMemo(
+    () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
+    [opencode.baseUrl, opencode.password, opencode.username, vaultPath],
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('OpenCode is ready.');
+  const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect GPT-5.4 in Settings to start chatting.');
+  const mountedRef = useRef(true);
+  const sessionIDRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      const activeSessionID = sessionIDRef.current;
+      if (activeSessionID) {
+        void client.session.abort({ sessionID: activeSessionID });
+      }
+    };
+  }, [client]);
+
+  useEffect(() => {
+    setStatus(modelConnected ? 'OpenCode is ready.' : 'Connect GPT-5.4 in Settings to start chatting.');
+  }, [modelConnected]);
 
   const ensureSession = async (): Promise<string> => {
-    if (sessionID) {
-      return sessionID;
+    if (sessionIDRef.current) {
+      return sessionIDRef.current;
     }
 
     const response = await client.session.create({ title: 'Tinker Chat' });
@@ -49,23 +73,19 @@ export const Chat = ({ memoryStore, opencodeUrl }: ChatProps): JSX.Element => {
       throw new Error('OpenCode did not return a session.');
     }
 
-    const nextSessionID = session.id;
-    setSessionID(nextSessionID);
-    return nextSessionID;
+    sessionIDRef.current = session.id;
+    return session.id;
   };
 
   const sendMessage = async (): Promise<void> => {
     const text = input.trim();
-    if (!text || busy) {
+    if (!text || busy || !modelConnected) {
       return;
     }
 
     setBusy(true);
     setStatus('Waiting for OpenCode…');
-    setMessages((current) => [
-      ...current,
-      { id: `user-${Date.now()}`, role: 'user', text },
-    ]);
+    setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', text }]);
     setInput('');
     setDraft('');
 
@@ -77,6 +97,10 @@ export const Chat = ({ memoryStore, opencodeUrl }: ChatProps): JSX.Element => {
       const stream = streamSessionEvents(client, activeSessionID);
       const consumeStream = (async () => {
         for await (const event of stream) {
+          if (!mountedRef.current) {
+            return;
+          }
+
           if (event.type === 'token') {
             setDraft((current) => current + event.text);
           } else if (event.type === 'tool_call') {
@@ -98,9 +122,15 @@ export const Chat = ({ memoryStore, opencodeUrl }: ChatProps): JSX.Element => {
       await consumeStream;
 
       const history = await client.session.messages({ sessionID: activeSessionID, limit: 24 });
-      setMessages(formatMessages(history.data ?? []));
-      setDraft('');
+      if (mountedRef.current) {
+        setMessages(formatMessages(history.data ?? []));
+        setDraft('');
+      }
     } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
       setMessages((current) => [
         ...current,
         {
@@ -111,7 +141,9 @@ export const Chat = ({ memoryStore, opencodeUrl }: ChatProps): JSX.Element => {
       ]);
       setStatus('Chat hit an error.');
     } finally {
-      setBusy(false);
+      if (mountedRef.current) {
+        setBusy(false);
+      }
     }
   };
 
@@ -128,7 +160,9 @@ export const Chat = ({ memoryStore, opencodeUrl }: ChatProps): JSX.Element => {
       <div className="tinker-chat-log">
         {messages.length === 0 ? (
           <div className="tinker-message tinker-message--system">
-            Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.
+            {modelConnected
+              ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+              : 'Connect GPT-5.4 in Settings before sending a message.'}
           </div>
         ) : null}
 
@@ -146,10 +180,15 @@ export const Chat = ({ memoryStore, opencodeUrl }: ChatProps): JSX.Element => {
           value={input}
           placeholder="Ask about the vault, your project, or the next change to make."
           onChange={(event) => setInput(event.currentTarget.value)}
-          disabled={busy}
+          disabled={busy || !modelConnected}
         />
         <div className="tinker-inline-actions">
-          <button className="tinker-button" type="button" onClick={sendMessage} disabled={busy || input.trim().length === 0}>
+          <button
+            className="tinker-button"
+            type="button"
+            onClick={sendMessage}
+            disabled={busy || !modelConnected || input.trim().length === 0}
+          >
             {busy ? 'Streaming…' : 'Send message'}
           </button>
         </div>

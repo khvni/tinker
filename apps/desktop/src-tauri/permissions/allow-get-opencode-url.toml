@@ -1,7 +1,0 @@
-[[permission]]
-identifier = "allow-get-opencode-url"
-description = "Allows the frontend to read the local OpenCode base URL."
-
-[permission.commands]
-allow = ["get_opencode_url"]
-deny = []

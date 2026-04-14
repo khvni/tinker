@@ -4,9 +4,10 @@ import type { Entity, MemoryStore } from '@tinker/shared-types';
 type TodayProps = {
   memoryStore: MemoryStore;
   vaultPath: string | null;
+  vaultRevision: number;
 };
 
-export const Today = ({ memoryStore, vaultPath }: TodayProps): JSX.Element => {
+export const Today = ({ memoryStore, vaultPath, vaultRevision }: TodayProps): JSX.Element => {
   const [entities, setEntities] = useState<Entity[]>([]);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export const Today = ({ memoryStore, vaultPath }: TodayProps): JSX.Element => {
     return () => {
       active = false;
     };
-  }, [memoryStore]);
+  }, [memoryStore, vaultPath, vaultRevision]);
 
   return (
     <section className="tinker-pane">

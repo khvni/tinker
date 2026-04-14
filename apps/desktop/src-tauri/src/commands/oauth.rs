@@ -84,7 +84,7 @@ fn parse_callback_request(request: &str) -> Result<HashMap<String, String>, Stri
   Ok(url.query_pairs().into_owned().collect())
 }
 
-async fn read_authorization_code(state: &str) -> Result<(String, String), String> {
+async fn read_authorization_code(state: &str, challenge: &str) -> Result<(String, String), String> {
   let listener = TcpListener::bind("127.0.0.1:0")
     .await
     .map_err(|error| error.to_string())?;
@@ -101,6 +101,7 @@ async fn read_authorization_code(state: &str) -> Result<(String, String), String
       ("response_type", "code".to_string()),
       ("scope", GOOGLE_SCOPES.join(" ")),
       ("state", state.to_string()),
+      ("code_challenge", challenge.to_string()),
       ("code_challenge_method", "S256".to_string()),
       ("access_type", "offline".to_string()),
       ("prompt", "consent".to_string()),
@@ -149,7 +150,7 @@ pub async fn oauth_flow() -> Result<GoogleOAuthSession, String> {
   let state = random_url_safe(24);
   let verifier = random_url_safe(48);
   let challenge = pkce_challenge(&verifier);
-  let (code, redirect_uri) = read_authorization_code(&state).await?;
+  let (code, redirect_uri) = read_authorization_code(&state, &challenge).await?;
 
   let token = reqwest::Client::new()
     .post(GOOGLE_TOKEN_URL)
@@ -159,7 +160,6 @@ pub async fn oauth_flow() -> Result<GoogleOAuthSession, String> {
       ("code_verifier", verifier),
       ("grant_type", "authorization_code".to_string()),
       ("redirect_uri", redirect_uri),
-      ("code_challenge", challenge),
     ])
     .send()
     .await

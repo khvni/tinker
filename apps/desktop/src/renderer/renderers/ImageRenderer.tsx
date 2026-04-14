@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { readFile } from '@tauri-apps/plugin-fs';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { getImageMimeType, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
@@ -7,6 +7,7 @@ export const ImageRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): 
   const path = params?.path;
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!path) {
@@ -16,19 +17,35 @@ export const ImageRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): 
     }
 
     let active = true;
-    let objectUrl: string | null = null;
+
+    const revokeObjectUrl = (value: string | null): void => {
+      if (value) {
+        URL.revokeObjectURL(value);
+      }
+    };
 
     void (async () => {
       try {
         setError(null);
         const bytes = await readFile(path);
         const blob = new Blob([bytes], { type: getImageMimeType(path) });
-        objectUrl = URL.createObjectURL(blob);
-        if (active) {
-          setSrc(objectUrl);
+        const nextObjectUrl = URL.createObjectURL(blob);
+
+        if (!active) {
+          revokeObjectUrl(nextObjectUrl);
+          return;
         }
+
+        const previousObjectUrl = objectUrlRef.current;
+        objectUrlRef.current = nextObjectUrl;
+        setSrc(nextObjectUrl);
+        revokeObjectUrl(previousObjectUrl);
       } catch (nextError) {
         if (active) {
+          if (objectUrlRef.current) {
+            revokeObjectUrl(objectUrlRef.current);
+            objectUrlRef.current = null;
+          }
           setError(nextError instanceof Error ? nextError.message : String(nextError));
           setSrc(null);
         }
@@ -37,8 +54,9 @@ export const ImageRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): 
 
     return () => {
       active = false;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
     };
   }, [path]);

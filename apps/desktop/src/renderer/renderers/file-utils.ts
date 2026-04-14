@@ -31,12 +31,12 @@ const CODE_LANGUAGE_BY_EXTENSION: Record<string, string> = {
 };
 
 export const getFileExtension = (path: string): string => {
-  const match = path.toLowerCase().match(/(\.[^.\/]+)$/u);
+  const match = path.toLowerCase().match(/(\.[^./]+)$/u);
   return match?.[1] ?? '';
 };
 
 export const getPanelTitleForPath = (path: string): string => {
-  const segments = path.split('/');
+  const segments = path.split(/[\\/]/u);
   return segments.at(-1) ?? path;
 };
 

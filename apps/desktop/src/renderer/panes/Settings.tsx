@@ -2,19 +2,29 @@ import type { JSX } from 'react';
 import type { SSOSession } from '@tinker/shared-types';
 
 type SettingsProps = {
+  modelConnected: boolean;
+  modelAuthBusy: boolean;
+  modelAuthMessage: string | null;
   session: SSOSession | null;
   vaultPath: string | null;
+  onConnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
+  onDisconnectModel(): Promise<void>;
   onDisconnectGoogle(): Promise<void>;
   onCreateVault(): Promise<void>;
   onSelectVault(): Promise<void>;
 };
 
 export const Settings = ({
+  modelAuthBusy,
+  modelAuthMessage,
+  modelConnected,
+  onConnectModel,
   session,
   vaultPath,
   onConnectGoogle,
   onCreateVault,
+  onDisconnectModel,
   onDisconnectGoogle,
   onSelectVault,
 }: SettingsProps): JSX.Element => {
@@ -28,6 +38,27 @@ export const Settings = ({
       </header>
 
       <div className="tinker-list">
+        <article className="tinker-list-item">
+          <h3>GPT-5.4</h3>
+          <p className="tinker-muted">
+            {modelConnected
+              ? 'Connected through OpenCode.'
+              : 'Not connected yet. Tinker asks OpenCode to run the provider OAuth flow instead of owning separate OpenAI token plumbing.'}
+          </p>
+          {modelAuthMessage ? <p className="tinker-muted">{modelAuthMessage}</p> : null}
+          <div className="tinker-inline-actions">
+            {modelConnected ? (
+              <button className="tinker-button-secondary" type="button" onClick={() => void onDisconnectModel()} disabled={modelAuthBusy}>
+                Disconnect GPT-5.4
+              </button>
+            ) : (
+              <button className="tinker-button" type="button" onClick={() => void onConnectModel()} disabled={modelAuthBusy}>
+                {modelAuthBusy ? 'Connecting…' : 'Connect GPT-5.4'}
+              </button>
+            )}
+          </div>
+        </article>
+
         <article className="tinker-list-item">
           <h3>Google</h3>
           <p className="tinker-muted">

@@ -41,6 +41,26 @@ const tokenizeQuery = (query: string): string | null => {
   return terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(' OR ');
 };
 
+const deleteEntityRecord = async (database: Awaited<ReturnType<typeof getDatabase>>, id: string): Promise<void> => {
+  await database.execute('DELETE FROM entities WHERE id = $1', [id]);
+  await database.execute('DELETE FROM entities_fts WHERE id = $1', [id]);
+};
+
+const getVaultEntityIds = async (database: Awaited<ReturnType<typeof getDatabase>>): Promise<string[]> => {
+  const rows = await database.select<Array<{ id: string; sources_json: string }>>('SELECT id, sources_json FROM entities');
+
+  return rows
+    .filter((row) => {
+      try {
+        const sources = JSON.parse(row.sources_json) as EntitySource[];
+        return sources.some((source) => source.integration === 'vault');
+      } catch {
+        return false;
+      }
+    })
+    .map((row) => row.id);
+};
+
 export const createMemoryStore = (): MemoryStore => {
   return {
     async upsertEntity(entity: Entity): Promise<void> {
@@ -181,9 +201,15 @@ export const createMemoryStore = (): MemoryStore => {
 
 export const indexVault = async (vault: VaultConfig): Promise<{ entitiesIndexed: number }> => {
   const memoryStore = createMemoryStore();
+  const database = await getDatabase();
+  const staleVaultEntityIds = await getVaultEntityIds(database);
+  await Promise.all(staleVaultEntityIds.map((id) => deleteEntityRecord(database, id)));
   const files = await walkMarkdownFiles(vault.path);
-  const counts = await Promise.all(
-    files.map(async (absolutePath) => {
+
+  let entitiesIndexed = 0;
+
+  for (const absolutePath of files) {
+    try {
       const text = await readTextFile(absolutePath);
       const { frontmatter, body } = parseFrontmatter(text);
       const relativePath = relativeVaultPath(vault.path, absolutePath);
@@ -205,11 +231,13 @@ export const indexVault = async (vault: VaultConfig): Promise<{ entitiesIndexed:
 
       const extractedEntities = extractEntities(body, relativePath);
       await Promise.all(extractedEntities.map((entity) => memoryStore.upsertEntity(entity)));
-      return 1 + extractedEntities.length;
-    }),
-  );
+      entitiesIndexed += 1 + extractedEntities.length;
+    } catch (error) {
+      console.warn(`Skipping vault file during indexing: ${absolutePath}`, error);
+    }
+  }
 
-  return { entitiesIndexed: counts.reduce((total, count) => total + count, 0) };
+  return { entitiesIndexed };
 };
 
 export const runDailySynthesis = async (userId: string): Promise<{ summary: string }> => {

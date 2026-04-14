@@ -13,7 +13,11 @@ const renderMarkdown = async (text: string): Promise<string> => {
   return DOMPurify.sanitize(html);
 };
 
-export const MarkdownRenderer = ({ api, params }: IDockviewPanelProps<FilePaneParams>): JSX.Element => {
+type MarkdownRendererProps = IDockviewPanelProps<FilePaneParams> & {
+  vaultRevision: number;
+};
+
+export const MarkdownRenderer = ({ api, params, vaultRevision }: MarkdownRendererProps): JSX.Element => {
   const path = params?.path;
   const dockviewApi = useDockviewApi();
   const [html, setHtml] = useState('');
@@ -47,7 +51,7 @@ export const MarkdownRenderer = ({ api, params }: IDockviewPanelProps<FilePanePa
     return () => {
       active = false;
     };
-  }, [path]);
+  }, [path, vaultRevision]);
 
   const openEditor = (): void => {
     if (!dockviewApi || !path) {

@@ -10,6 +10,10 @@ type VaultBrowserParams = {
   vaultPath?: string | null;
 };
 
+type VaultBrowserProps = IDockviewPanelProps<VaultBrowserParams> & {
+  vaultRevision: number;
+};
+
 type GroupedFiles = Array<{
   directory: string;
   files: string[];
@@ -34,7 +38,11 @@ const groupFilesByDirectory = (vaultPath: string, absolutePaths: string[]): Grou
     }));
 };
 
-export const VaultBrowser = ({ params }: IDockviewPanelProps<VaultBrowserParams>): JSX.Element => {
+const getReferencePanelId = (dockviewApi: NonNullable<ReturnType<typeof useDockviewApi>>): string | null => {
+  return dockviewApi.activePanel?.id ?? dockviewApi.panels[0]?.id ?? null;
+};
+
+export const VaultBrowser = ({ params, vaultRevision }: VaultBrowserProps): JSX.Element => {
   const dockviewApi = useDockviewApi();
   const memoryStore = params?.memoryStore;
   const vaultPath = params?.vaultPath ?? null;
@@ -84,7 +92,7 @@ export const VaultBrowser = ({ params }: IDockviewPanelProps<VaultBrowserParams>
     return () => {
       active = false;
     };
-  }, [memoryStore, vaultPath]);
+  }, [memoryStore, vaultPath, vaultRevision]);
 
   const groupedFiles = useMemo(() => {
     return vaultPath ? groupFilesByDirectory(vaultPath, files) : [];
@@ -105,15 +113,20 @@ export const VaultBrowser = ({ params }: IDockviewPanelProps<VaultBrowserParams>
       return;
     }
 
+    const referencePanelId = getReferencePanelId(dockviewApi);
     dockviewApi.addPanel({
       id: panelId,
       component,
       title: getPanelTitleForPath(absolutePath),
       params: { path: absolutePath },
-      position: {
-        referencePanel: 'chat',
-        direction: 'right',
-      },
+      ...(referencePanelId
+        ? {
+            position: {
+              referencePanel: referencePanelId,
+              direction: 'right' as const,
+            },
+          }
+        : {}),
     });
   };
 

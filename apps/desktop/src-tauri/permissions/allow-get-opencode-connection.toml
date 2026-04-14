@@ -1,0 +1,7 @@
+[[permission]]
+identifier = "allow-get-opencode-connection"
+description = "Allows the frontend to read the active OpenCode connection details."
+
+[permission.commands]
+allow = ["get_opencode_connection"]
+deny = []

@@ -50,11 +50,6 @@ export const extractEntities = (text: string, source: string): Entity[] => {
     }
   }
 
-  const titleMatch = text.match(/^#\s+(.+)$/mu);
-  if (titleMatch?.[1]) {
-    addEntity('document', titleMatch[1]);
-  }
-
   for (const line of text.split('\n')) {
     if (line.startsWith('PROJECT:')) {
       addEntity('project', line.slice('PROJECT:'.length));
