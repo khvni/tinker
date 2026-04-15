@@ -3,8 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { homeDir, join } from '@tauri-apps/api/path';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
-import { createLayoutStore, createMemoryStore, createVaultService, indexVault } from '@tinker/memory';
-import type { LayoutStore, MemoryStore, SSOSession, VaultConfig } from '@tinker/shared-types';
+import { createLayoutStore, createMemoryStore, createSkillStore, createVaultService, indexVault } from '@tinker/memory';
+import type { LayoutStore, MemoryStore, SkillStore, SSOSession, VaultConfig } from '@tinker/shared-types';
 import { deletePassword, getPassword, setPassword } from 'tauri-plugin-keyring-api';
 import {
   DEFAULT_USER_ID,
@@ -23,12 +23,14 @@ type ReadyAppState = {
   status: 'ready';
   layoutStore: LayoutStore;
   memoryStore: MemoryStore;
+  skillStore: SkillStore;
   opencode: OpencodeConnection;
   session: SSOSession | null;
   vaultPath: string | null;
   onboarded: boolean;
   modelConnected: boolean;
   vaultRevision: number;
+  activeSkillsRevision: number;
 };
 
 type AppState =
@@ -249,6 +251,7 @@ const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath
 export const App = (): JSX.Element => {
   const memoryStore = useMemo(() => createMemoryStore(), []);
   const layoutStore = useMemo(() => createLayoutStore(), []);
+  const skillStore = useMemo(() => createSkillStore(), []);
   const vaultService = useMemo(() => createVaultService(), []);
   const [state, setState] = useState<AppState>({ status: 'loading' });
   const [modelAuthBusy, setModelAuthBusy] = useState(false);
@@ -283,6 +286,8 @@ export const App = (): JSX.Element => {
           const config = { path: vaultPath, isNew: false };
           await vaultService.init(config);
           await indexVault(config);
+          await skillStore.init(vaultPath);
+          await skillStore.reindex();
           vaultRevision = 1;
         }
 
@@ -296,12 +301,14 @@ export const App = (): JSX.Element => {
           status: 'ready',
           layoutStore,
           memoryStore,
+          skillStore,
           opencode,
           session,
           vaultPath,
           onboarded: window.localStorage.getItem(ONBOARDING_KEY) === '1',
           modelConnected,
           vaultRevision,
+          activeSkillsRevision: 0,
         });
       } catch (error) {
         if (!active) {
@@ -318,7 +325,7 @@ export const App = (): JSX.Element => {
     return () => {
       active = false;
     };
-  }, [layoutStore, memoryStore, vaultService]);
+  }, [layoutStore, memoryStore, skillStore, vaultService]);
 
   useEffect(() => {
     if (state.status !== 'ready' || !state.vaultPath) {
@@ -352,6 +359,7 @@ export const App = (): JSX.Element => {
 
       try {
         await indexVault({ path: activeVaultPath, isNew: false });
+        await skillStore.reindex();
 
         if (!active) {
           return;
@@ -392,7 +400,7 @@ export const App = (): JSX.Element => {
       }
       unsubscribe();
     };
-  }, [state.status, state.status === 'ready' ? state.vaultPath : null, vaultService]);
+  }, [state.status, state.status === 'ready' ? state.vaultPath : null, vaultService, skillStore]);
 
   if (state.status === 'loading') {
     return (
@@ -425,6 +433,8 @@ export const App = (): JSX.Element => {
   const setVaultPath = async (config: VaultConfig): Promise<void> => {
     await vaultService.init(config);
     await indexVault(config);
+    await skillStore.init(config.path);
+    await skillStore.reindex();
     window.localStorage.setItem(VAULT_PATH_KEY, config.path);
     const modelConnected = await probeModelConnection(state.opencode, config.path);
 
@@ -436,6 +446,18 @@ export const App = (): JSX.Element => {
             vaultPath: config.path,
             modelConnected,
             vaultRevision: current.vaultRevision + 1,
+            activeSkillsRevision: current.activeSkillsRevision + 1,
+          },
+    );
+  };
+
+  const handleActiveSkillsChanged = (): void => {
+    setState((current) =>
+      current.status !== 'ready'
+        ? current
+        : {
+            ...current,
+            activeSkillsRevision: current.activeSkillsRevision + 1,
           },
     );
   };
@@ -592,6 +614,7 @@ export const App = (): JSX.Element => {
           key={DEFAULT_USER_ID}
           layoutStore={state.layoutStore}
           memoryStore={state.memoryStore}
+          skillStore={state.skillStore}
           modelConnected={state.modelConnected}
           modelAuthBusy={modelAuthBusy}
           modelAuthMessage={modelAuthMessage}
@@ -601,12 +624,14 @@ export const App = (): JSX.Element => {
           session={state.session}
           vaultPath={state.vaultPath}
           vaultRevision={state.vaultRevision}
+          activeSkillsRevision={state.activeSkillsRevision}
           onConnectGoogle={handleGoogleConnect}
           onDisconnectGoogle={handleGoogleDisconnect}
           onConnectModel={handleConnectModel}
           onDisconnectModel={handleDisconnectModel}
           onCreateVault={handleCreateVault}
           onSelectVault={handlePickVault}
+          onActiveSkillsChanged={handleActiveSkillsChanged}
         />
       )}
     </div>

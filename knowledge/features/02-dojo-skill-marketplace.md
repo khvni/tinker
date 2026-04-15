@@ -1,7 +1,7 @@
 ---
 type: concept
 tags: [tinker, feature, skills, dojo, marketplace]
-status: not-started
+status: review
 priority: p1
 ---
 
@@ -75,11 +75,16 @@ tools: [optional tool allowlist]
 - `[2026-04-14]` User configures one Git remote per Tinker install (e.g., team Dojo)
 - `[2026-04-14]` Sync command: pull + merge + push in single action; conflicts surface as UI dialog
 - `[2026-04-14]` Skills path in remote repo: `skills/*.md` at root
+- `[2026-04-15]` **Implementation pivot**: shipped with `@tauri-apps/plugin-shell` `Command.create('git', ...)` instead of `simple-git` / `@napi-rs/simple-git`. `simple-git` itself spawns the git CLI under Node and does not run inside the Tauri webview; `@napi-rs/simple-git` bundles platform-native binaries and bloats the app. Shelling out to system git keeps bundle small, inherits the user's credential helper (SSH agent / Keychain / Credential Manager), and avoids a second Git implementation to keep in sync. Requires git on PATH; surfaced via `isGitAvailable()` + a visible notice in the Dojo pane.
+- `[2026-04-15]` Working tree is `<vault>/.tinker/` (not `.tinker/skills/`) so tracked paths match the spec's `skills/*.md` at repo root convention.
+- `[2026-04-15]` `shell:allow-execute` capability scoped to `{ name: "git", cmd: "git", args: true, sidecar: false }` in `apps/desktop/src-tauri/capabilities/default.json` — any future binary requires its own scope.
 
 ### 4. Runtime integration with OpenCode
 - `[2026-04-14]` On session start, bridge package injects active skills into the OpenCode system prompt or registers as sub-agents (TBD based on OpenCode SDK capabilities)
 - `[2026-04-14]` Sensei ([[05-sensei-skill-discovery]]) decides which subset to activate per session
 - `[2026-04-14]` User can manually toggle skill activation per session via UI
+- `[2026-04-15]` **Shipped**: prompt-injection path only. `packages/bridge/src/skill-injector.ts` sends all active skills as a single `noReply` text part when a session is created (mirrors the memory-injector pattern). Sub-agent registration is deferred to [[06-subagent-orchestration]].
+- `[2026-04-15]` Activation state lives in the `skills.active` column. Toggling a skill in the Dojo pane calls `onActiveSkillsChanged`, which bumps `App.activeSkillsRevision`; `Chat` watches that counter and aborts the current session so the next prompt opens a fresh session with the refreshed injection (avoids duplicating skill text across turns).
 
 ## Authoring Flow
 
@@ -108,12 +113,12 @@ tools: [optional tool allowlist]
 
 ## Acceptance Criteria
 
-- [ ] Skills list renders in a Dockview pane
-- [ ] User can author a new skill from a chat turn
-- [ ] User can install a skill from an arbitrary `.md` file
-- [ ] Git sync pulls and pushes skills to a configured remote
-- [ ] Skill frontmatter is indexed into SQLite for Sensei queries
-- [ ] Installed skills are activated in the OpenCode session
+- [x] Skills list renders in a Dockview pane (`apps/desktop/src/renderer/panes/Dojo.tsx`)
+- [x] User can author a new skill from a chat turn (Chat "Save as skill" button → Dojo pane prefilled draft)
+- [x] User can install a skill from an arbitrary `.md` file (Dojo "Install from file" button → `openDialog` → `SkillStore.installFromFile`)
+- [x] Git sync pulls and pushes skills to a configured remote (`packages/memory/src/skill-git.ts`, Dojo Git sync tab)
+- [x] Skill frontmatter is indexed into SQLite for Sensei queries (`skills` + `skills_fts` tables in `database.ts`, `SkillStore.search`)
+- [x] Installed skills are activated in the OpenCode session (`packages/bridge/src/skill-injector.ts` + `Chat.ensureSession`)
 
 ## Connections
 - [[05-sensei-skill-discovery]] — consumer of the skill index

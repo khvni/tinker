@@ -262,6 +262,18 @@ export const runDailySynthesis = async (userId: string): Promise<{ summary: stri
 
 export { createLayoutStore } from './layout-store.js';
 export { extractEntities } from './entity-extractor.js';
+export { createSkillStore } from './skill-service.js';
+export {
+  draftToSkillContent,
+  isSkillRelativePath,
+  isValidSkillSlug,
+  parseSkillFile,
+  serializeSkill,
+  skillRelativePath,
+  slugFromRelativePath,
+  slugify,
+} from './skill-parser.js';
+export { isGitAvailable, syncSkills } from './skill-git.js';
 export { createVaultService } from './vault-service.js';
 export { deriveNoteTitle, parseFrontmatter, relativeVaultPath, resolveVaultPath, serializeFrontmatter, walkMarkdownFiles, walkVaultFiles } from './vault-utils.js';
 export type { LayoutStore } from '@tinker/shared-types';

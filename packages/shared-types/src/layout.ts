@@ -3,6 +3,7 @@ export type PaneKind =
   | 'chat'
   | 'today'
   | 'settings'
+  | 'dojo'
   | 'markdown-editor'
   | 'file'
   | 'markdown'

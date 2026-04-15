@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent } from 'dockview-react';
-import type { LayoutStore, MemoryStore, SSOSession } from '@tinker/shared-types';
+import type { LayoutStore, MemoryStore, SkillStore, SSOSession } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, type OpencodeConnection } from '../../bindings.js';
 import { Chat } from '../panes/Chat.js';
+import { Dojo } from '../panes/Dojo.js';
 import { Settings } from '../panes/Settings.js';
 import { Today } from '../panes/Today.js';
 import { VaultBrowser } from '../panes/VaultBrowser.js';
@@ -19,6 +20,7 @@ import { DockviewApiContext } from './DockviewContext.js';
 type WorkspaceProps = {
   layoutStore: LayoutStore;
   memoryStore: MemoryStore;
+  skillStore: SkillStore;
   modelConnected: boolean;
   modelAuthBusy: boolean;
   modelAuthMessage: string | null;
@@ -28,17 +30,20 @@ type WorkspaceProps = {
   session: SSOSession | null;
   vaultPath: string | null;
   vaultRevision: number;
+  activeSkillsRevision: number;
   onConnectModel(): Promise<void>;
   onDisconnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
   onDisconnectGoogle(): Promise<void>;
   onCreateVault(): Promise<void>;
   onSelectVault(): Promise<void>;
+  onActiveSkillsChanged(): void;
 };
 
 export const Workspace = ({
   layoutStore,
   memoryStore,
+  skillStore,
   modelAuthBusy,
   modelAuthMessage,
   modelConnected,
@@ -50,10 +55,12 @@ export const Workspace = ({
   onDisconnectModel,
   onDisconnectGoogle,
   onSelectVault,
+  onActiveSkillsChanged,
   opencode,
   session,
   vaultPath,
   vaultRevision,
+  activeSkillsRevision,
 }: WorkspaceProps): JSX.Element => {
   const dockviewApiRef = useRef<DockviewApi | null>(null);
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
@@ -64,7 +71,16 @@ export const Workspace = ({
     () =>
       createPaneRegistry({
         'vault-browser': (props) => <VaultBrowser {...props} vaultRevision={vaultRevision} />,
-        chat: () => <Chat memoryStore={memoryStore} modelConnected={modelConnected} opencode={opencode} vaultPath={vaultPath} />,
+        chat: () => (
+          <Chat
+            memoryStore={memoryStore}
+            skillStore={skillStore}
+            modelConnected={modelConnected}
+            opencode={opencode}
+            vaultPath={vaultPath}
+            activeSkillsRevision={activeSkillsRevision}
+          />
+        ),
         today: () => <Today memoryStore={memoryStore} vaultPath={vaultPath} vaultRevision={vaultRevision} />,
         settings: () => (
           <Settings
@@ -83,6 +99,7 @@ export const Workspace = ({
             onSelectVault={onSelectVault}
           />
         ),
+        dojo: (props) => <Dojo {...props} />,
         file: (props) => <CodeRenderer {...props} />,
         markdown: (props) => <MarkdownRenderer {...props} vaultRevision={vaultRevision} />,
         html: (props) => <HtmlRenderer {...props} />,
@@ -92,7 +109,9 @@ export const Workspace = ({
         'markdown-editor': (props) => <MarkdownEditor {...props} vaultRevision={vaultRevision} />,
       }),
     [
+      activeSkillsRevision,
       memoryStore,
+      skillStore,
       modelAuthBusy,
       modelAuthMessage,
       modelConnected,
@@ -122,6 +141,7 @@ export const Workspace = ({
       } else {
         applyDefaultLayout(event.api, {
           memoryStore,
+          skillStore,
           vaultPath,
         });
       }
@@ -132,6 +152,16 @@ export const Workspace = ({
           panel.api.updateParameters({
             memoryStore,
             vaultPath,
+          });
+        });
+
+      event.api.panels
+        .filter((panel) => panel.id === 'dojo')
+        .forEach((panel) => {
+          panel.api.updateParameters({
+            skillStore,
+            vaultPath,
+            onActiveSkillsChanged,
           });
         });
 
@@ -162,31 +192,66 @@ export const Workspace = ({
         });
       });
 
-    if (!vaultPath || api.panels.some((panel) => panel.id === 'vault-browser')) {
+    api.panels
+      .filter((panel) => panel.id === 'dojo')
+      .forEach((panel) => {
+        panel.api.updateParameters({
+          skillStore,
+          vaultPath,
+          onActiveSkillsChanged,
+        });
+      });
+
+    if (!vaultPath) {
       return;
     }
 
-    const referencePanelId = getReferencePanelId(api);
-    api.addPanel({
-      id: 'vault-browser',
-      component: 'vault-browser',
-      title: 'Vault',
-      params: {
-        memoryStore,
-        vaultPath,
-      },
-      initialWidth: 280,
-      inactive: true,
-      ...(referencePanelId
-        ? {
-            position: {
-              referencePanel: referencePanelId,
-              direction: 'left' as const,
-            },
-          }
-        : {}),
-    });
-  }, [dockviewApi, memoryStore, vaultPath]);
+    if (!api.panels.some((panel) => panel.id === 'vault-browser')) {
+      const referencePanelId = getReferencePanelId(api);
+      api.addPanel({
+        id: 'vault-browser',
+        component: 'vault-browser',
+        title: 'Vault',
+        params: {
+          memoryStore,
+          vaultPath,
+        },
+        initialWidth: 280,
+        inactive: true,
+        ...(referencePanelId
+          ? {
+              position: {
+                referencePanel: referencePanelId,
+                direction: 'left' as const,
+              },
+            }
+          : {}),
+      });
+    }
+
+    if (!api.panels.some((panel) => panel.id === 'dojo')) {
+      const referencePanelId = getReferencePanelId(api);
+      api.addPanel({
+        id: 'dojo',
+        component: 'dojo',
+        title: 'Dojo',
+        params: {
+          skillStore,
+          vaultPath,
+          onActiveSkillsChanged,
+        },
+        inactive: true,
+        ...(referencePanelId
+          ? {
+              position: {
+                referencePanel: referencePanelId,
+                direction: 'within' as const,
+              },
+            }
+          : {}),
+      });
+    }
+  }, [dockviewApi, memoryStore, skillStore, vaultPath, onActiveSkillsChanged]);
 
   return (
     <main className="tinker-workspace-shell">

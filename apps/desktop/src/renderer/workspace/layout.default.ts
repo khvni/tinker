@@ -1,8 +1,9 @@
-import type { MemoryStore } from '@tinker/shared-types';
+import type { MemoryStore, SkillStore } from '@tinker/shared-types';
 import type { DockviewApi } from 'dockview-react';
 
 type DefaultLayoutOptions = {
   memoryStore: MemoryStore;
+  skillStore: SkillStore;
   vaultPath: string | null;
 };
 
@@ -59,4 +60,21 @@ export const applyDefaultLayout = (api: DockviewApi, options: DefaultLayoutOptio
       direction: 'within',
     },
   });
+
+  if (options.vaultPath) {
+    api.addPanel({
+      id: 'dojo',
+      component: 'dojo',
+      title: 'Dojo',
+      inactive: true,
+      params: {
+        skillStore: options.skillStore,
+        vaultPath: options.vaultPath,
+      },
+      position: {
+        referencePanel: 'today',
+        direction: 'within',
+      },
+    });
+  }
 };

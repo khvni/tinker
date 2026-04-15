@@ -33,6 +33,35 @@ const schema = [
     dockview_model_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS skills (
+    slug TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    tools_json TEXT NOT NULL,
+    tags_json TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    frontmatter_json TEXT NOT NULL,
+    body TEXT NOT NULL,
+    last_modified TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 0,
+    installed_at TEXT NOT NULL
+  )`,
+  `CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts USING fts5(
+    slug UNINDEXED,
+    title,
+    description,
+    tags,
+    tools,
+    body
+  )`,
+  `CREATE TABLE IF NOT EXISTS skill_git_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    remote_url TEXT NOT NULL,
+    branch TEXT NOT NULL,
+    author_name TEXT,
+    author_email TEXT,
+    updated_at TEXT NOT NULL
+  )`,
 ];
 
 const bootstrap = async (database: Database): Promise<Database> => {

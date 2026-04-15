@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./layout": "./src/layout.ts",
     "./memory": "./src/memory.ts",
+    "./skill": "./src/skill.ts",
     "./sso": "./src/sso.ts",
     "./vault": "./src/vault.ts"
   },

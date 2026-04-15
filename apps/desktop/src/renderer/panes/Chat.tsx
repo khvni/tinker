@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
-import type { MemoryStore } from '@tinker/shared-types';
+import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
+import { slugify } from '@tinker/memory';
+import type { MemoryStore, SkillDraft, SkillStore } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../bindings.js';
 import { createWorkspaceClient, getOpencodeDirectory } from '../opencode.js';
+import { useDockviewApi } from '../workspace/DockviewContext.js';
 
 type ChatMessage = {
   id: string;
@@ -13,9 +15,23 @@ type ChatMessage = {
 
 type ChatProps = {
   memoryStore: MemoryStore;
+  skillStore: SkillStore;
   modelConnected: boolean;
   opencode: OpencodeConnection;
   vaultPath: string | null;
+  activeSkillsRevision: number;
+};
+
+const deriveSkillSlug = (text: string): string => {
+  const firstLine = text.split('\n').find((line) => line.trim().length > 0) ?? 'new-skill';
+  const trimmed = firstLine.replace(/^#+\s*/u, '').slice(0, 80);
+  const slug = slugify(trimmed);
+  return slug.length > 0 ? slug : 'new-skill';
+};
+
+const deriveSkillDescription = (text: string): string => {
+  const cleaned = text.replace(/[#*`]/gu, '').trim().replace(/\s+/gu, ' ');
+  return cleaned.length > 160 ? `${cleaned.slice(0, 157)}…` : cleaned;
 };
 
 const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessage[] => {
@@ -33,11 +49,19 @@ const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): Chat
   });
 };
 
-export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath }: ChatProps): JSX.Element => {
+export const Chat = ({
+  memoryStore,
+  skillStore,
+  modelConnected,
+  opencode,
+  vaultPath,
+  activeSkillsRevision,
+}: ChatProps): JSX.Element => {
   const client = useMemo(
     () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
     [opencode.baseUrl, opencode.password, opencode.username, vaultPath],
   );
+  const dockviewApi = useDockviewApi();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [input, setInput] = useState('');
@@ -63,6 +87,16 @@ export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath }: ChatP
     setStatus(modelConnected ? 'OpenCode is ready.' : 'Connect GPT-5.4 in Settings to start chatting.');
   }, [modelConnected]);
 
+  useEffect(() => {
+    // When the active skill set changes, abandon the current session so the next
+    // prompt spins up a fresh session with the refreshed skill injection.
+    const existing = sessionIDRef.current;
+    sessionIDRef.current = null;
+    if (existing) {
+      void client.session.abort({ sessionID: existing });
+    }
+  }, [activeSkillsRevision, client]);
+
   const ensureSession = async (): Promise<string> => {
     if (sessionIDRef.current) {
       return sessionIDRef.current;
@@ -75,7 +109,65 @@ export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath }: ChatP
     }
 
     sessionIDRef.current = session.id;
+
+    try {
+      const activeSkills = await skillStore.getActive();
+      if (activeSkills.length > 0) {
+        await injectActiveSkills(client, session.id, activeSkills);
+      }
+    } catch (error) {
+      console.warn('Failed to inject active skills into the session.', error);
+    }
+
     return session.id;
+  };
+
+  const openDojoWithDraft = (seedDraft: SkillDraft): void => {
+    if (!dockviewApi) {
+      return;
+    }
+
+    const existing = dockviewApi.panels.find((panel) => panel.id === 'dojo');
+    if (existing) {
+      existing.api.updateParameters({
+        skillStore,
+        vaultPath,
+        initialDraft: seedDraft,
+        focus: 'author',
+      });
+      existing.api.setActive();
+      return;
+    }
+
+    const referencePanelId = dockviewApi.activePanel?.id ?? dockviewApi.panels[0]?.id ?? null;
+    dockviewApi.addPanel({
+      id: 'dojo',
+      component: 'dojo',
+      title: 'Dojo',
+      params: {
+        skillStore,
+        vaultPath,
+        initialDraft: seedDraft,
+        focus: 'author',
+      },
+      ...(referencePanelId
+        ? {
+            position: {
+              referencePanel: referencePanelId,
+              direction: 'within' as const,
+            },
+          }
+        : {}),
+    });
+  };
+
+  const handleSaveAsSkill = (message: ChatMessage): void => {
+    const seed: SkillDraft = {
+      slug: deriveSkillSlug(message.text),
+      description: deriveSkillDescription(message.text),
+      body: message.text,
+    };
+    openDojoWithDraft(seed);
   };
 
   const sendMessage = async (): Promise<void> => {
@@ -169,7 +261,18 @@ export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath }: ChatP
 
         {messages.map((message) => (
           <div key={message.id} className={`tinker-message tinker-message--${message.role}`}>
-            {message.text}
+            <p className="tinker-message-text">{message.text}</p>
+            {message.role === 'assistant' && message.text.trim().length > 0 ? (
+              <div className="tinker-message-actions">
+                <button
+                  type="button"
+                  className="tinker-button-ghost tinker-button-ghost--small"
+                  onClick={() => handleSaveAsSkill(message)}
+                >
+                  Save as skill
+                </button>
+              </div>
+            ) : null}
           </div>
         ))}
 

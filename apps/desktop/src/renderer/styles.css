@@ -420,6 +420,234 @@ textarea {
   font-size: 0.8rem;
 }
 
+.tinker-dojo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tinker-dojo-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--tinker-panel-border);
+  padding-bottom: 0.5rem;
+}
+
+.tinker-dojo-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--tinker-muted);
+  padding: 0.35rem 0.7rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.tinker-dojo-tab--active {
+  color: var(--tinker-text);
+  background: rgba(125, 211, 252, 0.1);
+  border-color: rgba(125, 211, 252, 0.3);
+}
+
+.tinker-dojo-status {
+  color: var(--tinker-accent);
+  margin: 0;
+}
+
+.tinker-dojo-error {
+  color: #fca5a5;
+  margin: 0;
+}
+
+.tinker-dojo-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.6fr);
+  gap: 0.9rem;
+  overflow: hidden;
+  flex: 1;
+}
+
+.tinker-dojo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow: auto;
+}
+
+.tinker-dojo-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tinker-dojo-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tinker-dojo-item {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.tinker-dojo-item--selected {
+  border-color: rgba(125, 211, 252, 0.45);
+  background: rgba(125, 211, 252, 0.08);
+}
+
+.tinker-dojo-item-main {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.tinker-dojo-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tinker-dojo-item-title {
+  font-weight: 600;
+}
+
+.tinker-dojo-item-description {
+  color: var(--tinker-muted);
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.tinker-dojo-item-meta {
+  color: var(--tinker-muted);
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.tinker-dojo-item-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tinker-dojo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--tinker-muted);
+  font-size: 0.85rem;
+}
+
+.tinker-dojo-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: auto;
+  padding: 0.25rem 0.35rem;
+}
+
+.tinker-dojo-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.tinker-dojo-body-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  color: var(--tinker-text);
+  font-size: 0.9rem;
+}
+
+.tinker-dojo-author,
+.tinker-dojo-git {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.tinker-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: var(--tinker-muted);
+  font-size: 0.85rem;
+}
+
+.tinker-field > span {
+  font-weight: 500;
+}
+
+.tinker-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+  color: var(--tinker-text);
+  font-size: 0.9rem;
+}
+
+.tinker-input--textarea {
+  min-height: 180px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.tinker-pill--accent {
+  background: rgba(125, 211, 252, 0.15);
+  border-color: rgba(125, 211, 252, 0.4);
+  color: var(--tinker-accent);
+}
+
+.tinker-dojo-sync-report {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.tinker-message-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.tinker-message-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
+.tinker-button-ghost--small {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+}
+
 @media (max-width: 800px) {
   .tinker-stage,
   .tinker-first-run {

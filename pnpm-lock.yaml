@@ -131,6 +131,9 @@ importers:
       '@tauri-apps/plugin-fs':
         specifier: ^2.5.0
         version: 2.5.0
+      '@tauri-apps/plugin-shell':
+        specifier: ^2.3.5
+        version: 2.3.5
       '@tauri-apps/plugin-sql':
         specifier: ^2.4.0
         version: 2.4.0
