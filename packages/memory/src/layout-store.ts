@@ -1,10 +1,49 @@
 import type { LayoutState, LayoutStore } from '@tinker/shared-types';
 import { getDatabase } from './database.js';
 
-type LayoutRow = {
+export type LayoutRow = {
   version: number;
   dockview_model_json: string;
   updated_at: string;
+};
+
+export const CURRENT_LAYOUT_VERSION = 1 as const;
+
+const parseDockviewModel = (raw: string): unknown | null => {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+const isVersionCompatible = (version: number): version is 1 => {
+  return version === CURRENT_LAYOUT_VERSION;
+};
+
+export const hydrateLayoutRow = (row: LayoutRow | undefined, userId: string): LayoutState | null => {
+  if (!row) {
+    return null;
+  }
+
+  if (!isVersionCompatible(row.version)) {
+    console.warn(
+      `Ignoring stored layout for user ${userId}: version ${row.version} is not compatible with app version ${CURRENT_LAYOUT_VERSION}.`,
+    );
+    return null;
+  }
+
+  const model = parseDockviewModel(row.dockview_model_json);
+  if (model === null || typeof model !== 'object') {
+    console.warn(`Ignoring stored layout for user ${userId}: payload was not valid JSON.`);
+    return null;
+  }
+
+  return {
+    version: row.version,
+    dockviewModel: model,
+    updatedAt: row.updated_at,
+  };
 };
 
 export const createLayoutStore = (): LayoutStore => {
@@ -19,16 +58,7 @@ export const createLayoutStore = (): LayoutStore => {
         [userId],
       );
 
-      const row = rows[0];
-      if (!row) {
-        return null;
-      }
-
-      return {
-        version: row.version as 1,
-        dockviewModel: JSON.parse(row.dockview_model_json) as unknown,
-        updatedAt: row.updated_at,
-      };
+      return hydrateLayoutRow(rows[0], userId);
     },
 
     async save(userId: string, state: LayoutState): Promise<void> {

@@ -16,6 +16,7 @@ type ChatProps = {
   modelConnected: boolean;
   opencode: OpencodeConnection;
   vaultPath: string | null;
+  onFileWritten?: (path: string) => void;
 };
 
 const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessage[] => {
@@ -33,7 +34,7 @@ const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): Chat
   });
 };
 
-export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath }: ChatProps): JSX.Element => {
+export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath, onFileWritten }: ChatProps): JSX.Element => {
   const client = useMemo(
     () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
     [opencode.baseUrl, opencode.password, opencode.username, vaultPath],
@@ -108,6 +109,8 @@ export const Chat = ({ memoryStore, modelConnected, opencode, vaultPath }: ChatP
             setStatus(`Running ${event.name}…`);
           } else if (event.type === 'tool_result') {
             setStatus(`${event.name} finished.`);
+          } else if (event.type === 'file_written') {
+            onFileWritten?.(event.path);
           } else if (event.type === 'error') {
             setStatus(event.message);
           } else if (event.type === 'done') {

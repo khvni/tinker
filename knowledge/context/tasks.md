@@ -31,7 +31,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 | 04 | Native scheduler (cron-style scheduled prompts) | p1 | not started | [[04-native-scheduler]] | In-process scheduler with SQLite-persisted job definitions |
 | 05 | Sensei skill discovery (recommend skills based on role + connected tools) | p2 | not started | [[05-sensei-skill-discovery]] | Depends on Dojo being built first |
 | 06 | Sub-agent orchestration (OpenCode-native multi-agent patterns) | p2 | not started | [[06-subagent-orchestration]] | Use OpenCode SDK sub-agent primitives; no Latent Briefing (see [[decisions]]) |
-| 07 | Workspace persistence + split-pane UI (Dockview) | p1 | in progress | [[07-workspace-persistence]] | Dockview already chosen; layout serialization to SQLite |
+| 07 | Workspace persistence + split-pane UI (Dockview) | p1 | review | [[07-workspace-persistence]] | Debounced layout save, version-gated hydration with default fallback, agent-created files auto-open via Chat stream → Workspace dispatcher |
 
 ## Cross-cutting / Infrastructure
 
