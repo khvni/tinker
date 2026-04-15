@@ -472,6 +472,86 @@ textarea {
   white-space: pre;
 }
 
+.tinker-code-content {
+  display: block;
+  margin: 0;
+  color: var(--tinker-text);
+  font-family:
+    "SFMono-Regular",
+    "JetBrains Mono",
+    "Menlo",
+    "Monaco",
+    "Consolas",
+    monospace;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.tinker-code-content.hljs {
+  background: transparent;
+}
+
+.tinker-code-content .hljs-comment,
+.tinker-code-content .hljs-quote {
+  color: #8fa1b8;
+  font-style: italic;
+}
+
+.tinker-code-content .hljs-keyword,
+.tinker-code-content .hljs-selector-tag,
+.tinker-code-content .hljs-literal,
+.tinker-code-content .hljs-title,
+.tinker-code-content .hljs-section,
+.tinker-code-content .hljs-doctag {
+  color: #7dd3fc;
+}
+
+.tinker-code-content .hljs-string,
+.tinker-code-content .hljs-regexp,
+.tinker-code-content .hljs-addition,
+.tinker-code-content .hljs-attr {
+  color: #fbbf24;
+}
+
+.tinker-code-content .hljs-number,
+.tinker-code-content .hljs-symbol,
+.tinker-code-content .hljs-bullet,
+.tinker-code-content .hljs-meta,
+.tinker-code-content .hljs-link {
+  color: #fb7185;
+}
+
+.tinker-code-content .hljs-function .hljs-title,
+.tinker-code-content .hljs-built_in,
+.tinker-code-content .hljs-type {
+  color: #34d399;
+}
+
+.tinker-code-content .hljs-variable,
+.tinker-code-content .hljs-params,
+.tinker-code-content .hljs-property {
+  color: #e2e8f0;
+}
+
+.tinker-code-content .hljs-strong {
+  font-weight: 700;
+}
+
+.tinker-code-content .hljs-emphasis {
+  font-style: italic;
+}
+
+.tinker-code-content .hljs-deletion {
+  color: #fca5a5;
+}
+
+.tinker-code-content .hljs,
+.tinker-code-content .hljs-subst {
+  color: inherit;
+}
+
 .tinker-markdown-editor {
   flex: 1;
   min-height: 0;

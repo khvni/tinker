@@ -2,16 +2,20 @@ import { useEffect, useState, type JSX } from 'react';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { getCodeLanguage, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
+import { highlightCode, MAX_HIGHLIGHTABLE_CODE_LENGTH } from './code-highlighter.js';
 
 export const CodeRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JSX.Element => {
   const path = params?.path;
   const [content, setContent] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  const language = path ? getCodeLanguage(path) : 'plaintext';
 
   useEffect(() => {
     if (!path) {
       setError('Missing file path.');
       setContent('');
+      setHighlightedHtml(null);
       return;
     }
 
@@ -20,14 +24,23 @@ export const CodeRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): J
     void (async () => {
       try {
         setError(null);
+        setContent('');
+        setHighlightedHtml(null);
         const text = await readTextFile(path);
         if (active) {
           setContent(text);
+          if (text.length <= MAX_HIGHLIGHTABLE_CODE_LENGTH) {
+            const html = await highlightCode(text, language);
+            if (active) {
+              setHighlightedHtml(html);
+            }
+          }
         }
       } catch (nextError) {
         if (active) {
           setError(nextError instanceof Error ? nextError.message : String(nextError));
           setContent('');
+          setHighlightedHtml(null);
         }
       }
     })();
@@ -35,7 +48,7 @@ export const CodeRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): J
     return () => {
       active = false;
     };
-  }, [path]);
+  }, [language, path]);
 
   return (
     <section className="tinker-pane tinker-renderer-pane">
@@ -44,13 +57,20 @@ export const CodeRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): J
           <p className="tinker-eyebrow">Code</p>
           <h2>{path ? getPanelTitleForPath(path) : 'Untitled file'}</h2>
         </div>
-        {path ? <span className="tinker-pill">{getCodeLanguage(path)}</span> : null}
+        {path ? <span className="tinker-pill">{language}</span> : null}
       </header>
 
       {error ? <p className="tinker-muted">{error}</p> : null}
       {!error ? (
-        <pre className="tinker-code-block">
-          <code className={`language-${path ? getCodeLanguage(path) : 'plaintext'}`}>{content}</code>
+        <pre className={`tinker-code-block${highlightedHtml ? ' tinker-code-block--highlighted' : ''}`}>
+          {highlightedHtml ? (
+            <code
+              className={`tinker-code-content hljs language-${language}`}
+              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            />
+          ) : (
+            <code className={`tinker-code-content language-${language}`}>{content}</code>
+          )}
         </pre>
       ) : null}
     </section>
