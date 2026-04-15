@@ -73,10 +73,10 @@ export const FirstRun = ({
             </p>
             <div className="tinker-inline-actions">
               <button className="tinker-button-secondary" type="button" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
-                {googleAuthBusy ? 'Connecting…' : sessions.google ? 'Reconnect Google' : 'Connect Google'}
+                {googleAuthBusy ? 'Signing in…' : sessions.google ? 'Reconnect Google' : 'Sign in with Google'}
               </button>
               <button className="tinker-button-secondary" type="button" onClick={() => void onConnectGithub()} disabled={githubAuthBusy}>
-                {githubAuthBusy ? 'Connecting…' : sessions.github ? 'Reconnect GitHub' : 'Connect GitHub'}
+                {githubAuthBusy ? 'Signing in…' : sessions.github ? 'Reconnect GitHub' : 'Sign in with GitHub'}
               </button>
             </div>
             {googleAuthMessage ? <p className="tinker-muted">{googleAuthMessage}</p> : null}

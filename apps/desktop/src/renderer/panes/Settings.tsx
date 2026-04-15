@@ -88,7 +88,7 @@ export const Settings = ({
               </button>
             ) : (
               <button className="tinker-button" type="button" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
-                {googleAuthBusy ? 'Connecting…' : 'Connect Google'}
+                {googleAuthBusy ? 'Signing in…' : 'Sign in with Google'}
               </button>
             )}
           </div>
@@ -107,7 +107,7 @@ export const Settings = ({
               </button>
             ) : (
               <button className="tinker-button" type="button" onClick={() => void onConnectGithub()} disabled={githubAuthBusy}>
-                {githubAuthBusy ? 'Connecting…' : 'Connect GitHub'}
+                {githubAuthBusy ? 'Signing in…' : 'Sign in with GitHub'}
               </button>
             )}
           </div>

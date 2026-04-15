@@ -22,10 +22,11 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 ## Tinker Scope
 
 ### v1 Providers
-- `[2026-04-14]` **Google OAuth** (loopback flow) — primary, already in PRD. Unlocks Gmail, Calendar, Drive via pre-configured MCP servers
-- `[2026-04-14]` **GitHub OAuth** — secondary, covers developer sub-segment. Unlocks GitHub repos, issues, PRs via MCP
+- `[2026-04-15]` **Google OAuth via Better Auth** — primary. Unlocks Gmail, Calendar, Drive via pre-configured MCP servers
+- `[2026-04-15]` **GitHub OAuth via Better Auth** — secondary. Unlocks GitHub repos, issues, PRs via MCP
 
 ### v1 Pre-wired Integrations (MCP servers in `opencode.json`)
+- `[2026-04-15]` Better Auth docs MCP = remote `https://mcp.better-auth.com/mcp` for agent/editor setup help
 - `[2026-04-14]` `@google/gmail-mcp-server` — already in `opencode.json`
 - `[2026-04-14]` `@google/calendar-mcp-server` — already in `opencode.json`
 - `[2026-04-14]` `@google/drive-mcp-server` — already in `opencode.json`
@@ -36,8 +37,9 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 
 ### 1. Auth layer (Rust — Tauri plugin boundary)
 - `[2026-04-14]` `tauri-plugin-keyring` for system keychain storage of OAuth tokens
-- `[2026-04-14]` Google loopback OAuth command runs in Rust (`src-tauri/src/auth.rs` pattern) — opens browser → receives callback → stores token in keychain
-- `[2026-04-15]` GitHub auth uses device flow in desktop build. Reason: GitHub web-flow token exchange needs `client_secret`, while device flow works with `client_id` only and fits local-first desktop constraints
+- `[2026-04-15]` Better Auth runs as local Node sidecar inside desktop app. It owns social OAuth browser flow and stateless cookie/account handling
+- `[2026-04-15]` Rust still owns loopback callback listener, one-time ticket exchange, and final keychain persistence. Better Auth never becomes token source of record
+- `[2026-04-15]` Better Auth sidecar returns provider tokens through one-time `/desktop/session?ticket=...` bridge guarded by per-run shared secret header
 - `[2026-04-14]` Rust exposes minimal `invoke` commands: `auth_sign_in(provider)`, `auth_sign_out(provider)`, `auth_status()`
 
 ### 2. Connector activation (TypeScript — renderer)
@@ -53,8 +55,9 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 ## Security Boundaries
 
 - `[2026-04-14]` Tokens stored **only** in system keychain (never in files, never in SQLite)
+- `[2026-04-15]` Better Auth sidecar uses stateless cookie/account cookies only during browser sign-in. Flow signs out before handing ticket back to app callback
 - `[2026-04-14]` MCP server processes inherit tokens via env vars at spawn time — not passed across IPC
-- `[2026-04-14]` Rust auth commands use loopback redirect URIs (`http://127.0.0.1:<random-port>/callback`) — no wildcard domains
+- `[2026-04-15]` Rust auth commands use loopback redirect URIs (`http://127.0.0.1:<random-port>/callback`) and Better Auth local callback routes — no wildcard domains
 - `[2026-04-14]` Treat external content returned from MCP as untrusted prompt input (per CLAUDE.md §5)
 
 ## Out of Scope ([[decisions]])
@@ -68,13 +71,16 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 - How to handle MCP server disabled/enabled state when a user signs out of a provider mid-session
 - Whether to pre-bundle MCP server npm packages in the Tauri binary or resolve at first run (affects cold-start time)
 - Token refresh UX — silent refresh vs. user-initiated re-auth on 401
+- How packaged desktop builds should source Better Auth social client secrets outside dev-shell env vars
 
 ## Open-Source References
 
 - `tauri-plugin-keyring` — https://crates.io/crates/tauri-plugin-keyring
 - `@opencode-ai/sdk` auth API — https://opencode.ai/docs/sdk/
-- Google loopback OAuth guide — https://developers.google.com/identity/protocols/oauth2/native-app#loopback
-- GitHub Device Flow (alternative to loopback) — https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app
+- Better Auth introduction — https://better-auth.com/docs/introduction
+- Better Auth installation — https://better-auth.com/docs/installation
+- Better Auth basic usage — https://better-auth.com/docs/basic-usage
+- Better Auth MCP docs — https://better-auth.com/docs/ai-resources/mcp
 
 ## Acceptance Criteria
 

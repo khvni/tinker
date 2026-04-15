@@ -1,12 +1,14 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::TcpListener as StdTcpListener, path::PathBuf, sync::Mutex};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use chrono::{Duration, Utc};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_keyring::KeyringExt;
+use tauri_plugin_shell::{
+  process::{CommandChild, CommandEvent},
+  ShellExt,
+};
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
   net::TcpListener,
@@ -18,32 +20,56 @@ pub const KEYRING_SERVICE: &str = "tinker";
 pub const GOOGLE_SESSION_ACCOUNT: &str = "google-session";
 pub const GITHUB_SESSION_ACCOUNT: &str = "github-session";
 
-const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
-const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
-const GOOGLE_USERINFO_URL: &str = "https://www.googleapis.com/oauth2/v2/userinfo";
-const GOOGLE_CLIENT_ID_PLACEHOLDER: &str = "GOOGLE_OAUTH_CLIENT_ID_PLACEHOLDER";
-const GOOGLE_SCOPES: [&str; 6] = [
-  "openid",
-  "https://www.googleapis.com/auth/userinfo.profile",
-  "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/calendar.readonly",
-  "https://www.googleapis.com/auth/drive.readonly",
-];
+const BETTER_AUTH_TIMEOUT: TokioDuration = TokioDuration::from_secs(180);
+const BETTER_AUTH_HEALTH_RETRY_COUNT: usize = 20;
+const BETTER_AUTH_HEALTH_RETRY_DELAY: TokioDuration = TokioDuration::from_millis(500);
+const BETTER_AUTH_SECRET_HEADER: &str = "x-tinker-bridge-secret";
+const GOOGLE_CLIENT_ID_ENV: &str = "GOOGLE_OAUTH_CLIENT_ID";
+const GOOGLE_CLIENT_SECRET_ENV: &str = "GOOGLE_OAUTH_CLIENT_SECRET";
+const GITHUB_CLIENT_ID_ENV: &str = "GITHUB_OAUTH_CLIENT_ID";
+const GITHUB_CLIENT_SECRET_ENV: &str = "GITHUB_OAUTH_CLIENT_SECRET";
+const BETTER_AUTH_SECRET_ENV: &str = "TINKER_BETTER_AUTH_SECRET";
 
-const GITHUB_DEVICE_CODE_URL: &str = "https://github.com/login/device/code";
-const GITHUB_ACCESS_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
-const GITHUB_USER_URL: &str = "https://api.github.com/user";
-const GITHUB_EMAILS_URL: &str = "https://api.github.com/user/emails";
-const GITHUB_CLIENT_ID_PLACEHOLDER: &str = "GITHUB_OAUTH_CLIENT_ID_PLACEHOLDER";
-const GITHUB_SCOPES: [&str; 3] = ["read:user", "user:email", "repo"];
-const APP_USER_AGENT: &str = "tinker-desktop";
+#[derive(Clone)]
+struct BetterAuthRuntime {
+  base_url: String,
+  bridge_secret: String,
+}
+
+#[derive(Default)]
+pub struct BetterAuthState {
+  child: Mutex<Option<CommandChild>>,
+  runtime: Mutex<Option<BetterAuthRuntime>>,
+}
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthProvider {
   Google,
   Github,
+}
+
+impl AuthProvider {
+  fn as_str(self) -> &'static str {
+    match self {
+      AuthProvider::Google => "google",
+      AuthProvider::Github => "github",
+    }
+  }
+
+  fn display_name(self) -> &'static str {
+    match self {
+      AuthProvider::Google => "Google",
+      AuthProvider::Github => "GitHub",
+    }
+  }
+
+  fn env_names(self) -> (&'static str, &'static str) {
+    match self {
+      AuthProvider::Google => (GOOGLE_CLIENT_ID_ENV, GOOGLE_CLIENT_SECRET_ENV),
+      AuthProvider::Github => (GITHUB_CLIENT_ID_ENV, GITHUB_CLIENT_SECRET_ENV),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -73,75 +99,10 @@ pub struct AuthStatus {
   github: Option<SSOSession>,
 }
 
-#[derive(Deserialize)]
-struct GoogleTokenResponse {
-  access_token: String,
-  expires_in: i64,
-  refresh_token: Option<String>,
-  scope: String,
-}
-
-#[derive(Deserialize)]
-struct GoogleUserInfo {
-  id: String,
-  email: String,
-  name: String,
-  picture: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct GithubDeviceCodeResponse {
-  device_code: String,
-  user_code: String,
-  verification_uri: String,
-  verification_uri_complete: Option<String>,
-  expires_in: i64,
-  interval: Option<u64>,
-}
-
-#[derive(Clone, Deserialize)]
-struct GithubAccessTokenResponse {
-  access_token: Option<String>,
-  expires_in: Option<i64>,
-  refresh_token: Option<String>,
-  scope: Option<String>,
-  error: Option<String>,
-  error_description: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct GithubUser {
-  id: u64,
-  login: String,
-  email: Option<String>,
-  name: Option<String>,
-  avatar_url: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct GithubEmail {
-  email: String,
-  verified: bool,
-  primary: bool,
-}
-
-fn google_client_id() -> String {
-  std::env::var("GOOGLE_OAUTH_CLIENT_ID").unwrap_or_else(|_| GOOGLE_CLIENT_ID_PLACEHOLDER.to_string())
-}
-
-fn github_client_id() -> String {
-  std::env::var("GITHUB_OAUTH_CLIENT_ID").unwrap_or_else(|_| GITHUB_CLIENT_ID_PLACEHOLDER.to_string())
-}
-
 fn random_url_safe(bytes: usize) -> String {
   let mut buffer = vec![0_u8; bytes];
   OsRng.fill_bytes(&mut buffer);
   URL_SAFE_NO_PAD.encode(buffer)
-}
-
-fn pkce_challenge(verifier: &str) -> String {
-  let digest = Sha256::digest(verifier.as_bytes());
-  URL_SAFE_NO_PAD.encode(digest)
 }
 
 fn provider_account(provider: AuthProvider) -> &'static str {
@@ -167,10 +128,6 @@ fn parse_callback_request(request: &str) -> Result<HashMap<String, String>, Stri
 
 fn keyring_error(error: impl std::fmt::Display) -> String {
   format!("Keychain operation failed: {error}")
-}
-
-fn token_access_token(response: &GithubAccessTokenResponse) -> Option<&str> {
-  response.access_token.as_deref().filter(|token| !token.is_empty())
 }
 
 fn store_session<R: Runtime>(app: &AppHandle<R>, session: &SSOSession) -> Result<(), String> {
@@ -221,283 +178,318 @@ fn clear_session<R: Runtime>(app: &AppHandle<R>, provider: AuthProvider) -> Resu
     .map_err(keyring_error)
 }
 
-async fn read_google_authorization_code(state: &str, challenge: &str) -> Result<(String, String), String> {
-  let listener = TcpListener::bind("127.0.0.1:0")
+fn optional_env(name: &str) -> Option<String> {
+  std::env::var(name).ok().filter(|value| !value.trim().is_empty())
+}
+
+fn require_provider_configuration(provider: AuthProvider) -> Result<(), String> {
+  let (client_id_env, client_secret_env) = provider.env_names();
+
+  if optional_env(client_id_env).is_some() && optional_env(client_secret_env).is_some() {
+    return Ok(());
+  }
+
+  Err(format!(
+    "{} sign-in is not configured. Set {} and {} before launching Tinker.",
+    provider.display_name(),
+    client_id_env,
+    client_secret_env
+  ))
+}
+
+fn auth_sidecar_script_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+  if cfg!(debug_assertions) {
+    let dev_resource = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/auth-sidecar.mjs");
+    if dev_resource.exists() {
+      return dev_resource.canonicalize().map_err(|error| error.to_string());
+    }
+
+    let dev_dist = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../packages/auth-sidecar/dist/auth-sidecar.mjs");
+    if dev_dist.exists() {
+      return dev_dist.canonicalize().map_err(|error| error.to_string());
+    }
+  }
+
+  let bundled = app
+    .path()
+    .resource_dir()
+    .map_err(|error| error.to_string())?
+    .join("auth-sidecar.mjs");
+
+  if bundled.exists() {
+    return Ok(bundled);
+  }
+
+  Err("Could not locate Better Auth sidecar bundle.".to_string())
+}
+
+fn next_loopback_port() -> Result<u16, String> {
+  let listener = StdTcpListener::bind("127.0.0.1:0").map_err(|error| error.to_string())?;
+  listener.local_addr().map_err(|error| error.to_string()).map(|address| address.port())
+}
+
+async fn wait_for_better_auth(runtime: &BetterAuthRuntime) -> Result<(), String> {
+  let client = reqwest::Client::new();
+  let health_url = format!("{}/health", runtime.base_url);
+
+  for _attempt in 0..BETTER_AUTH_HEALTH_RETRY_COUNT {
+    match client.get(&health_url).send().await {
+      Ok(response) if response.status().is_success() => return Ok(()),
+      _ => sleep(BETTER_AUTH_HEALTH_RETRY_DELAY).await,
+    }
+  }
+
+  Err("Timed out waiting for Better Auth sidecar to become healthy.".to_string())
+}
+
+fn spawn_auth_log_task(mut receiver: tauri::async_runtime::Receiver<CommandEvent>) {
+  tauri::async_runtime::spawn(async move {
+    while let Some(event) = receiver.recv().await {
+      match event {
+        CommandEvent::Stdout(line) => {
+          eprintln!("[better-auth] {}", String::from_utf8_lossy(&line));
+        }
+        CommandEvent::Stderr(line) => {
+          eprintln!("[better-auth:error] {}", String::from_utf8_lossy(&line));
+        }
+        CommandEvent::Error(error) => {
+          eprintln!("[better-auth:error] {error}");
+        }
+        CommandEvent::Terminated(payload) => {
+          eprintln!(
+            "[better-auth] exited with code {:?} and signal {:?}",
+            payload.code, payload.signal
+          );
+        }
+        _ => {}
+      }
+    }
+  });
+}
+
+async fn start_better_auth<R: Runtime>(app: &AppHandle<R>) -> Result<BetterAuthRuntime, String> {
+  let script_path = auth_sidecar_script_path(app)?;
+  let port = next_loopback_port()?;
+  let bridge_secret = random_url_safe(24);
+  let base_url = format!("http://127.0.0.1:{port}");
+
+  let mut sidecar = app
+    .shell()
+    .sidecar("node")
+    .map_err(|error| error.to_string())?
+    .args([script_path.to_string_lossy().into_owned()])
+    .envs([
+      ("TINKER_BETTER_AUTH_PORT", port.to_string()),
+      ("TINKER_BETTER_AUTH_BRIDGE_SECRET", bridge_secret.clone()),
+    ]);
+
+  for env_name in [
+    GOOGLE_CLIENT_ID_ENV,
+    GOOGLE_CLIENT_SECRET_ENV,
+    GITHUB_CLIENT_ID_ENV,
+    GITHUB_CLIENT_SECRET_ENV,
+    BETTER_AUTH_SECRET_ENV,
+  ] {
+    if let Some(value) = optional_env(env_name) {
+      sidecar = sidecar.env(env_name, value);
+    }
+  }
+
+  if let Some(parent) = script_path.parent() {
+    sidecar = sidecar.current_dir(parent.to_path_buf());
+  }
+
+  let (receiver, child) = sidecar.spawn().map_err(|error| error.to_string())?;
+  let runtime = BetterAuthRuntime { base_url, bridge_secret };
+
+  {
+    let state = app.state::<BetterAuthState>();
+    let mut child_guard = state
+      .child
+      .lock()
+      .map_err(|_| "Better Auth state lock was poisoned.".to_string())?;
+    *child_guard = Some(child);
+  }
+
+  spawn_auth_log_task(receiver);
+
+  if let Err(error) = wait_for_better_auth(&runtime).await {
+    stop_better_auth(app);
+    return Err(error);
+  }
+
+  {
+    let state = app.state::<BetterAuthState>();
+    let mut runtime_guard = state
+      .runtime
+      .lock()
+      .map_err(|_| "Better Auth state lock was poisoned.".to_string())?;
+    *runtime_guard = Some(runtime.clone());
+  }
+
+  Ok(runtime)
+}
+
+async fn ensure_better_auth<R: Runtime>(app: &AppHandle<R>) -> Result<BetterAuthRuntime, String> {
+  let existing_runtime = {
+    let state = app.state::<BetterAuthState>();
+    let runtime = state
+      .runtime
+      .lock()
+      .map_err(|_| "Better Auth state lock was poisoned.".to_string())?
+      .clone();
+    runtime
+  };
+
+  if let Some(runtime) = existing_runtime {
+    if wait_for_better_auth(&runtime).await.is_ok() {
+      return Ok(runtime);
+    }
+
+    stop_better_auth(app);
+  }
+
+  start_better_auth(app).await
+}
+
+fn callback_success_page(provider: AuthProvider) -> &'static [u8] {
+  match provider {
+    AuthProvider::Google | AuthProvider::Github => {
+      b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h1>Tinker</h1><p>Sign-in finished. You can close this window and return to the app.</p></body></html>"
+    }
+  }
+}
+
+fn callback_error_page() -> &'static [u8] {
+  b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h1>Tinker</h1><p>Sign-in finished with an error. You can close this window and return to the app.</p></body></html>"
+}
+
+async fn await_callback(provider: AuthProvider, listener: TcpListener) -> Result<HashMap<String, String>, String> {
+  let (mut stream, _) = timeout(BETTER_AUTH_TIMEOUT, listener.accept())
     .await
-    .map_err(|error| error.to_string())?;
-  let redirect_uri = format!(
-    "http://127.0.0.1:{}/callback",
-    listener.local_addr().map_err(|error| error.to_string())?.port()
-  );
-
-  let auth_url = Url::parse_with_params(
-    GOOGLE_AUTH_URL,
-    &[
-      ("client_id", google_client_id()),
-      ("redirect_uri", redirect_uri.clone()),
-      ("response_type", "code".to_string()),
-      ("scope", GOOGLE_SCOPES.join(" ")),
-      ("state", state.to_string()),
-      ("code_challenge", challenge.to_string()),
-      ("code_challenge_method", "S256".to_string()),
-      ("access_type", "offline".to_string()),
-      ("prompt", "consent".to_string()),
-    ],
-  )
-  .map_err(|error| error.to_string())?;
-
-  webbrowser::open(auth_url.as_str()).map_err(|error| error.to_string())?;
-
-  let (mut stream, _) = timeout(TokioDuration::from_secs(180), listener.accept())
-    .await
-    .map_err(|_| "Timed out waiting for Google OAuth callback.".to_string())?
+    .map_err(|_| format!("Timed out waiting for {} sign-in callback.", provider.display_name()))?
     .map_err(|error| error.to_string())?;
 
   let mut buffer = [0_u8; 8192];
-  let bytes_read = stream
-    .read(&mut buffer)
-    .await
-    .map_err(|error| error.to_string())?;
+  let bytes_read = stream.read(&mut buffer).await.map_err(|error| error.to_string())?;
   let request = String::from_utf8_lossy(&buffer[..bytes_read]);
   let params = parse_callback_request(&request)?;
 
-  stream
-    .write_all(
-      b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h1>Tinker</h1><p>You can close this window and return to the app.</p></body></html>",
-    )
-    .await
-    .map_err(|error| error.to_string())?;
+  let response = if params.contains_key("error") {
+    callback_error_page()
+  } else {
+    callback_success_page(provider)
+  };
 
-  let returned_state = params
-    .get("state")
-    .ok_or_else(|| "Google OAuth callback did not include state.".to_string())?;
-  if returned_state != state {
-    return Err("Google OAuth callback state did not match request.".to_string());
-  }
-
-  let code = params
-    .get("code")
-    .ok_or_else(|| "Google OAuth callback did not include code.".to_string())?;
-
-  Ok((code.clone(), redirect_uri))
+  stream.write_all(response).await.map_err(|error| error.to_string())?;
+  Ok(params)
 }
 
-async fn sign_in_google<R: Runtime>(app: &AppHandle<R>) -> Result<SSOSession, String> {
-  let previous = read_session(app, AuthProvider::Google)?;
-  let state = random_url_safe(24);
-  let verifier = random_url_safe(48);
-  let challenge = pkce_challenge(&verifier);
-  let (code, redirect_uri) = read_google_authorization_code(&state, &challenge).await?;
+fn callback_url(listener: &TcpListener) -> Result<String, String> {
+  Ok(format!(
+    "http://127.0.0.1:{}/callback",
+    listener.local_addr().map_err(|error| error.to_string())?.port()
+  ))
+}
 
-  let token = reqwest::Client::new()
-    .post(GOOGLE_TOKEN_URL)
-    .form(&[
-      ("client_id", google_client_id()),
-      ("code", code),
-      ("code_verifier", verifier),
-      ("grant_type", "authorization_code".to_string()),
-      ("redirect_uri", redirect_uri),
-    ])
+async fn fetch_transferred_session(runtime: &BetterAuthRuntime, ticket: &str) -> Result<SSOSession, String> {
+  let url = Url::parse_with_params(&format!("{}/desktop/session", runtime.base_url), &[("ticket", ticket)])
+    .map_err(|error| error.to_string())?;
+  let response = reqwest::Client::new()
+    .get(url)
+    .header(BETTER_AUTH_SECRET_HEADER, runtime.bridge_secret.clone())
     .send()
-    .await
-    .map_err(|error| error.to_string())?
-    .error_for_status()
-    .map_err(|error| error.to_string())?
-    .json::<GoogleTokenResponse>()
     .await
     .map_err(|error| error.to_string())?;
 
-  let user = reqwest::Client::new()
-    .get(GOOGLE_USERINFO_URL)
-    .bearer_auth(&token.access_token)
-    .send()
-    .await
-    .map_err(|error| error.to_string())?
-    .error_for_status()
-    .map_err(|error| error.to_string())?
-    .json::<GoogleUserInfo>()
-    .await
-    .map_err(|error| error.to_string())?;
+  if !response.status().is_success() {
+    let body = response.text().await.unwrap_or_default();
+    return Err(if body.is_empty() {
+      "Better Auth sidecar rejected session transfer.".to_string()
+    } else {
+      format!("Better Auth sidecar rejected session transfer: {body}")
+    });
+  }
 
-  let refresh_token = token
-    .refresh_token
-    .filter(|token| !token.is_empty())
-    .or_else(|| previous.as_ref().map(|session| session.refresh_token.clone()))
-    .unwrap_or_default();
+  response.json::<SSOSession>().await.map_err(|error| error.to_string())
+}
 
-  let session = SSOSession {
-    provider: AuthProvider::Google,
-    user_id: user.id,
-    email: user.email,
-    display_name: user.name,
-    avatar_url: user.picture,
-    access_token: token.access_token,
-    refresh_token,
-    expires_at: (Utc::now() + Duration::seconds(token.expires_in)).to_rfc3339(),
-    scopes: token.scope.split_whitespace().map(ToString::to_string).collect(),
-  };
+fn callback_error_message(provider: AuthProvider, params: &HashMap<String, String>) -> String {
+  let code = params
+    .get("error")
+    .map(|value| value.replace('_', " "))
+    .unwrap_or_else(|| "sign-in failed".to_string());
+
+  if let Some(description) = params.get("errorDescription").filter(|value| !value.trim().is_empty()) {
+    return format!("{} sign-in failed: {description}", provider.display_name());
+  }
+
+  format!("{} sign-in failed: {code}", provider.display_name())
+}
+
+async fn sign_in_with_better_auth<R: Runtime>(app: &AppHandle<R>, provider: AuthProvider) -> Result<SSOSession, String> {
+  require_provider_configuration(provider)?;
+
+  let runtime = ensure_better_auth(app).await?;
+  let listener = TcpListener::bind("127.0.0.1:0").await.map_err(|error| error.to_string())?;
+  let ticket = random_url_safe(24);
+  let callback = callback_url(&listener)?;
+  let sign_in_url = Url::parse_with_params(
+    &format!("{}/desktop/sign-in/{}", runtime.base_url, provider.as_str()),
+    &[("ticket", ticket.as_str()), ("appCallback", callback.as_str())],
+  )
+  .map_err(|error| error.to_string())?;
+
+  webbrowser::open(sign_in_url.as_str()).map_err(|error| error.to_string())?;
+
+  let params = await_callback(provider, listener).await?;
+  if params.contains_key("error") {
+    return Err(callback_error_message(provider, &params));
+  }
+
+  let returned_ticket = params
+    .get("ticket")
+    .ok_or_else(|| format!("{} sign-in callback did not include transfer ticket.", provider.display_name()))?;
+  if returned_ticket != &ticket {
+    return Err(format!(
+      "{} sign-in callback returned mismatched transfer ticket.",
+      provider.display_name()
+    ));
+  }
+
+  let session = fetch_transferred_session(&runtime, &ticket).await?;
+  if session.provider != provider {
+    return Err("Better Auth returned session for wrong provider.".to_string());
+  }
 
   store_session(app, &session)?;
   Ok(session)
 }
 
-async fn sign_in_github<R: Runtime>(app: &AppHandle<R>) -> Result<SSOSession, String> {
-  let client = reqwest::Client::builder()
-    .user_agent(APP_USER_AGENT)
-    .build()
-    .map_err(|error| error.to_string())?;
+pub fn stop_better_auth<R: Runtime>(app: &tauri::AppHandle<R>) {
+  let child = {
+    let state = app.state::<BetterAuthState>();
 
-  let device = client
-    .post(GITHUB_DEVICE_CODE_URL)
-    .header("Accept", "application/json")
-    .form(&[
-      ("client_id", github_client_id()),
-      ("scope", GITHUB_SCOPES.join(" ")),
-    ])
-    .send()
-    .await
-    .map_err(|error| error.to_string())?
-    .error_for_status()
-    .map_err(|error| error.to_string())?
-    .json::<GithubDeviceCodeResponse>()
-    .await
-    .map_err(|error| error.to_string())?;
-
-  let auth_url = device
-    .verification_uri_complete
-    .clone()
-    .unwrap_or_else(|| device.verification_uri.clone());
-  webbrowser::open(&auth_url).map_err(|error| error.to_string())?;
-
-  let started_at = Utc::now();
-  let mut interval = device.interval.unwrap_or(5);
-  loop {
-    if (Utc::now() - started_at) >= Duration::seconds(device.expires_in) {
-      return Err(format!(
-        "GitHub device sign-in timed out. Retry and enter code {} at {}.",
-        device.user_code, device.verification_uri
-      ));
+    if let Ok(mut runtime_guard) = state.runtime.lock() {
+      *runtime_guard = None;
     }
 
-    sleep(TokioDuration::from_secs(interval)).await;
+    let child = match state.child.lock() {
+      Ok(mut child_guard) => child_guard.take(),
+      Err(_) => None,
+    };
 
-    let token = client
-      .post(GITHUB_ACCESS_TOKEN_URL)
-      .header("Accept", "application/json")
-      .form(&[
-        ("client_id", github_client_id()),
-        ("device_code", device.device_code.clone()),
-        ("grant_type", "urn:ietf:params:oauth:grant-type:device_code".to_string()),
-      ])
-      .send()
-      .await
-      .map_err(|error| error.to_string())?
-      .error_for_status()
-      .map_err(|error| error.to_string())?
-      .json::<GithubAccessTokenResponse>()
-      .await
-      .map_err(|error| error.to_string())?;
+    child
+  };
 
-    if let Some(access_token) = token_access_token(&token) {
-      let user = client
-        .get(GITHUB_USER_URL)
-        .bearer_auth(access_token)
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await
-        .map_err(|error| error.to_string())?
-        .error_for_status()
-        .map_err(|error| error.to_string())?
-        .json::<GithubUser>()
-        .await
-        .map_err(|error| error.to_string())?;
-
-      let emails = client
-        .get(GITHUB_EMAILS_URL)
-        .bearer_auth(access_token)
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await
-        .map_err(|error| error.to_string())?
-        .error_for_status()
-        .map_err(|error| error.to_string())?
-        .json::<Vec<GithubEmail>>()
-        .await
-        .unwrap_or_default();
-
-      let email = user
-        .email
-        .clone()
-        .or_else(|| {
-          emails
-            .iter()
-            .find(|email| email.primary && email.verified)
-            .map(|email| email.email.clone())
-        })
-        .or_else(|| {
-          emails
-            .iter()
-            .find(|email| email.verified)
-            .map(|email| email.email.clone())
-        })
-        .unwrap_or_else(|| format!("{}@users.noreply.github.com", user.login));
-
-      let session = SSOSession {
-        provider: AuthProvider::Github,
-        user_id: user.id.to_string(),
-        email,
-        display_name: user.name.unwrap_or_else(|| user.login.clone()),
-        avatar_url: user.avatar_url,
-        access_token: access_token.to_string(),
-        refresh_token: token.refresh_token.unwrap_or_default(),
-        expires_at: token
-          .expires_in
-          .map(|seconds| (Utc::now() + Duration::seconds(seconds)).to_rfc3339())
-          .unwrap_or_else(|| (Utc::now() + Duration::days(3650)).to_rfc3339()),
-        scopes: token
-          .scope
-          .unwrap_or_else(|| GITHUB_SCOPES.join(","))
-          .split([',', ' '])
-          .filter(|scope| !scope.is_empty())
-          .map(ToString::to_string)
-          .collect(),
-      };
-
-      store_session(app, &session)?;
-      return Ok(session);
-    }
-
-    match token.error.as_deref() {
-      Some("authorization_pending") => continue,
-      Some("slow_down") => {
-        interval += 5;
-        continue;
-      }
-      Some("expired_token") => {
-        return Err(format!(
-          "GitHub device code expired. Retry and enter code {} at {}.",
-          device.user_code, device.verification_uri
-        ));
-      }
-      Some("access_denied") => return Err("GitHub sign-in was denied.".to_string()),
-      Some(error) => {
-        return Err(
-          token
-            .error_description
-            .unwrap_or_else(|| format!("GitHub token exchange failed: {error}")),
-        );
-      }
-      None => return Err("GitHub token exchange did not return access token.".to_string()),
-    }
+  if let Some(child) = child {
+    let _ = child.kill();
   }
 }
 
 #[tauri::command]
 pub async fn auth_sign_in<R: Runtime>(app: AppHandle<R>, provider: AuthProvider) -> Result<SSOSession, String> {
-  match provider {
-    AuthProvider::Google => sign_in_google(&app).await,
-    AuthProvider::Github => sign_in_github(&app).await,
-  }
+  sign_in_with_better_auth(&app, provider).await
 }
 
 #[tauri::command]

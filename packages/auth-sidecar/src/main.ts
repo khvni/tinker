@@ -49,43 +49,75 @@ const parsePort = (value: string): number => {
 const authPort = parsePort(requiredEnv('TINKER_BETTER_AUTH_PORT'));
 const bridgeSecret = requiredEnv('TINKER_BETTER_AUTH_BRIDGE_SECRET');
 const baseURL = `http://127.0.0.1:${authPort}`;
+const googleClientId = optionalEnv('GOOGLE_OAUTH_CLIENT_ID');
+const googleClientSecret = optionalEnv('GOOGLE_OAUTH_CLIENT_SECRET');
+const githubClientId = optionalEnv('GITHUB_OAUTH_CLIENT_ID');
+const githubClientSecret = optionalEnv('GITHUB_OAUTH_CLIENT_SECRET');
 
 const transfers = new Map<string, TransferRecord>();
+
+const socialProviders = {
+  ...(googleClientId && googleClientSecret
+    ? {
+        google: {
+          clientId: googleClientId,
+          clientSecret: googleClientSecret,
+          scope: [
+            'openid',
+            'email',
+            'profile',
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/calendar.readonly',
+            'https://www.googleapis.com/auth/drive.readonly',
+          ],
+        },
+      }
+    : {}),
+  ...(githubClientId && githubClientSecret
+    ? {
+        github: {
+          clientId: githubClientId,
+          clientSecret: githubClientSecret,
+          scope: ['read:user', 'user:email', 'repo'],
+        },
+      }
+    : {}),
+};
+
+const enabledProviders = new Set(Object.keys(socialProviders));
+
+if (enabledProviders.size === 0) {
+  throw new Error('At least one social provider must be configured for Better Auth.');
+}
 
 const auth = betterAuth({
   appName: 'Tinker',
   baseURL,
   secret: optionalEnv('TINKER_BETTER_AUTH_SECRET') ?? bridgeSecret,
   trustedOrigins: [baseURL],
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 300,
+      strategy: 'compact',
+    },
+  },
   account: {
+    storeStateStrategy: 'cookie',
     storeAccountCookie: true,
     accountLinking: {
       enabled: false,
     },
   },
-  socialProviders: {
-    google: {
-      clientId: requiredEnv('GOOGLE_OAUTH_CLIENT_ID'),
-      clientSecret: requiredEnv('GOOGLE_OAUTH_CLIENT_SECRET'),
-      scope: [
-        'openid',
-        'email',
-        'profile',
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/drive.readonly',
-      ],
-    },
-    github: {
-      clientId: requiredEnv('GITHUB_OAUTH_CLIENT_ID'),
-      clientSecret: requiredEnv('GITHUB_OAUTH_CLIENT_SECRET'),
-      scope: ['read:user', 'user:email', 'repo'],
-    },
-  },
+  socialProviders,
 });
 
 const isDesktopProvider = (value: string): value is DesktopProvider => {
   return value === 'google' || value === 'github';
+};
+
+const isConfiguredProvider = (provider: DesktopProvider): boolean => {
+  return enabledProviders.has(provider);
 };
 
 const pruneTransfers = (): void => {
@@ -135,11 +167,16 @@ const toRequest = async (request: IncomingMessage): Promise<Request> => {
   const url = new URL(request.url ?? '/', baseURL);
   const body = await readBody(request);
 
-  return new Request(url, {
-    method: request.method,
+  const init: RequestInit = {
+    method: request.method ?? 'GET',
     headers: toHeaders(request),
-    body,
-  });
+  };
+
+  if (body !== undefined) {
+    init.body = Buffer.from(body);
+  }
+
+  return new Request(url, init);
 };
 
 const getSetCookieValues = (headers: Headers): string[] => {
@@ -315,6 +352,10 @@ const startSignIn = async (request: Request): Promise<Response> => {
 
   if (!provider || !isDesktopProvider(provider)) {
     return errorResponse(400, 'Unsupported provider.');
+  }
+
+  if (!isConfiguredProvider(provider)) {
+    return errorResponse(503, `${provider} is not configured.`);
   }
 
   if (!appCallback || !isLoopbackCallback(appCallback)) {

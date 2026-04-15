@@ -14,7 +14,7 @@ use tauri_plugin_shell::{
 };
 use tokio::time::{sleep, timeout, Duration as TokioDuration, Instant};
 
-use crate::commands::auth::{AuthProvider, SSOSession, KEYRING_SERVICE};
+use crate::commands::auth::{AuthProvider, BetterAuthState, SSOSession, KEYRING_SERVICE};
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -316,6 +316,7 @@ pub fn run() {
     .plugin(tauri_plugin_keyring::init())
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_sql::Builder::default().build())
+    .manage(BetterAuthState::default())
     .manage(OpencodeState::default())
     .invoke_handler(tauri::generate_handler![
       get_opencode_connection,
@@ -338,6 +339,7 @@ pub fn run() {
   let handle = app.handle().clone();
   app.run(move |_app, event| {
     if matches!(event, RunEvent::Exit) {
+      crate::commands::auth::stop_better_auth(&handle);
       stop_opencode(&handle);
     }
   });
