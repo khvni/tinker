@@ -17,6 +17,7 @@ out/
 .vercel/
 .vite/
 coverage/
+*.tsbuildinfo
 
 # Tauri
 target/

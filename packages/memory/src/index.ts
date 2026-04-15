@@ -202,11 +202,9 @@ export const createMemoryStore = (): MemoryStore => {
 export const indexVault = async (vault: VaultConfig): Promise<{ entitiesIndexed: number }> => {
   const memoryStore = createMemoryStore();
   const database = await getDatabase();
-  const staleVaultEntityIds = await getVaultEntityIds(database);
-  await Promise.all(staleVaultEntityIds.map((id) => deleteEntityRecord(database, id)));
   const files = await walkMarkdownFiles(vault.path);
-
-  let entitiesIndexed = 0;
+  const nextEntities: Entity[] = [];
+  let hadIndexingFailure = false;
 
   for (const absolutePath of files) {
     try {
@@ -215,7 +213,7 @@ export const indexVault = async (vault: VaultConfig): Promise<{ entitiesIndexed:
       const relativePath = relativeVaultPath(vault.path, absolutePath);
       const title = deriveNoteTitle(relativePath, frontmatter, body);
 
-      await memoryStore.upsertEntity({
+      nextEntities.push({
         id: `vault:${relativePath}`,
         kind: 'document',
         name: title,
@@ -230,14 +228,26 @@ export const indexVault = async (vault: VaultConfig): Promise<{ entitiesIndexed:
       });
 
       const extractedEntities = extractEntities(body, relativePath);
-      await Promise.all(extractedEntities.map((entity) => memoryStore.upsertEntity(entity)));
-      entitiesIndexed += 1 + extractedEntities.length;
+      nextEntities.push(...extractedEntities);
     } catch (error) {
+      hadIndexingFailure = true;
       console.warn(`Skipping vault file during indexing: ${absolutePath}`, error);
     }
   }
 
-  return { entitiesIndexed };
+  await Promise.all(nextEntities.map((entity) => memoryStore.upsertEntity(entity)));
+
+  if (!hadIndexingFailure) {
+    const staleVaultEntityIds = await getVaultEntityIds(database);
+    const nextEntityIds = new Set(nextEntities.map((entity) => entity.id));
+    await Promise.all(
+      staleVaultEntityIds
+        .filter((id) => !nextEntityIds.has(id))
+        .map((id) => deleteEntityRecord(database, id)),
+    );
+  }
+
+  return { entitiesIndexed: nextEntities.length };
 };
 
 export const runDailySynthesis = async (userId: string): Promise<{ summary: string }> => {

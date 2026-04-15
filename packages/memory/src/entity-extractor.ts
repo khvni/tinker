@@ -1,9 +1,9 @@
 import type { Entity } from '@tinker/shared-types';
 
+const encodeEntityKey = (value: string): string => encodeURIComponent(value.toLowerCase());
+
 const createEntityId = (kind: Entity['kind'], source: string, name: string): string => {
-  const normalizedSource = source.toLowerCase().replace(/[^\w/-]+/gu, '-');
-  const normalizedName = name.toLowerCase().replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/-+/gu, '-').replace(/^-|-$/gu, '');
-  return `vault:${normalizedSource}#${kind}:${normalizedName}`;
+  return `vault:${encodeEntityKey(source)}#${kind}:${encodeEntityKey(name)}`;
 };
 
 const createEntity = (kind: Entity['kind'], source: string, name: string): Entity => {

@@ -5,6 +5,8 @@ type SettingsProps = {
   modelConnected: boolean;
   modelAuthBusy: boolean;
   modelAuthMessage: string | null;
+  googleAuthBusy: boolean;
+  googleAuthMessage: string | null;
   session: SSOSession | null;
   vaultPath: string | null;
   onConnectModel(): Promise<void>;
@@ -19,6 +21,8 @@ export const Settings = ({
   modelAuthBusy,
   modelAuthMessage,
   modelConnected,
+  googleAuthBusy,
+  googleAuthMessage,
   onConnectModel,
   session,
   vaultPath,
@@ -64,13 +68,14 @@ export const Settings = ({
           <p className="tinker-muted">
             {session ? `Connected as ${session.email}` : 'Not connected. You can skip this and still use Tinker as a coding workspace.'}
           </p>
+          {googleAuthMessage ? <p className="tinker-muted">{googleAuthMessage}</p> : null}
           <div className="tinker-inline-actions">
             {session ? (
-              <button className="tinker-button-secondary" type="button" onClick={() => void onDisconnectGoogle()}>
+              <button className="tinker-button-secondary" type="button" onClick={() => void onDisconnectGoogle()} disabled={googleAuthBusy}>
                 Disconnect Google
               </button>
             ) : (
-              <button className="tinker-button" type="button" onClick={() => void onConnectGoogle()}>
+              <button className="tinker-button" type="button" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
                 Connect Google
               </button>
             )}

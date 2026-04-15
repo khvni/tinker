@@ -39,6 +39,46 @@ type AppState =
 const MODEL_CONNECT_POLL_INTERVAL_MS = 1_500;
 const MODEL_CONNECT_TIMEOUT_MS = 180_000;
 const VAULT_REINDEX_DEBOUNCE_MS = 300;
+const OPENCODE_AUTH_HOST = 'auth.openai.com';
+
+type StoredSSOSession = {
+  provider: 'google';
+  userId: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  scopes: string[];
+};
+
+const isNonEmptyString = (value: unknown): value is string => {
+  return typeof value === 'string' && value.trim().length > 0;
+};
+
+const isStoredSession = (value: unknown): value is StoredSSOSession => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const { avatarUrl, scopes } = candidate;
+
+  return (
+    candidate.provider === 'google' &&
+    isNonEmptyString(candidate.userId) &&
+    isNonEmptyString(candidate.email) &&
+    isNonEmptyString(candidate.displayName) &&
+    isNonEmptyString(candidate.accessToken) &&
+    isNonEmptyString(candidate.refreshToken) &&
+    isNonEmptyString(candidate.expiresAt) &&
+    !Number.isNaN(Date.parse(candidate.expiresAt)) &&
+    Array.isArray(scopes) &&
+    scopes.every((scope) => isNonEmptyString(scope)) &&
+    (avatarUrl === undefined || isNonEmptyString(avatarUrl))
+  );
+};
 
 const wait = (ms: number): Promise<void> => {
   return new Promise((resolve) => {
@@ -53,7 +93,12 @@ const readStoredSession = async (): Promise<SSOSession | null> => {
   }
 
   try {
-    return JSON.parse(raw) as SSOSession;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isStoredSession(parsed)) {
+      throw new Error('Stored Google session was malformed.');
+    }
+
+    return parsed;
   } catch {
     await deletePassword(KEYRING_SERVICE, GOOGLE_SESSION_ACCOUNT);
     return null;
@@ -109,6 +154,10 @@ const forwardGoogleAuth = async (
   session: SSOSession,
 ): Promise<void> => {
   const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
+  const expires = Date.parse(session.expiresAt);
+  if (Number.isNaN(expires)) {
+    throw new Error('Stored Google session had an invalid expiration timestamp.');
+  }
 
   await client.auth.set({
     providerID: 'google',
@@ -116,7 +165,7 @@ const forwardGoogleAuth = async (
       type: 'oauth',
       access: session.accessToken,
       refresh: session.refreshToken,
-      expires: Date.parse(session.expiresAt),
+      expires,
       accountId: session.userId,
     },
   });
@@ -131,6 +180,15 @@ const isModelConnected = async (connection: OpencodeConnection, vaultPath: strin
   const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
   const response = await client.provider.list();
   return response.data?.connected.includes(OPENCODE_OPENAI_PROVIDER_ID) ?? false;
+};
+
+const probeModelConnection = async (connection: OpencodeConnection, vaultPath: string | null): Promise<boolean> => {
+  try {
+    return await isModelConnected(connection, vaultPath);
+  } catch (error) {
+    console.warn('Could not determine whether GPT-5.4 is connected. Continuing with model disconnected.', error);
+    return false;
+  }
 };
 
 const waitForModelConnection = async (connection: OpencodeConnection, vaultPath: string | null): Promise<boolean> => {
@@ -167,7 +225,16 @@ const connectModelProvider = async (connection: OpencodeConnection, vaultPath: s
     throw new Error('OpenCode did not return an authorization URL for the OpenAI provider.');
   }
 
-  await openExternal(authorization.url);
+  const authorizationUrl = new URL(authorization.url);
+  if (
+    authorizationUrl.protocol !== 'https:' ||
+    authorizationUrl.hostname !== OPENCODE_AUTH_HOST ||
+    !/^\/(?:oauth|codex)\//u.test(authorizationUrl.pathname)
+  ) {
+    throw new Error('OpenCode returned an unexpected authorization URL for the OpenAI provider.');
+  }
+
+  await openExternal(authorizationUrl.toString());
 
   if (!(await waitForModelConnection(connection, vaultPath))) {
     throw new Error('OpenCode did not finish connecting GPT-5.4 before the authorization timed out.');
@@ -186,6 +253,8 @@ export const App = (): JSX.Element => {
   const [state, setState] = useState<AppState>({ status: 'loading' });
   const [modelAuthBusy, setModelAuthBusy] = useState(false);
   const [modelAuthMessage, setModelAuthMessage] = useState<string | null>(null);
+  const [googleAuthBusy, setGoogleAuthBusy] = useState(false);
+  const [googleAuthMessage, setGoogleAuthMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -217,7 +286,7 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
-        const modelConnected = await isModelConnected(opencode, vaultPath);
+        const modelConnected = await probeModelConnection(opencode, vaultPath);
 
         if (!active) {
           return;
@@ -357,7 +426,7 @@ export const App = (): JSX.Element => {
     await vaultService.init(config);
     await indexVault(config);
     window.localStorage.setItem(VAULT_PATH_KEY, config.path);
-    const modelConnected = await isModelConnected(state.opencode, config.path);
+    const modelConnected = await probeModelConnection(state.opencode, config.path);
 
     setState((current) =>
       current.status !== 'ready'
@@ -415,35 +484,64 @@ export const App = (): JSX.Element => {
   };
 
   const handleGoogleConnect = async (): Promise<void> => {
-    const session = mergeGoogleSession(state.session, await invoke<GoogleOAuthSession>('oauth_flow'));
-    await storeSession(session);
-    await forwardGoogleAuth(state.opencode, state.vaultPath, session);
+    setGoogleAuthBusy(true);
+    setGoogleAuthMessage('Waiting for the Google sign-in flow to finish…');
 
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            session,
-          },
-    );
+    try {
+      const nextSession = await invoke<GoogleOAuthSession>('oauth_flow');
+      const session = mergeGoogleSession(state.session, nextSession);
+      if (session.refreshToken.length === 0) {
+        throw new Error('Google sign-in did not return a refresh token. Try connecting again.');
+      }
+
+      await forwardGoogleAuth(state.opencode, state.vaultPath, session);
+      await storeSession(session);
+
+      setState((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              session,
+            },
+      );
+      setGoogleAuthMessage(`Google is connected as ${session.email}.`);
+    } catch (error) {
+      setGoogleAuthMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGoogleAuthBusy(false);
+    }
   };
 
   const handleGoogleDisconnect = async (): Promise<void> => {
-    await storeSession(null);
+    setGoogleAuthBusy(true);
+    setGoogleAuthMessage(null);
+
     try {
-      await clearGoogleAuth(state.opencode, state.vaultPath);
+      const results = await Promise.allSettled([
+        storeSession(null),
+        clearGoogleAuth(state.opencode, state.vaultPath),
+      ]);
+      const remoteClearFailed = results.some((result) => result.status === 'rejected');
+
+      setState((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              session: null,
+            },
+      );
+      setGoogleAuthMessage(
+        remoteClearFailed
+          ? 'Google was disconnected locally, but OpenCode could not clear the remote session.'
+          : 'Google has been disconnected.',
+      );
     } catch (error) {
-      console.warn('Failed to clear Google auth from OpenCode.', error);
+      setGoogleAuthMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGoogleAuthBusy(false);
     }
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            session: null,
-          },
-    );
   };
 
   const handleCreateVault = async (): Promise<void> => {
@@ -479,6 +577,8 @@ export const App = (): JSX.Element => {
           modelConnected={state.modelConnected}
           modelAuthBusy={modelAuthBusy}
           modelAuthMessage={modelAuthMessage}
+          googleAuthBusy={googleAuthBusy}
+          googleAuthMessage={googleAuthMessage}
           session={state.session}
           vaultPath={state.vaultPath}
           onConnectModel={handleConnectModel}
@@ -495,6 +595,8 @@ export const App = (): JSX.Element => {
           modelConnected={state.modelConnected}
           modelAuthBusy={modelAuthBusy}
           modelAuthMessage={modelAuthMessage}
+          googleAuthBusy={googleAuthBusy}
+          googleAuthMessage={googleAuthMessage}
           opencode={state.opencode}
           session={state.session}
           vaultPath={state.vaultPath}

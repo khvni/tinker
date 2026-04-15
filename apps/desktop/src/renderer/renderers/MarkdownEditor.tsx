@@ -7,13 +7,20 @@ const isSaveShortcut = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
   return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's';
 };
 
-export const MarkdownEditor = ({ params }: IDockviewPanelProps<FilePaneParams>): JSX.Element => {
+type MarkdownEditorProps = IDockviewPanelProps<FilePaneParams> & {
+  vaultRevision: number;
+};
+
+export const MarkdownEditor = ({ params, vaultRevision }: MarkdownEditorProps): JSX.Element => {
   const path = params?.path;
   const [value, setValue] = useState('');
   const [savedValue, setSavedValue] = useState('');
   const [status, setStatus] = useState('Loading note…');
   const [error, setError] = useState<string | null>(null);
   const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const loadedPathRef = useRef<string | null>(null);
+  const loadedRevisionRef = useRef<number>(-1);
 
   useEffect(() => {
     if (!path) {
@@ -21,6 +28,16 @@ export const MarkdownEditor = ({ params }: IDockviewPanelProps<FilePaneParams>):
       setStatus('Unavailable');
       setValue('');
       setSavedValue('');
+      dirtyRef.current = false;
+      loadedPathRef.current = null;
+      return;
+    }
+
+    const isSamePath = loadedPathRef.current === path;
+    const externalChange = isSamePath && loadedRevisionRef.current !== vaultRevision;
+
+    if (externalChange && dirtyRef.current) {
+      setStatus('File changed externally. Save or reopen to avoid overwriting newer content.');
       return;
     }
 
@@ -37,6 +54,9 @@ export const MarkdownEditor = ({ params }: IDockviewPanelProps<FilePaneParams>):
 
         setValue(text);
         setSavedValue(text);
+        dirtyRef.current = false;
+        loadedPathRef.current = path;
+        loadedRevisionRef.current = vaultRevision;
         setStatus('Saved');
       } catch (nextError) {
         if (active) {
@@ -49,7 +69,7 @@ export const MarkdownEditor = ({ params }: IDockviewPanelProps<FilePaneParams>):
     return () => {
       active = false;
     };
-  }, [path]);
+  }, [path, vaultRevision]);
 
   const save = async (): Promise<void> => {
     if (!path || savingRef.current || value === savedValue) {
@@ -62,6 +82,7 @@ export const MarkdownEditor = ({ params }: IDockviewPanelProps<FilePaneParams>):
     try {
       await writeTextFile(path, value);
       setSavedValue(value);
+      dirtyRef.current = false;
       setStatus('Saved');
       setError(null);
     } catch (nextError) {
@@ -90,6 +111,7 @@ export const MarkdownEditor = ({ params }: IDockviewPanelProps<FilePaneParams>):
         onChange={(event) => {
           const nextValue = event.currentTarget.value;
           setValue(nextValue);
+          dirtyRef.current = nextValue !== savedValue;
           setStatus(nextValue === savedValue ? 'Saved' : 'Editing…');
         }}
         onBlur={() => void save()}

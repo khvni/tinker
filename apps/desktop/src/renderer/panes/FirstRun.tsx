@@ -5,6 +5,8 @@ type FirstRunProps = {
   modelConnected: boolean;
   modelAuthBusy: boolean;
   modelAuthMessage: string | null;
+  googleAuthBusy: boolean;
+  googleAuthMessage: string | null;
   session: SSOSession | null;
   vaultPath: string | null;
   onConnectModel(): Promise<void>;
@@ -18,6 +20,8 @@ export const FirstRun = ({
   modelAuthBusy,
   modelAuthMessage,
   modelConnected,
+  googleAuthBusy,
+  googleAuthMessage,
   onConnectModel,
   onConnectGoogle,
   onContinue,
@@ -57,9 +61,10 @@ export const FirstRun = ({
             <p className="tinker-muted">
               {session ? `Connected as ${session.email}` : 'Optional. Enables Gmail, Calendar, Drive, and forwarded auth for MCP tools.'}
             </p>
+            {googleAuthMessage ? <p className="tinker-muted">{googleAuthMessage}</p> : null}
             <div className="tinker-inline-actions">
-              <button className="tinker-button-secondary" type="button" onClick={() => void onConnectGoogle()}>
-                {session ? 'Reconnect Google' : 'Connect Google'}
+              <button className="tinker-button-secondary" type="button" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
+                {googleAuthBusy ? 'Connecting…' : session ? 'Reconnect Google' : 'Connect Google'}
               </button>
             </div>
           </article>

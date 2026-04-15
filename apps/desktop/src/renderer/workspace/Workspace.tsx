@@ -22,6 +22,8 @@ type WorkspaceProps = {
   modelConnected: boolean;
   modelAuthBusy: boolean;
   modelAuthMessage: string | null;
+  googleAuthBusy: boolean;
+  googleAuthMessage: string | null;
   opencode: OpencodeConnection;
   session: SSOSession | null;
   vaultPath: string | null;
@@ -40,6 +42,8 @@ export const Workspace = ({
   modelAuthBusy,
   modelAuthMessage,
   modelConnected,
+  googleAuthBusy,
+  googleAuthMessage,
   onConnectModel,
   onConnectGoogle,
   onCreateVault,
@@ -67,6 +71,8 @@ export const Workspace = ({
             modelConnected={modelConnected}
             modelAuthBusy={modelAuthBusy}
             modelAuthMessage={modelAuthMessage}
+            googleAuthBusy={googleAuthBusy}
+            googleAuthMessage={googleAuthMessage}
             session={session}
             vaultPath={vaultPath}
             onConnectModel={onConnectModel}
@@ -83,13 +89,15 @@ export const Workspace = ({
         csv: (props) => <CsvRenderer {...props} />,
         image: (props) => <ImageRenderer {...props} />,
         code: (props) => <CodeRenderer {...props} />,
-        'markdown-editor': (props) => <MarkdownEditor {...props} />,
+        'markdown-editor': (props) => <MarkdownEditor {...props} vaultRevision={vaultRevision} />,
       }),
     [
       memoryStore,
       modelAuthBusy,
       modelAuthMessage,
       modelConnected,
+      googleAuthBusy,
+      googleAuthMessage,
       onConnectGoogle,
       onConnectModel,
       onCreateVault,
@@ -105,7 +113,6 @@ export const Workspace = ({
 
   const onReady = (event: DockviewReadyEvent): void => {
     dockviewApiRef.current = event.api;
-    setDockviewApi(event.api);
 
     void (async () => {
       const savedLayout = await layoutStore.load(DEFAULT_USER_ID);
@@ -135,11 +142,13 @@ export const Workspace = ({
           updatedAt: new Date().toISOString(),
         });
       });
+
+      setDockviewApi(event.api);
     })();
   };
 
   useEffect(() => {
-    const api = dockviewApiRef.current;
+    const api = dockviewApi;
     if (!api) {
       return;
     }
@@ -177,7 +186,7 @@ export const Workspace = ({
           }
         : {}),
     });
-  }, [memoryStore, vaultPath]);
+  }, [dockviewApi, memoryStore, vaultPath]);
 
   return (
     <main className="tinker-workspace-shell">
