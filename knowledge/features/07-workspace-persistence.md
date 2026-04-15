@@ -1,7 +1,7 @@
 ---
 type: concept
 tags: [tinker, feature, workspace, dockview, ui, persistence]
-status: in-progress
+status: review
 priority: p1
 ---
 
@@ -112,15 +112,23 @@ User opens Tinker. Their workspace is exactly how they left it — panes in the 
 
 ## Acceptance Criteria
 
-- [ ] Dockview renders a multi-pane workspace
-- [ ] Default layout shows Chat + Today on first launch
-- [ ] User can drag tabs to rearrange
-- [ ] User can split panes horizontally and vertically
-- [ ] Layout state serializes to SQLite on change
-- [ ] Layout restores on app relaunch
-- [ ] Agent-created files auto-open in new tabs
-- [ ] Markdown, CSV, code, and image tabs render inline with correct content
-- [ ] App remains usable if the layout_state table is empty or corrupted (fallback to default)
+- [x] Dockview renders a multi-pane workspace — `apps/desktop/src/renderer/workspace/Workspace.tsx`
+- [x] Default layout shows Chat + Today on first launch — `workspace/layout.default.ts` (+ Vault + Settings)
+- [x] User can drag tabs to rearrange — native Dockview behavior
+- [x] User can split panes horizontally and vertically — native Dockview behavior
+- [x] Layout state serializes to SQLite on change — `packages/memory/src/layout-store.ts` + debounced (300ms) save in `Workspace.onReady`
+- [x] Layout restores on app relaunch — `layoutStore.load()` + `event.api.fromJSON()` with version-gated hydration
+- [x] Agent-created files auto-open in new tabs — `Chat` forwards `file_written` stream events to `Workspace.openFileInWorkspace`, which resolves vault-relative paths via `resolveVaultPath` and opens/focuses the right renderer panel
+- [x] Markdown, CSV, code, and image tabs render inline with correct content — renderers wired through `pane-registry` + `getPaneKindForPath`
+- [x] App remains usable if the layout_state table is empty or corrupted (fallback to default) — `hydrateLayoutRow` rejects incompatible versions and malformed JSON; `fromJSON` failures fall back to `applyDefaultLayout` (see `layout-store.test.ts` for corruption cases)
+
+## Implementation Notes (2026-04-15)
+
+- Layout save is debounced 300ms in `Workspace.scheduleLayoutSave` to avoid thrashing on tab drags. A final flush runs on unmount.
+- `hydrateLayoutRow` exported from `layout-store.ts` is the pure hydrate path used both at runtime and in `layout-store.test.ts`.
+- `isAbsolutePath` helper in `renderer/renderers/file-utils.ts` keeps POSIX + Windows path detection local to the renderer without leaking `vault-utils` regex internals.
+- Auto-open uses the existing `getPanelIdForPath` keying, so repeat writes to the same file reuse the open tab instead of stacking duplicates.
+- Code rendering still uses the plain `<pre><code>` fallback; CodeMirror 6 vs Monaco decision is deferred (still an open question below). No runtime regression — existing syntax-class hook in `getCodeLanguage` stays in place for when the renderer is upgraded.
 
 ## Connections
 - [[ramp-glass]] — workspace reference

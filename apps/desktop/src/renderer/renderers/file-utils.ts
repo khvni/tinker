@@ -30,6 +30,13 @@ const CODE_LANGUAGE_BY_EXTENSION: Record<string, string> = {
   '.yml': 'yaml',
 };
 
+const POSIX_ABSOLUTE_PATH_PATTERN = /^\//u;
+const WINDOWS_ABSOLUTE_PATH_PATTERN = /^(?:[A-Za-z]:[\\/]|[\\/]{2})/u;
+
+export const isAbsolutePath = (path: string): boolean => {
+  return POSIX_ABSOLUTE_PATH_PATTERN.test(path) || WINDOWS_ABSOLUTE_PATH_PATTERN.test(path);
+};
+
 export const getFileExtension = (path: string): string => {
   const match = path.toLowerCase().match(/(\.[^./]+)$/u);
   return match?.[1] ?? '';

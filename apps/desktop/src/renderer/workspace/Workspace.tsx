@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent } from 'dockview-react';
-import type { LayoutStore, MemoryStore, SSOSession } from '@tinker/shared-types';
+import { resolveVaultPath } from '@tinker/memory';
+import type { LayoutState, LayoutStore, MemoryStore, SSOSession } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, type OpencodeConnection } from '../../bindings.js';
 import { Chat } from '../panes/Chat.js';
 import { Settings } from '../panes/Settings.js';
@@ -12,9 +13,18 @@ import { HtmlRenderer } from '../renderers/HtmlRenderer.js';
 import { ImageRenderer } from '../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../renderers/MarkdownEditor.js';
 import { MarkdownRenderer } from '../renderers/MarkdownRenderer.js';
+import {
+  getPaneKindForPath,
+  getPanelIdForPath,
+  getPanelTitleForPath,
+  isAbsolutePath,
+} from '../renderers/file-utils.js';
 import { applyDefaultLayout } from './layout.default.js';
 import { createPaneRegistry } from './pane-registry.js';
 import { DockviewApiContext } from './DockviewContext.js';
+
+const LAYOUT_SAVE_DEBOUNCE_MS = 300;
+const LAYOUT_VERSION = 1 as const;
 
 type WorkspaceProps = {
   layoutStore: LayoutStore;
@@ -56,15 +66,90 @@ export const Workspace = ({
   vaultRevision,
 }: WorkspaceProps): JSX.Element => {
   const dockviewApiRef = useRef<DockviewApi | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const vaultPathRef = useRef<string | null>(vaultPath);
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
+
+  useEffect(() => {
+    vaultPathRef.current = vaultPath;
+  }, [vaultPath]);
+
   const getReferencePanelId = (api: DockviewApi): string | null => {
     return api.activePanel?.id ?? api.panels[0]?.id ?? null;
   };
+
+  const resolveAgentPath = useCallback((reportedPath: string): string | null => {
+    if (isAbsolutePath(reportedPath)) {
+      return reportedPath;
+    }
+
+    const activeVault = vaultPathRef.current;
+    if (!activeVault) {
+      return null;
+    }
+
+    try {
+      return resolveVaultPath(activeVault, reportedPath);
+    } catch (error) {
+      console.warn(`Ignoring agent file event with unsafe path "${reportedPath}".`, error);
+      return null;
+    }
+  }, []);
+
+  const openFileInWorkspace = useCallback(
+    (reportedPath: string): void => {
+      const api = dockviewApiRef.current;
+      if (!api) {
+        return;
+      }
+
+      const absolutePath = resolveAgentPath(reportedPath);
+      if (!absolutePath) {
+        return;
+      }
+
+      const component = getPaneKindForPath(absolutePath);
+      const panelId = getPanelIdForPath(component, absolutePath);
+      const existingPanel = api.panels.find((panel) => panel.id === panelId);
+
+      if (existingPanel) {
+        existingPanel.api.updateParameters({ path: absolutePath });
+        existingPanel.api.setActive();
+        return;
+      }
+
+      const referencePanelId = getReferencePanelId(api);
+      api.addPanel({
+        id: panelId,
+        component,
+        title: getPanelTitleForPath(absolutePath),
+        params: { path: absolutePath },
+        ...(referencePanelId
+          ? {
+              position: {
+                referencePanel: referencePanelId,
+                direction: 'right' as const,
+              },
+            }
+          : {}),
+      });
+    },
+    [resolveAgentPath],
+  );
+
   const components = useMemo(
     () =>
       createPaneRegistry({
         'vault-browser': (props) => <VaultBrowser {...props} vaultRevision={vaultRevision} />,
-        chat: () => <Chat memoryStore={memoryStore} modelConnected={modelConnected} opencode={opencode} vaultPath={vaultPath} />,
+        chat: () => (
+          <Chat
+            memoryStore={memoryStore}
+            modelConnected={modelConnected}
+            opencode={opencode}
+            vaultPath={vaultPath}
+            onFileWritten={openFileInWorkspace}
+          />
+        ),
         today: () => <Today memoryStore={memoryStore} vaultPath={vaultPath} vaultRevision={vaultRevision} />,
         settings: () => (
           <Settings
@@ -108,18 +193,77 @@ export const Workspace = ({
       session,
       vaultPath,
       vaultRevision,
+      openFileInWorkspace,
     ],
   );
+
+  const saveLayoutNow = useCallback(
+    (api: DockviewApi): void => {
+      const snapshot: LayoutState = {
+        version: LAYOUT_VERSION,
+        dockviewModel: api.toJSON(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      void layoutStore.save(DEFAULT_USER_ID, snapshot).catch((error) => {
+        console.warn('Failed to persist workspace layout.', error);
+      });
+    },
+    [layoutStore],
+  );
+
+  const scheduleLayoutSave = useCallback(
+    (api: DockviewApi): void => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+
+      saveTimerRef.current = window.setTimeout(() => {
+        saveTimerRef.current = null;
+        saveLayoutNow(api);
+      }, LAYOUT_SAVE_DEBOUNCE_MS);
+    },
+    [saveLayoutNow],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+
+        const api = dockviewApiRef.current;
+        if (api) {
+          saveLayoutNow(api);
+        }
+      }
+    };
+  }, [saveLayoutNow]);
 
   const onReady = (event: DockviewReadyEvent): void => {
     dockviewApiRef.current = event.api;
 
     void (async () => {
-      const savedLayout = await layoutStore.load(DEFAULT_USER_ID);
+      let savedLayout: LayoutState | null = null;
+      try {
+        savedLayout = await layoutStore.load(DEFAULT_USER_ID);
+      } catch (error) {
+        console.warn('Failed to load saved workspace layout. Falling back to default.', error);
+      }
 
+      let hydrated = false;
       if (savedLayout?.dockviewModel) {
-        event.api.fromJSON(savedLayout.dockviewModel as ReturnType<typeof event.api.toJSON>);
-      } else {
+        try {
+          event.api.fromJSON(savedLayout.dockviewModel as ReturnType<typeof event.api.toJSON>);
+          hydrated = event.api.panels.length > 0;
+        } catch (error) {
+          console.warn('Stored workspace layout could not be hydrated. Falling back to default.', error);
+          hydrated = false;
+        }
+      }
+
+      if (!hydrated) {
+        event.api.clear();
         applyDefaultLayout(event.api, {
           memoryStore,
           vaultPath,
@@ -136,11 +280,7 @@ export const Workspace = ({
         });
 
       event.api.onDidLayoutChange(() => {
-        void layoutStore.save(DEFAULT_USER_ID, {
-          version: 1,
-          dockviewModel: event.api.toJSON(),
-          updatedAt: new Date().toISOString(),
-        });
+        scheduleLayoutSave(event.api);
       });
 
       setDockviewApi(event.api);
