@@ -86,6 +86,7 @@ How this shows up in practice:
 
 - Monorepo root: `tinker`
 - Commits: conventional commits with a real scope, for example `feat(bridge): stream OpenCode events to chat`
+- Branch names match the feature or fix they implement, for example `feat/07-workspace-persistence` or `fix/bridge-stream-shaping`. Do not leave agent-generated throwaway names like `claude/<slug>` on work that will reach review — rename before opening a PR so reviewers see scope, not a codename.
 - Sync against `origin/main`
 - Doc references that mention the future repo name should use `https://github.com/khvni/tinker.git`
 
