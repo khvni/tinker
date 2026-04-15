@@ -2,6 +2,7 @@ import { exists, mkdir, readDir, readTextFile, stat, watch, writeTextFile } from
 import type { VaultConfig, VaultNote, VaultService } from '@tinker/shared-types';
 import {
   deriveNoteTitle,
+  normalizeVaultRelativePath,
   parseFrontmatter,
   relativeVaultPath,
   resolveVaultPath,
@@ -14,6 +15,7 @@ type StoredVaultState = {
 };
 
 const DEFAULT_WELCOME_BODY = ['# Welcome', '', 'Your vault is ready.'].join('\n');
+const WINDOWS_VAULT_ROOT_PATTERN = /^(?:[A-Za-z]:|[\\/]{2})/u;
 
 const normalizeSuffixFilter = (glob?: string): string | null => {
   if (!glob) {
@@ -57,7 +59,11 @@ export const createVaultService = (): VaultService => {
 
     async readNote(relativePath: string): Promise<VaultNote | null> {
       const vaultPath = requireVaultPath();
-      const absolutePath = resolveVaultPath(vaultPath, relativePath);
+      const normalizedRelativePath = normalizeVaultRelativePath(
+        relativePath,
+        WINDOWS_VAULT_ROOT_PATTERN.test(vaultPath) ? 'windows' : 'posix',
+      );
+      const absolutePath = resolveVaultPath(vaultPath, normalizedRelativePath);
 
       if (!(await exists(absolutePath))) {
         return null;
@@ -67,8 +73,8 @@ export const createVaultService = (): VaultService => {
       const { frontmatter, body } = parseFrontmatter(text);
 
       return {
-        relativePath,
-        title: deriveNoteTitle(relativePath, frontmatter, body),
+        relativePath: normalizedRelativePath,
+        title: deriveNoteTitle(normalizedRelativePath, frontmatter, body),
         frontmatter,
         body,
         lastModified: info.mtime?.toISOString() ?? new Date().toISOString(),
@@ -77,11 +83,19 @@ export const createVaultService = (): VaultService => {
 
     async writeNote(relativePath: string, frontmatter: Record<string, unknown>, body: string): Promise<void> {
       const vaultPath = requireVaultPath();
-      const lastSlash = relativePath.lastIndexOf('/');
-      if (lastSlash > 0) {
-        await mkdir(resolveVaultPath(vaultPath, relativePath.slice(0, lastSlash)), { recursive: true });
+      const normalizedRelativePath = normalizeVaultRelativePath(
+        relativePath,
+        WINDOWS_VAULT_ROOT_PATTERN.test(vaultPath) ? 'windows' : 'posix',
+      );
+      if (normalizedRelativePath.length === 0) {
+        throw new Error('Vault note paths cannot be empty.');
       }
-      await writeTextFile(resolveVaultPath(vaultPath, relativePath), serializeFrontmatter(frontmatter, body));
+
+      const lastSlash = normalizedRelativePath.lastIndexOf('/');
+      if (lastSlash > 0) {
+        await mkdir(resolveVaultPath(vaultPath, normalizedRelativePath.slice(0, lastSlash)), { recursive: true });
+      }
+      await writeTextFile(resolveVaultPath(vaultPath, normalizedRelativePath), serializeFrontmatter(frontmatter, body));
     },
 
     async listNotes(glob?: string): Promise<string[]> {

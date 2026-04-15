@@ -1,57 +1,126 @@
 import { readDir } from '@tauri-apps/plugin-fs';
 import { dump, load } from 'js-yaml';
 
-const PATH_SEPARATOR_PATTERN = /[\\/]+/u;
-const TRAILING_SEPARATOR_PATTERN = /[\\/]+$/u;
-const LEADING_SEPARATOR_PATTERN = /^[\\/]+/u;
+type PathStyle = 'posix' | 'windows';
 
-const getPathSeparator = (path: string): '/' | '\\' => {
-  return path.includes('\\') ? '\\' : '/';
+const POSIX_SEPARATOR_PATTERN = /\/+/u;
+const WINDOWS_SEPARATOR_PATTERN = /[\\/]+/u;
+const WINDOWS_DRIVE_ROOT_PATTERN = /^[A-Za-z]:[\\/]?$/u;
+const WINDOWS_ABSOLUTE_PATH_PATTERN = /^(?:[A-Za-z]:|[\\/]{2})/u;
+const LEADING_POSIX_SEPARATOR_PATTERN = /^\//u;
+
+const getPathStyle = (path: string): PathStyle => {
+  return WINDOWS_ABSOLUTE_PATH_PATTERN.test(path) ? 'windows' : 'posix';
 };
 
-const normalizeRoot = (root: string): string => root.replace(TRAILING_SEPARATOR_PATTERN, '');
-
-const normalizeRelativePath = (value: string): string => {
-  return value
-    .replace(LEADING_SEPARATOR_PATTERN, '')
-    .split(PATH_SEPARATOR_PATTERN)
-    .filter((segment) => segment.length > 0)
-    .join('/');
+const getPathSeparator = (style: PathStyle): '/' | '\\' => {
+  return style === 'windows' ? '\\' : '/';
 };
 
-const toAbsolutePath = (directory: string, name: string): string => {
-  const separator = getPathSeparator(directory);
-  const normalizedDirectory = normalizeRoot(directory);
-  return normalizedDirectory.length > 0 ? `${normalizedDirectory}${separator}${name}` : name;
+const getPathSeparatorPattern = (style: PathStyle): RegExp => {
+  return style === 'windows' ? WINDOWS_SEPARATOR_PATTERN : POSIX_SEPARATOR_PATTERN;
+};
+
+const standardizeAbsolutePath = (value: string, style: PathStyle): string => {
+  if (value.length === 0) {
+    throw new Error('Vault paths cannot be empty.');
+  }
+
+  if (style === 'posix') {
+    return /^\/+$/u.test(value) ? '/' : value.replace(/\/+$/u, '');
+  }
+
+  const standardized = value.replace(/\//gu, '\\');
+
+  if (WINDOWS_DRIVE_ROOT_PATTERN.test(standardized)) {
+    return `${standardized.slice(0, 2)}\\`;
+  }
+
+  return standardized.replace(/\\+$/u, '');
+};
+
+const normalizeRoot = (root: string): string => {
+  const style = getPathStyle(root);
+  return standardizeAbsolutePath(root, style);
+};
+
+export const normalizeVaultRelativePath = (value: string, style: PathStyle = 'posix'): string => {
+  if (value.length === 0) {
+    return '';
+  }
+
+  if (
+    (style === 'windows' && WINDOWS_ABSOLUTE_PATH_PATTERN.test(value)) ||
+    (style === 'posix' && LEADING_POSIX_SEPARATOR_PATTERN.test(value))
+  ) {
+    throw new Error('Vault note paths must be relative to the vault root.');
+  }
+
+  const segments = value
+    .split(getPathSeparatorPattern(style))
+    .filter((segment) => segment.length > 0 && segment !== '.');
+
+  if (segments.some((segment) => segment === '..')) {
+    throw new Error('Vault note paths cannot escape the configured vault root.');
+  }
+
+  return segments.join('/');
+};
+
+const normalizeAbsoluteForComparison = (value: string, style: PathStyle): string => {
+  const normalized = standardizeAbsolutePath(value, style);
+  return style === 'windows' ? normalized.toLowerCase() : normalized;
+};
+
+const joinAbsolutePath = (root: string, child: string, style: PathStyle): string => {
+  if (child.length === 0) {
+    return root;
+  }
+
+  if ((style === 'posix' && root === '/') || (style === 'windows' && WINDOWS_DRIVE_ROOT_PATTERN.test(root))) {
+    return `${root}${child}`;
+  }
+
+  return `${root}${getPathSeparator(style)}${child}`;
 };
 
 export const relativeVaultPath = (root: string, absolutePath: string): string => {
   const normalizedRoot = normalizeRoot(root);
-  const normalizedRootPath = normalizedRoot.split(PATH_SEPARATOR_PATTERN).join('/');
-  const normalizedAbsolutePath = absolutePath.split(PATH_SEPARATOR_PATTERN).join('/');
+  const style = getPathStyle(normalizedRoot);
+  const separator = getPathSeparator(style);
+  const normalizedAbsolutePath = standardizeAbsolutePath(absolutePath, style);
+  const comparableRoot = normalizeAbsoluteForComparison(normalizedRoot, style);
+  const comparableAbsolutePath = normalizeAbsoluteForComparison(normalizedAbsolutePath, style);
 
-  if (normalizedAbsolutePath === normalizedRootPath) {
+  if (comparableAbsolutePath === comparableRoot) {
     return '';
   }
 
-  const rootPrefix = `${normalizedRootPath}/`;
-  return normalizedAbsolutePath.startsWith(rootPrefix)
-    ? normalizedAbsolutePath.slice(rootPrefix.length)
-    : normalizeRelativePath(absolutePath);
+  const rootPrefix = normalizedRoot.endsWith(separator) ? normalizedRoot : `${normalizedRoot}${separator}`;
+  const comparableRootPrefix = separator === '\\' ? rootPrefix.toLowerCase() : rootPrefix;
+
+  if (!comparableAbsolutePath.startsWith(comparableRootPrefix)) {
+    throw new Error(`Path "${absolutePath}" is outside vault root "${root}".`);
+  }
+
+  return normalizedAbsolutePath.slice(rootPrefix.length).split(getPathSeparatorPattern(style)).join('/');
 };
 
 export const resolveVaultPath = (root: string, relativePath: string): string => {
-  const separator = getPathSeparator(root);
   const normalizedRoot = normalizeRoot(root);
-  const normalizedRelativePath = normalizeRelativePath(relativePath).replaceAll('/', separator);
-  return normalizedRelativePath.length > 0 ? `${normalizedRoot}${separator}${normalizedRelativePath}` : normalizedRoot;
+  const style = getPathStyle(normalizedRoot);
+  const separator = getPathSeparator(style);
+  const normalizedRelativePath = normalizeVaultRelativePath(relativePath, style);
+  return joinAbsolutePath(normalizedRoot, normalizedRelativePath.replaceAll('/', separator), style);
 };
 
 export const walkVaultFiles = async (
   root: string,
   predicate?: (absolutePath: string) => boolean,
 ): Promise<string[]> => {
-  const stack = [normalizeRoot(root)];
+  const normalizedRoot = normalizeRoot(root);
+  const style = getPathStyle(normalizedRoot);
+  const stack = [normalizedRoot];
   const files: string[] = [];
 
   while (stack.length > 0) {
@@ -67,7 +136,7 @@ export const walkVaultFiles = async (
         continue;
       }
 
-      const absolutePath = toAbsolutePath(directory, entry.name);
+      const absolutePath = joinAbsolutePath(directory, entry.name, style);
 
       if (entry.isDirectory) {
         stack.push(absolutePath);
