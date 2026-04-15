@@ -37,12 +37,16 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | Task | Priority | Status | Notes |
 |------|----------|--------|-------|
-| Tauri sidecar lifecycle (start/health-check/stop OpenCode) | p1 | in progress | PRD §2.1, §2.2 |
+| Tauri sidecar lifecycle (start/health-check/stop OpenCode) | p1 | in progress | PRD §2.1, §2.2; adopt two-phase readiness + proxy-safe loopback health checks from [[opencode-desktop-review]] |
 | FirstRun UX (sign-in → vault choice → workspace) | p1 | not started | PRD runtime flow "First launch" |
 | Memory injection in bridge package | p1 | in progress | PRD §2.4 — `packages/bridge` |
 | Vault indexing to SQLite (entities + FTS) | p1 | not started | PRD §2.4 |
 | Today pane (recent entities view) | p2 | not started | PRD §2.5 default layout |
 | System keychain OAuth token storage | p1 | not started | CLAUDE.md §5 Security |
+| Startup loading orchestration (fast path + migration gate) | p1 | not started | Add delayed loading window only for long SQLite/bootstrap operations; avoid blocking happy path startup (from [[opencode-desktop-review]]) |
+| Desktop deep-link reliability pass (OAuth callback queueing) | p1 | not started | Buffer deep links before renderer listeners mount to prevent callback races on cold launch (from [[opencode-desktop-review]]) |
+| Renderer persistence durability (debounced writes + lifecycle flush + memory fallback) | p2 | not started | Harden local store behavior when plugin store unavailable/corrupt; preserve usability offline/failure states (from [[opencode-desktop-review]]) |
+| Desktop operator recovery controls (restart sidecar, diagnostics, update trigger) | p2 | not started | Add explicit recovery actions in app menu/Settings to shorten failure-to-recovery loop (from [[opencode-desktop-review]]) |
 
 ## Deferred (not v1)
 
