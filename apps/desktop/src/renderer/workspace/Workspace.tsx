@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent } from 'dockview-react';
-import { resolveVaultPath } from '@tinker/memory';
+import { resolveVaultPath, type MemoryRunState } from '@tinker/memory';
 import type { LayoutState, LayoutStore, MemoryStore, SkillStore, SSOSession } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, type OpencodeConnection } from '../../bindings.js';
 import { Chat } from '../panes/Chat.js';
@@ -41,6 +41,8 @@ type WorkspaceProps = {
   vaultPath: string | null;
   vaultRevision: number;
   activeSkillsRevision: number;
+  memorySweepState: MemoryRunState | null;
+  memorySweepBusy: boolean;
   onConnectModel(): Promise<void>;
   onDisconnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
@@ -48,6 +50,8 @@ type WorkspaceProps = {
   onCreateVault(): Promise<void>;
   onSelectVault(): Promise<void>;
   onActiveSkillsChanged(): void;
+  onRunMemorySweep(): Promise<void>;
+  onMemoryCommitted(): void;
 };
 
 export const Workspace = ({
@@ -66,11 +70,15 @@ export const Workspace = ({
   onDisconnectGoogle,
   onSelectVault,
   onActiveSkillsChanged,
+  onRunMemorySweep,
+  onMemoryCommitted,
   opencode,
   session,
   vaultPath,
   vaultRevision,
   activeSkillsRevision,
+  memorySweepState,
+  memorySweepBusy,
 }: WorkspaceProps): JSX.Element => {
   const dockviewApiRef = useRef<DockviewApi | null>(null);
   const saveTimerRef = useRef<number | null>(null);
@@ -150,16 +158,25 @@ export const Workspace = ({
         'vault-browser': (props) => <VaultBrowser {...props} vaultRevision={vaultRevision} />,
         chat: () => (
           <Chat
-            memoryStore={memoryStore}
             skillStore={skillStore}
             modelConnected={modelConnected}
             opencode={opencode}
             vaultPath={vaultPath}
             activeSkillsRevision={activeSkillsRevision}
             onFileWritten={openFileInWorkspace}
+            onMemoryCommitted={onMemoryCommitted}
           />
         ),
-        today: () => <Today memoryStore={memoryStore} vaultPath={vaultPath} vaultRevision={vaultRevision} />,
+        today: () => (
+          <Today
+            memoryStore={memoryStore}
+            vaultPath={vaultPath}
+            vaultRevision={vaultRevision}
+            memorySweepState={memorySweepState}
+            memorySweepBusy={memorySweepBusy}
+            onRunMemorySweep={onRunMemorySweep}
+          />
+        ),
         settings: () => (
           <Settings
             modelConnected={modelConnected}
@@ -193,6 +210,8 @@ export const Workspace = ({
       modelAuthBusy,
       modelAuthMessage,
       modelConnected,
+      memorySweepBusy,
+      memorySweepState,
       googleAuthBusy,
       googleAuthMessage,
       onConnectGoogle,
@@ -200,6 +219,8 @@ export const Workspace = ({
       onCreateVault,
       onDisconnectGoogle,
       onDisconnectModel,
+      onMemoryCommitted,
+      onRunMemorySweep,
       onSelectVault,
       opencode,
       session,
@@ -297,112 +318,30 @@ export const Workspace = ({
         .forEach((panel) => {
           panel.api.updateParameters({
             skillStore,
-            vaultPath,
             onActiveSkillsChanged,
+            vaultPath,
           });
         });
 
-      event.api.onDidLayoutChange(() => {
-        scheduleLayoutSave(event.api);
-      });
+      event.api.onDidAddPanel(() => scheduleLayoutSave(event.api));
+      event.api.onDidRemovePanel(() => scheduleLayoutSave(event.api));
+      event.api.onDidMovePanel(() => scheduleLayoutSave(event.api));
+      event.api.onDidActivePanelChange(() => scheduleLayoutSave(event.api));
 
       setDockviewApi(event.api);
+      scheduleLayoutSave(event.api);
     })();
   };
 
-  useEffect(() => {
-    const api = dockviewApi;
-    if (!api) {
-      return;
-    }
-
-    api.panels
-      .filter((panel) => panel.id === 'vault-browser')
-      .forEach((panel) => {
-        panel.api.updateParameters({
-          memoryStore,
-          vaultPath,
-        });
-      });
-
-    api.panels
-      .filter((panel) => panel.id === 'dojo')
-      .forEach((panel) => {
-        panel.api.updateParameters({
-          skillStore,
-          vaultPath,
-          onActiveSkillsChanged,
-        });
-      });
-
-    if (!vaultPath) {
-      return;
-    }
-
-    if (!api.panels.some((panel) => panel.id === 'vault-browser')) {
-      const referencePanelId = getReferencePanelId(api);
-      api.addPanel({
-        id: 'vault-browser',
-        component: 'vault-browser',
-        title: 'Vault',
-        params: {
-          memoryStore,
-          vaultPath,
-        },
-        initialWidth: 280,
-        inactive: true,
-        ...(referencePanelId
-          ? {
-              position: {
-                referencePanel: referencePanelId,
-                direction: 'left' as const,
-              },
-            }
-          : {}),
-      });
-    }
-
-    if (!api.panels.some((panel) => panel.id === 'dojo')) {
-      const referencePanelId = getReferencePanelId(api);
-      api.addPanel({
-        id: 'dojo',
-        component: 'dojo',
-        title: 'Dojo',
-        params: {
-          skillStore,
-          vaultPath,
-          onActiveSkillsChanged,
-        },
-        inactive: true,
-        ...(referencePanelId
-          ? {
-              position: {
-                referencePanel: referencePanelId,
-                direction: 'within' as const,
-              },
-            }
-          : {}),
-      });
-    }
-  }, [dockviewApi, memoryStore, skillStore, vaultPath, onActiveSkillsChanged]);
-
   return (
-    <main className="tinker-workspace-shell">
-      <header className="tinker-header">
-        <div>
-          <p className="tinker-eyebrow">Workspace</p>
-          <h1>Tinker</h1>
-        </div>
-        <div className="tinker-header-meta">
-          <span className="tinker-pill">{modelConnected ? 'GPT-5.4 connected' : 'GPT-5.4 disconnected'}</span>
-          <span className="tinker-pill">{session ? session.email : 'Offline mode'}</span>
-          <span className="tinker-pill">{vaultPath ?? 'No vault selected'}</span>
-        </div>
-      </header>
-
-      <DockviewApiContext.Provider value={dockviewApi}>
-        <DockviewReact className="dockview-theme-abyss tinker-dockview" components={components} onReady={onReady} />
-      </DockviewApiContext.Provider>
-    </main>
+    <DockviewApiContext.Provider value={dockviewApi}>
+      <section className="tinker-stage">
+        <DockviewReact
+          className="dockview-theme-dark tinker-workspace"
+          components={components}
+          onReady={onReady}
+        />
+      </section>
+    </DockviewApiContext.Provider>
   );
 };

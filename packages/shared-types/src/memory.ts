@@ -5,6 +5,10 @@ export type EntityKind =
   | 'channel'
   | 'ticket'
   | 'account'
+  | 'concept'
+  | 'organization'
+  | 'tool'
+  | 'event'
   | 'other';
 
 export type EntitySource = {

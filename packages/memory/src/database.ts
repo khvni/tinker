@@ -62,6 +62,13 @@ const schema = [
     author_email TEXT,
     updated_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS memory_runs (
+    run_key TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    last_started_at TEXT,
+    last_completed_at TEXT,
+    last_error TEXT
+  )`,
 ];
 
 const bootstrap = async (database: Database): Promise<Database> => {

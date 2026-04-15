@@ -1,7 +1,7 @@
 ---
 type: concept
 tags: [tinker, feature, memory, vault, pipeline]
-status: not-started
+status: review
 priority: p2
 ---
 
@@ -66,6 +66,9 @@ Triggered by:
 - `[2026-04-14]` Never overwrite existing atomic facts — append new dated bullets
 - `[2026-04-14]` Pronoun resolution is critical — extraction sub-agent must resolve "he/she/it" to named entities before writing
 - `[2026-04-14]` Wikilinks use bare form `[[Name]]`, not `[[path/Name]]`
+- `[2026-04-15]` Managed facts append under `## Tinker Memory`; user-authored note content and later sections stay intact
+- `[2026-04-15]` Prompt-time retrieval uses SQLite FTS + one-hop `relationships` expansion from indexed wikilinks
+- `[2026-04-15]` Daily sweep state lives in SQLite `memory_runs`; renderer timer calls same extraction + append-only merge path until [[04-native-scheduler]] is on this branch
 
 ### Scheduling
 
@@ -99,12 +102,12 @@ Triggered by:
 
 ## Acceptance Criteria
 
-- [ ] Vault markdown files are indexed into SQLite `entities` table on app launch
-- [ ] After a chat session, atomic facts are appended to relevant vault notes
-- [ ] Daily scheduled sweep extracts entities from Gmail / Calendar / Drive / Linear
-- [ ] Before each user prompt, relevant entities are injected as context
-- [ ] Agents can traverse wikilinks in extracted content (existing entity references preserved)
-- [ ] Extraction never overwrites existing content destructively
+- [x] Vault markdown files are indexed into SQLite `entities` table on app launch
+- [x] After a chat session, atomic facts are appended to relevant vault notes
+- [x] Daily scheduled sweep extracts entities from Gmail / Calendar / Drive / Linear
+- [x] Before each user prompt, relevant entities are injected as context
+- [x] Agents can traverse wikilinks in extracted content (existing entity references preserved)
+- [x] Extraction never overwrites existing content destructively
 
 ## Connections
 - [[ramp-glass]] — 24hr synthesis reference
