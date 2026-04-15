@@ -1,7 +1,7 @@
 ---
 type: concept
 tags: [tinker, feature, sso, oauth, mcp, integrations]
-status: in-progress
+status: review
 priority: p1
 ---
 
@@ -30,19 +30,19 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 - `[2026-04-14]` `@google/calendar-mcp-server` — already in `opencode.json`
 - `[2026-04-14]` `@google/drive-mcp-server` — already in `opencode.json`
 - `[2026-04-14]` `@tacticlaunch/mcp-linear` — already configured, gated on env var
-- `[2026-04-14]` Add: GitHub MCP server (to be identified; check ClawHub / awesome-mcp-servers)
+- `[2026-04-15]` GitHub MCP server = `@modelcontextprotocol/server-github`, wired behind `TINKER_GITHUB_TOKEN`
 
 ## Implementation Outline
 
 ### 1. Auth layer (Rust — Tauri plugin boundary)
 - `[2026-04-14]` `tauri-plugin-keyring` for system keychain storage of OAuth tokens
 - `[2026-04-14]` Google loopback OAuth command runs in Rust (`src-tauri/src/auth.rs` pattern) — opens browser → receives callback → stores token in keychain
-- `[2026-04-14]` GitHub OAuth mirrors the same pattern
+- `[2026-04-15]` GitHub auth uses device flow in desktop build. Reason: GitHub web-flow token exchange needs `client_secret`, while device flow works with `client_id` only and fits local-first desktop constraints
 - `[2026-04-14]` Rust exposes minimal `invoke` commands: `auth_sign_in(provider)`, `auth_sign_out(provider)`, `auth_status()`
 
 ### 2. Connector activation (TypeScript — renderer)
-- `[2026-04-14]` On successful auth, renderer reads token from keychain and calls OpenCode `auth.set()` to register credentials
-- `[2026-04-14]` MCP servers that depend on provider tokens become active automatically (OpenCode SDK handles this)
+- `[2026-04-14]` On successful auth, renderer reloads sidecar state, forwards Google auth into OpenCode, and re-reads MCP status for UI
+- `[2026-04-15]` GitHub MCP is activated by restarting OpenCode with `TINKER_GITHUB_TOKEN` in process env, then connecting `github` server from renderer
 - `[2026-04-14]` UI reflects connection state in a compact status indicator (not a modal)
 
 ### 3. First-run flow (PRD §2.5)
