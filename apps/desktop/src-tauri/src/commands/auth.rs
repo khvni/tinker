@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::TcpListener as StdTcpListener, path::PathBuf, sync::Mutex};
+use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use rand::{rngs::OsRng, RngCore};
@@ -24,10 +24,16 @@ const BETTER_AUTH_TIMEOUT: TokioDuration = TokioDuration::from_secs(180);
 const BETTER_AUTH_HEALTH_RETRY_COUNT: usize = 20;
 const BETTER_AUTH_HEALTH_RETRY_DELAY: TokioDuration = TokioDuration::from_millis(500);
 const BETTER_AUTH_SECRET_HEADER: &str = "x-tinker-bridge-secret";
+const BETTER_AUTH_PORT_ENV: &str = "TINKER_BETTER_AUTH_PORT";
+const DEFAULT_BETTER_AUTH_PORT: u16 = 3147;
 const GOOGLE_CLIENT_ID_ENV: &str = "GOOGLE_OAUTH_CLIENT_ID";
 const GOOGLE_CLIENT_SECRET_ENV: &str = "GOOGLE_OAUTH_CLIENT_SECRET";
+const GOOGLE_CLIENT_ID_ALIAS_ENV: &str = "GOOGLE_CLIENT_ID";
+const GOOGLE_CLIENT_SECRET_ALIAS_ENV: &str = "GOOGLE_CLIENT_SECRET";
 const GITHUB_CLIENT_ID_ENV: &str = "GITHUB_OAUTH_CLIENT_ID";
 const GITHUB_CLIENT_SECRET_ENV: &str = "GITHUB_OAUTH_CLIENT_SECRET";
+const GITHUB_CLIENT_ID_ALIAS_ENV: &str = "GITHUB_CLIENT_ID";
+const GITHUB_CLIENT_SECRET_ALIAS_ENV: &str = "GITHUB_CLIENT_SECRET";
 const BETTER_AUTH_SECRET_ENV: &str = "TINKER_BETTER_AUTH_SECRET";
 
 #[derive(Clone)]
@@ -64,10 +70,17 @@ impl AuthProvider {
     }
   }
 
-  fn env_names(self) -> (&'static str, &'static str) {
+  fn client_id_env_names(self) -> &'static [&'static str] {
     match self {
-      AuthProvider::Google => (GOOGLE_CLIENT_ID_ENV, GOOGLE_CLIENT_SECRET_ENV),
-      AuthProvider::Github => (GITHUB_CLIENT_ID_ENV, GITHUB_CLIENT_SECRET_ENV),
+      AuthProvider::Google => &[GOOGLE_CLIENT_ID_ENV, GOOGLE_CLIENT_ID_ALIAS_ENV],
+      AuthProvider::Github => &[GITHUB_CLIENT_ID_ENV, GITHUB_CLIENT_ID_ALIAS_ENV],
+    }
+  }
+
+  fn client_secret_env_names(self) -> &'static [&'static str] {
+    match self {
+      AuthProvider::Google => &[GOOGLE_CLIENT_SECRET_ENV, GOOGLE_CLIENT_SECRET_ALIAS_ENV],
+      AuthProvider::Github => &[GITHUB_CLIENT_SECRET_ENV, GITHUB_CLIENT_SECRET_ALIAS_ENV],
     }
   }
 }
@@ -182,19 +195,73 @@ fn optional_env(name: &str) -> Option<String> {
   std::env::var(name).ok().filter(|value| !value.trim().is_empty())
 }
 
-fn require_provider_configuration(provider: AuthProvider) -> Result<(), String> {
-  let (client_id_env, client_secret_env) = provider.env_names();
+fn is_placeholder_value(value: &str) -> bool {
+  let normalized = value.trim().to_ascii_uppercase();
+  normalized.contains("PLACEHOLDER")
+    || normalized.starts_with("YOUR_")
+    || normalized == "CHANGEME"
+    || normalized == "CHANGE_ME"
+}
 
-  if optional_env(client_id_env).is_some() && optional_env(client_secret_env).is_some() {
+fn looks_like_google_client_id(value: &str) -> bool {
+  value.trim().ends_with(".apps.googleusercontent.com")
+}
+
+fn configured_better_auth_port() -> Result<u16, String> {
+  match optional_env(BETTER_AUTH_PORT_ENV) {
+    Some(value) => {
+      let port = value
+        .parse::<u16>()
+        .map_err(|_| format!("Invalid {} value: {}", BETTER_AUTH_PORT_ENV, value))?;
+      if port == 0 {
+        return Err(format!("Invalid {} value: {}", BETTER_AUTH_PORT_ENV, value));
+      }
+      Ok(port)
+    }
+    None => Ok(DEFAULT_BETTER_AUTH_PORT),
+  }
+}
+
+fn better_auth_callback_uri(provider: AuthProvider, port: u16) -> String {
+  format!("http://127.0.0.1:{port}/api/auth/callback/{}", provider.as_str())
+}
+
+fn provider_configuration_message(provider: AuthProvider, port: u16) -> String {
+  format!(
+    "{} sign-in is not configured. Set {} and {}, then register redirect URI {}.",
+    provider.display_name(),
+    provider.client_id_env_names().join(" or "),
+    provider.client_secret_env_names().join(" or "),
+    better_auth_callback_uri(provider, port)
+  )
+}
+
+fn first_usable_env(provider: AuthProvider, names: &[&str], validate: impl Fn(&str) -> bool) -> Option<String> {
+  names
+    .iter()
+    .filter_map(|name| optional_env(name))
+    .find(|value| {
+      if is_placeholder_value(value) {
+        return false;
+      }
+
+      match provider {
+        AuthProvider::Google => validate(value),
+        AuthProvider::Github => true,
+      }
+    })
+}
+
+fn require_provider_configuration(provider: AuthProvider) -> Result<(), String> {
+  let port = configured_better_auth_port()?;
+  let client_id = first_usable_env(provider, provider.client_id_env_names(), looks_like_google_client_id);
+  let client_secret = first_usable_env(provider, provider.client_secret_env_names(), |_| true);
+
+  if client_id.is_some() && client_secret.is_some() {
     return Ok(());
   }
 
-  Err(format!(
-    "{} sign-in is not configured. Set {} and {} before launching Tinker.",
-    provider.display_name(),
-    client_id_env,
-    client_secret_env
-  ))
+  Err(provider_configuration_message(provider, port))
 }
 
 fn auth_sidecar_script_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -222,12 +289,6 @@ fn auth_sidecar_script_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, S
 
   Err("Could not locate Better Auth sidecar bundle.".to_string())
 }
-
-fn next_loopback_port() -> Result<u16, String> {
-  let listener = StdTcpListener::bind("127.0.0.1:0").map_err(|error| error.to_string())?;
-  listener.local_addr().map_err(|error| error.to_string()).map(|address| address.port())
-}
-
 async fn wait_for_better_auth(runtime: &BetterAuthRuntime) -> Result<(), String> {
   let client = reqwest::Client::new();
   let health_url = format!("{}/health", runtime.base_url);
@@ -269,7 +330,7 @@ fn spawn_auth_log_task(mut receiver: tauri::async_runtime::Receiver<CommandEvent
 
 async fn start_better_auth<R: Runtime>(app: &AppHandle<R>) -> Result<BetterAuthRuntime, String> {
   let script_path = auth_sidecar_script_path(app)?;
-  let port = next_loopback_port()?;
+  let port = configured_better_auth_port()?;
   let bridge_secret = random_url_safe(24);
   let base_url = format!("http://127.0.0.1:{port}");
 
@@ -283,16 +344,20 @@ async fn start_better_auth<R: Runtime>(app: &AppHandle<R>) -> Result<BetterAuthR
       ("TINKER_BETTER_AUTH_BRIDGE_SECRET", bridge_secret.clone()),
     ]);
 
-  for env_name in [
-    GOOGLE_CLIENT_ID_ENV,
-    GOOGLE_CLIENT_SECRET_ENV,
-    GITHUB_CLIENT_ID_ENV,
-    GITHUB_CLIENT_SECRET_ENV,
-    BETTER_AUTH_SECRET_ENV,
-  ] {
-    if let Some(value) = optional_env(env_name) {
-      sidecar = sidecar.env(env_name, value);
-    }
+  if let Some(value) = first_usable_env(AuthProvider::Google, AuthProvider::Google.client_id_env_names(), looks_like_google_client_id) {
+    sidecar = sidecar.env(GOOGLE_CLIENT_ID_ENV, value);
+  }
+  if let Some(value) = first_usable_env(AuthProvider::Google, AuthProvider::Google.client_secret_env_names(), |_| true) {
+    sidecar = sidecar.env(GOOGLE_CLIENT_SECRET_ENV, value);
+  }
+  if let Some(value) = first_usable_env(AuthProvider::Github, AuthProvider::Github.client_id_env_names(), |_| true) {
+    sidecar = sidecar.env(GITHUB_CLIENT_ID_ENV, value);
+  }
+  if let Some(value) = first_usable_env(AuthProvider::Github, AuthProvider::Github.client_secret_env_names(), |_| true) {
+    sidecar = sidecar.env(GITHUB_CLIENT_SECRET_ENV, value);
+  }
+  if let Some(value) = optional_env(BETTER_AUTH_SECRET_ENV) {
+    sidecar = sidecar.env(BETTER_AUTH_SECRET_ENV, value);
   }
 
   if let Some(parent) = script_path.parent() {
@@ -417,14 +482,30 @@ async fn fetch_transferred_session(runtime: &BetterAuthRuntime, ticket: &str) ->
 fn callback_error_message(provider: AuthProvider, params: &HashMap<String, String>) -> String {
   let code = params
     .get("error")
-    .map(|value| value.replace('_', " "))
-    .unwrap_or_else(|| "sign-in failed".to_string());
+    .cloned()
+    .unwrap_or_else(|| "oauth_failed".to_string());
+  let port = configured_better_auth_port().unwrap_or(DEFAULT_BETTER_AUTH_PORT);
+
+  if provider == AuthProvider::Google
+    && (code == "invalid_client"
+      || code == "redirect_uri_mismatch"
+      || params
+        .get("errorDescription")
+        .is_some_and(|value| value.contains("OAuth client was not found") || value.contains("redirect_uri_mismatch")))
+  {
+    let setup_hint = provider_configuration_message(provider, port);
+    if let Some(description) = params.get("errorDescription").filter(|value| !value.trim().is_empty()) {
+      return format!("{setup_hint} Google said: {description}");
+    }
+
+    return setup_hint;
+  }
 
   if let Some(description) = params.get("errorDescription").filter(|value| !value.trim().is_empty()) {
     return format!("{} sign-in failed: {description}", provider.display_name());
   }
 
-  format!("{} sign-in failed: {code}", provider.display_name())
+  format!("{} sign-in failed: {}", provider.display_name(), code.replace('_', " "))
 }
 
 async fn sign_in_with_better_auth<R: Runtime>(app: &AppHandle<R>, provider: AuthProvider) -> Result<SSOSession, String> {

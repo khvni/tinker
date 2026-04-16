@@ -22,6 +22,7 @@ type TransferRecord = {
 
 const TRANSFER_TTL_MS = 5 * 60 * 1000;
 const SESSION_FALLBACK_TTL_MS = 60 * 60 * 1000;
+const DEFAULT_BETTER_AUTH_PORT = 3147;
 
 const requiredEnv = (name: string): string => {
   const value = process.env[name];
@@ -37,6 +38,14 @@ const optionalEnv = (name: string): string | null => {
   return value && value.trim().length > 0 ? value : null;
 };
 
+const isPlaceholderValue = (value: string): boolean => {
+  return /PLACEHOLDER|^YOUR_|^CHANGE(?:_|-)ME$/iu.test(value.trim());
+};
+
+const looksLikeGoogleClientId = (value: string): boolean => {
+  return value.trim().endsWith('.apps.googleusercontent.com');
+};
+
 const parsePort = (value: string): number => {
   const port = Number.parseInt(value, 10);
   if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
@@ -46,22 +55,28 @@ const parsePort = (value: string): number => {
   return port;
 };
 
-const authPort = parsePort(requiredEnv('TINKER_BETTER_AUTH_PORT'));
+const authPort = parsePort(optionalEnv('TINKER_BETTER_AUTH_PORT') ?? String(DEFAULT_BETTER_AUTH_PORT));
 const bridgeSecret = requiredEnv('TINKER_BETTER_AUTH_BRIDGE_SECRET');
 const baseURL = `http://127.0.0.1:${authPort}`;
 const googleClientId = optionalEnv('GOOGLE_OAUTH_CLIENT_ID');
 const googleClientSecret = optionalEnv('GOOGLE_OAUTH_CLIENT_SECRET');
 const githubClientId = optionalEnv('GITHUB_OAUTH_CLIENT_ID');
 const githubClientSecret = optionalEnv('GITHUB_OAUTH_CLIENT_SECRET');
+const configuredGoogleClientId =
+  googleClientId && !isPlaceholderValue(googleClientId) && looksLikeGoogleClientId(googleClientId) ? googleClientId : null;
+const configuredGoogleClientSecret = googleClientSecret && !isPlaceholderValue(googleClientSecret) ? googleClientSecret : null;
+const configuredGithubClientId = githubClientId && !isPlaceholderValue(githubClientId) ? githubClientId : null;
+const configuredGithubClientSecret = githubClientSecret && !isPlaceholderValue(githubClientSecret) ? githubClientSecret : null;
 
 const transfers = new Map<string, TransferRecord>();
 
 const socialProviders = {
-  ...(googleClientId && googleClientSecret
+  ...(configuredGoogleClientId && configuredGoogleClientSecret
     ? {
         google: {
-          clientId: googleClientId,
-          clientSecret: googleClientSecret,
+          clientId: configuredGoogleClientId,
+          clientSecret: configuredGoogleClientSecret,
+          redirectURI: `${baseURL}/api/auth/callback/google`,
           scope: [
             'openid',
             'email',
@@ -73,11 +88,12 @@ const socialProviders = {
         },
       }
     : {}),
-  ...(githubClientId && githubClientSecret
+  ...(configuredGithubClientId && configuredGithubClientSecret
     ? {
         github: {
-          clientId: githubClientId,
-          clientSecret: githubClientSecret,
+          clientId: configuredGithubClientId,
+          clientSecret: configuredGithubClientSecret,
+          redirectURI: `${baseURL}/api/auth/callback/github`,
           scope: ['read:user', 'user:email', 'repo'],
         },
       }

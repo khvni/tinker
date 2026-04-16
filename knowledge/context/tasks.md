@@ -25,7 +25,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | # | Feature | Priority | Status | Spec | Notes |
 |---|---------|----------|--------|------|-------|
-| 01 | SSO connector layer (Google + GitHub OAuth, pre-wired MCP integrations) | p1 | review | [[01-sso-connector-layer]] | Better Auth local sidecar now owns social OAuth; Rust still owns keychain + loopback bridge |
+| 01 | SSO connector layer (Google + GitHub OAuth, pre-wired MCP integrations) | p1 | review | [[01-sso-connector-layer]] | Better Auth local sidecar now owns social OAuth; Rust still owns keychain + loopback bridge. `[2026-04-15]` Google flow hardened: stable Better Auth callback URI + bad-client validation |
 | 02 | Dojo skill marketplace (local + optional Git sync) | p1 | review | [[02-dojo-skill-marketplace]] | Vault-backed skill storage; browser UI; install/publish actions |
 | 03 | Self-building memory pipeline (scheduled entity extraction from connected tools) | p2 | review | [[03-memory-pipeline]] | Vault indexing, prompt injection, session append, and daily sweep wired; review daily sweep behavior against live connectors |
 | 04 | Native scheduler (cron-style scheduled prompts) | p1 | review | [[04-native-scheduler]] | In-process scheduler with SQLite-persisted job definitions |

@@ -57,7 +57,7 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 - `[2026-04-14]` Tokens stored **only** in system keychain (never in files, never in SQLite)
 - `[2026-04-15]` Better Auth sidecar uses stateless cookie/account cookies only during browser sign-in. Flow signs out before handing ticket back to app callback
 - `[2026-04-14]` MCP server processes inherit tokens via env vars at spawn time — not passed across IPC
-- `[2026-04-15]` Rust auth commands use loopback redirect URIs (`http://127.0.0.1:<random-port>/callback`) and Better Auth local callback routes — no wildcard domains
+- `[2026-04-15]` Rust auth commands use random loopback app callbacks (`http://127.0.0.1:<random-port>/callback`), but Better Auth provider callbacks use stable local redirect URIs (`http://127.0.0.1:3147/api/auth/callback/{provider}`) so Google/GitHub console config stays deterministic
 - `[2026-04-14]` Treat external content returned from MCP as untrusted prompt input (per CLAUDE.md §5)
 
 ## Out of Scope ([[decisions]])
