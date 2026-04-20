@@ -85,21 +85,6 @@ export type FlashAccentStyle = {
   readonly blurRadius: number;
 };
 
-const EMPTY_SET: ReadonlySet<string> = new Set<string>();
-
-const EMPTY_WORKSPACE_SNAPSHOT: WorkspaceAttentionSnapshot = {
-  focusedPaneId: null,
-  unreadPaneIds: EMPTY_SET,
-  focusedReadPaneId: null,
-  manualUnreadPaneIds: EMPTY_SET,
-  activeFlash: null,
-};
-
-const EMPTY_ATTENTION_SNAPSHOT: AttentionSnapshot = {
-  workspaceId: null,
-  ...EMPTY_WORKSPACE_SNAPSHOT,
-};
-
 export const FLASH_RAMP_UP_MS = 120;
 export const FLASH_HOLD_MS = 180;
 export const FLASH_RAMP_DOWN_MS = 420;
@@ -132,10 +117,6 @@ const withPaneRemoved = (source: ReadonlySet<string>, paneId: string): ReadonlyS
   return next;
 };
 
-const isFocused = (workspace: WorkspaceAttentionSnapshot, paneId: string): boolean => {
-  return workspace.focusedPaneId === paneId;
-};
-
 const hasCompetingIndicator = (
   workspace: WorkspaceAttentionSnapshot,
   paneId: string,
@@ -149,14 +130,10 @@ const hasCompetingIndicator = (
   return workspace.activeFlash?.accent === 'notification-blue' && workspace.activeFlash.paneId !== paneId;
 };
 
-const toFlashAccent = (reason: FlashReason): FlashAccent => {
-  return reason === 'navigation' ? 'navigation-teal' : 'notification-blue';
-};
-
 const buildFlash = (signal: AttentionSignal, startedAt: number): AttentionFlash => ({
   paneId: signal.paneId,
   reason: signal.reason,
-  accent: toFlashAccent(signal.reason),
+  accent: signal.reason === 'navigation' ? 'navigation-teal' : 'notification-blue',
   startedAt,
 });
 
@@ -193,6 +170,7 @@ const reduceSignal = (
   signal: AttentionSignal,
   startedAt: number,
 ): WorkspaceAttentionSnapshot => {
+  const focused = workspace.focusedPaneId === signal.paneId;
   let unreadPaneIds = workspace.unreadPaneIds;
   let manualUnreadPaneIds = workspace.manualUnreadPaneIds;
   let focusedReadPaneId = workspace.focusedReadPaneId;
@@ -200,7 +178,7 @@ const reduceSignal = (
 
   switch (signal.reason) {
     case 'notification-arrival': {
-      if (isFocused(workspace, signal.paneId)) {
+      if (focused) {
         unreadPaneIds = withPaneRemoved(unreadPaneIds, signal.paneId);
         focusedReadPaneId = signal.paneId;
         break;
@@ -210,9 +188,7 @@ const reduceSignal = (
       break;
     }
     case 'navigation': {
-      if (isFocused(workspace, signal.paneId) || hasCompetingIndicator(workspace, signal.paneId)) {
-        break;
-      }
+      if (focused || hasCompetingIndicator(workspace, signal.paneId)) break;
       activeFlash = buildFlash(signal, startedAt);
       break;
     }
@@ -224,9 +200,7 @@ const reduceSignal = (
     }
     case 'notification-dismiss': {
       unreadPaneIds = withPaneRemoved(unreadPaneIds, signal.paneId);
-      if (isFocused(workspace, signal.paneId)) {
-        activeFlash = buildFlash(signal, startedAt);
-      }
+      if (focused) activeFlash = buildFlash(signal, startedAt);
       break;
     }
     case 'debug': {
@@ -253,32 +227,6 @@ const reduceSignal = (
   };
 };
 
-const initialAttentionState = (): Omit<AttentionStoreState, 'actions'> => ({
-  activeWorkspaceId: null,
-  workspaces: {},
-});
-
-const scheduleAnimationFrame = (callback: () => void):
-  | { readonly kind: 'raf'; readonly id: number }
-  | { readonly kind: 'timeout'; readonly id: ReturnType<typeof setTimeout> } => {
-  if (typeof globalThis.requestAnimationFrame === 'function') {
-    return { kind: 'raf', id: globalThis.requestAnimationFrame(() => callback()) };
-  }
-  return { kind: 'timeout', id: setTimeout(callback, 16) };
-};
-
-const cancelAnimationFrameHandle = (
-  handle:
-    | { readonly kind: 'raf'; readonly id: number }
-    | { readonly kind: 'timeout'; readonly id: ReturnType<typeof setTimeout> },
-): void => {
-  if (handle.kind === 'raf') {
-    globalThis.cancelAnimationFrame?.(handle.id);
-    return;
-  }
-  clearTimeout(handle.id);
-};
-
 export const createAttentionStore = (
   options: CreateAttentionStoreOptions = {},
 ): AttentionStore => {
@@ -292,15 +240,9 @@ export const createAttentionStore = (
     flashTimers.delete(workspaceId);
   };
 
-  const cancelAllFlashTimers = (): void => {
-    for (const timer of flashTimers.values()) {
-      clearTimeout(timer);
-    }
-    flashTimers.clear();
-  };
-
   return createStore<AttentionStoreState>((set, get) => ({
-    ...initialAttentionState(),
+    activeWorkspaceId: null,
+    workspaces: {},
     actions: {
       activateWorkspace: (workspaceId) => {
         set((state) => withWorkspaceSnapshot(state, workspaceId, (workspace) => workspace));
@@ -323,8 +265,9 @@ export const createAttentionStore = (
         }));
       },
       reset: () => {
-        cancelAllFlashTimers();
-        set({ ...initialAttentionState(), actions: get().actions });
+        for (const timer of flashTimers.values()) clearTimeout(timer);
+        flashTimers.clear();
+        set({ activeWorkspaceId: null, workspaces: {}, actions: get().actions });
       },
       focusPane: ({ workspaceId, paneId }) => {
         set((state) =>
@@ -359,10 +302,7 @@ export const createAttentionStore = (
           withWorkspaceSnapshot(state, workspaceId, (workspace) => {
             const manualUnreadPaneIds = withPaneAdded(workspace.manualUnreadPaneIds, paneId);
             if (manualUnreadPaneIds === workspace.manualUnreadPaneIds) return workspace;
-            return {
-              ...workspace,
-              manualUnreadPaneIds,
-            };
+            return { ...workspace, manualUnreadPaneIds };
           }),
         );
       },
@@ -402,10 +342,7 @@ export const selectWorkspaceAttentionSnapshot = (
   state: AttentionStoreState,
   workspaceId: string,
 ): AttentionSnapshot => {
-  const workspace = state.workspaces[workspaceId];
-  if (!workspace) {
-    return { workspaceId, ...EMPTY_WORKSPACE_SNAPSHOT };
-  }
+  const workspace = state.workspaces[workspaceId] ?? emptyWorkspaceSnapshot();
   return { workspaceId, ...workspace };
 };
 
@@ -413,7 +350,7 @@ export const selectAttentionSnapshot = (
   state: AttentionStoreState,
 ): AttentionSnapshot => {
   const workspaceId = state.activeWorkspaceId;
-  if (workspaceId === null) return EMPTY_ATTENTION_SNAPSHOT;
+  if (workspaceId === null) return { workspaceId: null, ...emptyWorkspaceSnapshot() };
   return selectWorkspaceAttentionSnapshot(state, workspaceId);
 };
 
@@ -423,9 +360,7 @@ export const collectUnreadPaneIds = (
   if (snapshot.unreadPaneIds.size === 0) return snapshot.manualUnreadPaneIds;
   if (snapshot.manualUnreadPaneIds.size === 0) return snapshot.unreadPaneIds;
   const next = new Set(snapshot.unreadPaneIds);
-  for (const paneId of snapshot.manualUnreadPaneIds) {
-    next.add(paneId);
-  }
+  for (const paneId of snapshot.manualUnreadPaneIds) next.add(paneId);
   return next;
 };
 
@@ -433,42 +368,17 @@ export const countUnreadPanes = (
   snapshot: Pick<AttentionSnapshot, 'unreadPaneIds' | 'manualUnreadPaneIds'>,
 ): number => collectUnreadPaneIds(snapshot).size;
 
-export const getFlashProgress = (startedAt: number, currentTime: number = Date.now()): number => {
-  const elapsed = currentTime - startedAt;
-  if (elapsed <= 0) return 0;
-  if (elapsed >= FLASH_DURATION_MS) return 1;
-  return elapsed / FLASH_DURATION_MS;
-};
-
-export const getFlashOpacity = (
-  accent: FlashAccent,
-  elapsedMs: number,
-): number => {
+export const getFlashOpacity = (accent: FlashAccent, elapsedMs: number): number => {
   if (elapsedMs <= 0) return 0;
-
   const peak = FLASH_ACCENT_STYLES[accent].peakOpacity;
-  if (elapsedMs < FLASH_RAMP_UP_MS) {
-    return peak * (elapsedMs / FLASH_RAMP_UP_MS);
-  }
-
-  if (elapsedMs <= FLASH_RAMP_UP_MS + FLASH_HOLD_MS) {
-    return peak;
-  }
-
-  if (elapsedMs >= FLASH_DURATION_MS) {
-    return 0;
-  }
-
-  const fadeElapsed = elapsedMs - FLASH_RAMP_UP_MS - FLASH_HOLD_MS;
-  return peak * (1 - fadeElapsed / FLASH_RAMP_DOWN_MS);
+  if (elapsedMs < FLASH_RAMP_UP_MS) return peak * (elapsedMs / FLASH_RAMP_UP_MS);
+  if (elapsedMs <= FLASH_RAMP_UP_MS + FLASH_HOLD_MS) return peak;
+  if (elapsedMs >= FLASH_DURATION_MS) return 0;
+  return peak * (1 - (elapsedMs - FLASH_RAMP_UP_MS - FLASH_HOLD_MS) / FLASH_RAMP_DOWN_MS);
 };
 
 export const useAttentionSnapshot = (store: AttentionStore): AttentionSnapshot => {
   return useStore(store, selectAttentionSnapshot);
-};
-
-export const useAttentionActions = (store: AttentionStore): AttentionActions => {
-  return useStore(store, (state) => state.actions);
 };
 
 export const useAttentionSignal = (
@@ -494,25 +404,28 @@ export const usePaneAttentionState = (
   useEffect(() => {
     if (activeFlash === null) return;
 
+    const raf = typeof globalThis.requestAnimationFrame === 'function';
+    let handle: number | ReturnType<typeof setTimeout>;
     setCurrentTime(Date.now());
     const tick = (): void => {
       const nextTime = Date.now();
       setCurrentTime(nextTime);
       if (nextTime - activeFlash.startedAt < FLASH_DURATION_MS) {
-        handle = scheduleAnimationFrame(tick);
+        handle = raf ? globalThis.requestAnimationFrame(tick) : setTimeout(tick, 16);
       }
     };
-
-    let handle = scheduleAnimationFrame(tick);
+    handle = raf ? globalThis.requestAnimationFrame(tick) : setTimeout(tick, 16);
     return () => {
-      cancelAnimationFrameHandle(handle);
+      if (raf) globalThis.cancelAnimationFrame(handle as number);
+      else clearTimeout(handle as ReturnType<typeof setTimeout>);
     };
   }, [activeFlash]);
 
   const flash = useMemo(() => {
     if (activeFlash === null) return null;
-    const progress = getFlashProgress(activeFlash.startedAt, currentTime);
-    if (progress >= 1) return null;
+    const elapsed = currentTime - activeFlash.startedAt;
+    if (elapsed >= FLASH_DURATION_MS) return null;
+    const progress = elapsed <= 0 ? 0 : elapsed / FLASH_DURATION_MS;
     return { accent: activeFlash.accent, progress };
   }, [activeFlash, currentTime]);
 
