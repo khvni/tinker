@@ -1,10 +1,8 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/host-grotesk';
 import 'dockview-react/dist/styles/dockview.css';
 import { App } from './App.js';
-import { DesignSystem } from './routes/design-system.js';
-import { PanesDemo } from './routes/panes-demo.js';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -13,10 +11,27 @@ if (!container) {
 }
 
 const route = new URLSearchParams(window.location.search).get('route');
-const root = (() => {
-  if (route === 'design-system') return <DesignSystem />;
-  if (route === 'panes-demo') return <PanesDemo />;
-  return <App />;
-})();
 
-createRoot(container).render(<StrictMode>{root}</StrictMode>);
+// Dev-only routes are lazy so they don't bloat the production boot bundle.
+const DesignSystem = lazy(() => import('./routes/design-system.js').then((m) => ({ default: m.DesignSystem })));
+const PanesDemo = lazy(() => import('./routes/panes-demo.js').then((m) => ({ default: m.PanesDemo })));
+
+const renderRoute = (): JSX.Element => {
+  if (route === 'design-system') {
+    return (
+      <Suspense fallback={null}>
+        <DesignSystem />
+      </Suspense>
+    );
+  }
+  if (route === 'panes-demo') {
+    return (
+      <Suspense fallback={null}>
+        <PanesDemo />
+      </Suspense>
+    );
+  }
+  return <App />;
+};
+
+createRoot(container).render(<StrictMode>{renderRoute()}</StrictMode>);
