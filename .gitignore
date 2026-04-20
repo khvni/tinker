@@ -52,4 +52,8 @@ logs/
 CLAUDE.local.md
 AGENTS.local.md
 .playwright-mcp/
+
+# Debug screenshots (dev captures, not part of repo)
 panes-demo-three-panes.png
+panes-v2-*.png
+
