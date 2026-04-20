@@ -7,6 +7,11 @@
       "url": "https://mcp.better-auth.com/mcp",
       "enabled": true
     },
+    "exa": {
+      "type": "remote",
+      "url": "https://mcp.exa.ai/mcp",
+      "enabled": true
+    },
     "gmail": {
       "type": "local",
       "command": ["npx", "-y", "@google/gmail-mcp-server"],
@@ -36,6 +41,19 @@
       "enabled": false,
       "environment": {
         "LINEAR_API_KEY": "{env:LINEAR_API_KEY}"
+      }
+    },
+    "qmd": {
+      "type": "local",
+      "command": ["npx", "-y", "@tobilu/qmd", "mcp"],
+      "enabled": true
+    },
+    "smart-connections": {
+      "type": "local",
+      "command": ["npx", "-y", "github:msdanyg/smart-connections-mcp"],
+      "enabled": true,
+      "environment": {
+        "SMART_VAULT_PATH": "{env:SMART_VAULT_PATH}"
       }
     }
   }
