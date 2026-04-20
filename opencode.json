@@ -12,21 +12,6 @@
       "url": "https://mcp.exa.ai/mcp",
       "enabled": true
     },
-    "gmail": {
-      "type": "local",
-      "command": ["npx", "-y", "@google/gmail-mcp-server"],
-      "enabled": true
-    },
-    "google-calendar": {
-      "type": "local",
-      "command": ["npx", "-y", "@google/calendar-mcp-server"],
-      "enabled": true
-    },
-    "google-drive": {
-      "type": "local",
-      "command": ["npx", "-y", "@google/drive-mcp-server"],
-      "enabled": true
-    },
     "github": {
       "type": "local",
       "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
