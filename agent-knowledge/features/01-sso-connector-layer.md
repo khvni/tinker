@@ -1,7 +1,7 @@
 ---
 type: concept
-tags: [tinker, feature, sso, oauth, mcp, integrations]
-status: review
+tags: [tinker, feature, sso, oauth, mcp, integrations, auth]
+status: in progress
 priority: p1
 ---
 
@@ -9,9 +9,11 @@ priority: p1
 
 One sign-in lights up connected tools. Zero configuration. The day-1 unlock.
 
+> **Canonical architecture:** `docs/auth-architecture.md` (public) + `agent-knowledge/reference/auth-architecture.md` (agent detail). This spec tracks feature-level work. Decisions D1–D13 in [[decisions]].
+
 ## Goal
 
-User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHub-adjacent) become available immediately. No JSON editing, no MCP setup wizard, no "go read the docs."
+User signs in with Google / Microsoft / GitHub. Gmail, Calendar, Drive, Linear (GitHub-adjacent) become available immediately. No JSON editing, no MCP setup wizard, no "go read the docs." First-time per-service OAuth is just-in-time; every subsequent launch is silent.
 
 ## Reference Implementation ([[ramp-glass]])
 
@@ -21,9 +23,13 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 
 ## Tinker Scope
 
-### v1 Providers
+### v1 Providers (Consumer OSS)
 - `[2026-04-15]` **Google OAuth via Better Auth** — primary. Unlocks Gmail, Calendar, Drive via pre-configured MCP servers
-- `[2026-04-15]` **GitHub OAuth via Better Auth** — secondary. Unlocks GitHub repos, issues, PRs via MCP
+- `[2026-04-19]` **Microsoft OAuth (common endpoint) via Better Auth** — for users with personal MSA or Entra accounts. Consumer default uses `common`; enterprise fork swaps to single-tenant
+- `[2026-04-15]` **GitHub OAuth via Better Auth** — unlocks GitHub repos, issues, PRs via MCP
+
+### Enterprise Fork (out of upstream scope; documented in `docs/enterprise-fork-guide.md`)
+- `[2026-04-19]` Single-tenant Entra registration + admin consent + OBO adapter — fork's responsibility
 
 ### v1 Pre-wired Integrations (MCP servers in `opencode.json`)
 - `[2026-04-15]` Better Auth docs MCP = remote `https://mcp.better-auth.com/mcp` for agent/editor setup help
@@ -35,12 +41,26 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 
 ## Implementation Outline
 
+### Architecture Layers (per D1–D13)
+
+```
+Better Auth sidecar (identity)
+   ↓ IdentitySession
+FederationAdapter (consumer = no-op; enterprise = OBO/XAA)
+   ↓
+IntegrationCredentialStore (per-service tokens, OS keychain)
+   ↓
+MCP Proxy Singleton (feature 08)
+   ↓
+Self-healing (feature 11)
+```
+
 ### 1. Auth layer (Rust — Tauri plugin boundary)
 - `[2026-04-14]` `tauri-plugin-keyring` for system keychain storage of OAuth tokens
-- `[2026-04-15]` Better Auth runs as local Node sidecar inside desktop app. It owns social OAuth browser flow and stateless cookie/account handling
-- `[2026-04-15]` Rust still owns loopback callback listener, one-time ticket exchange, and final keychain persistence. Better Auth never becomes token source of record
-- `[2026-04-15]` Better Auth sidecar returns provider tokens through one-time `/desktop/session?ticket=...` bridge guarded by per-run shared secret header
-- `[2026-04-14]` Rust exposes minimal `invoke` commands: `auth_sign_in(provider)`, `auth_sign_out(provider)`, `auth_status()`
+- `[2026-04-15]` Better Auth runs as local Node sidecar. Owns social OAuth browser flow
+- `[2026-04-15]` Rust owns loopback callback, ticket exchange, keychain persistence
+- `[2026-04-19]` **PKCE only — no `client_secret` in binary ever** (D4)
+- `[2026-04-14]` Rust invoke commands: `auth_sign_in(provider)`, `auth_sign_out(provider)`, `auth_status()`
 
 ### 2. Connector activation (TypeScript — renderer)
 - `[2026-04-15]` On successful auth, renderer reloads sidecar state, forwards Google auth into OpenCode, and re-reads MCP status for UI
@@ -62,9 +82,11 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 
 ## Out of Scope ([[decisions]])
 
-- `[2026-04-14]` Okta / SAML / Azure AD — defer to enterprise edition
+- `[2026-04-19]` **Enterprise-specific federation (Entra OBO, Okta XAA) — not in upstream. Fork's responsibility.** Documented in `docs/enterprise-fork-guide.md`
+- `[2026-04-14]` SAML 2.0 — BA SAML plugin in flight; OIDC sufficient for consumer
 - `[2026-04-14]` Multi-account-per-provider — one Google account per Tinker install, one GitHub account. Revisit on user ask.
 - `[2026-04-14]` Custom OAuth providers (Dropbox, Notion, Slack) — MCP only; each provider picks up its own MCP server
+- `[2026-04-19]` Cross-tenant integration (D9) — work login → work apps only; personal apps need separate OAuth
 
 ## Open Questions
 
@@ -96,4 +118,8 @@ User signs in with Google (and/or GitHub). Gmail, Calendar, Drive, Linear (GitHu
 - [[vision]] — why SSO is a Tinker moat
 - [[positioning]] — see SSO row in feature gap table
 - [[ramp-glass]] — Okta → 30+ tools reference
-- [[decisions]] — SSO provider decisions
+- [[decisions]] — D1–D13 auth decisions
+- [[auth-architecture]] — adapter pattern + sequence diagrams
+- [[auth-vendor-evaluation]] — why Better Auth
+- [[08-mcp-proxy-layer]] — consumes credentials from this layer
+- [[11-self-healing-integrations]] — handles refresh failures

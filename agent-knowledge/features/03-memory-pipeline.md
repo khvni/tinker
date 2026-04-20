@@ -34,11 +34,57 @@ Every 24 hours (and on demand), mine connected MCP integrations (Gmail, Calendar
 
 ## Architecture
 
+### Vault layout separation (D13)
+
+```
+<vault>/
+  <user-authored markdown>          # user's notes — NEVER touched by agent
+  .tinker/
+    memory/                         # synthesized memory, write-once-read-many
+      entities/<id>.md
+      relationships/<id>.md
+    mirrors/                        # auto-synced from services; wipeable on disconnect
+      notion/
+      slack/
+      ...
+    logs/
+    dojo/
+```
+
+**Invariant:** top-level vault is user-owned; `.tinker/mirrors/<service>/` is app-owned and wipeable.
+
 ### Storage layers
 
-1. **Vault** (`<vault>/**/*.md`) — canonical, human-readable. Entities live in their own files (e.g., `People/Jane Smith.md`, `Projects/Q2 Launch.md`). Atomic bullets with `[YYYY-MM-DD]` timestamps.
+1. **Vault** (`<vault>/**/*.md`) — canonical, human-readable. Entities in their own files with `[YYYY-MM-DD]` atomic bullets.
 2. **SQLite** (via Tauri SQL plugin) — index of entities + relationships + FTS for search. NOT the canonical copy.
 3. **In-memory session context** — subset of SQLite entities relevant to the current prompt, injected before the user message.
+
+### Entity provenance (D12)
+
+Every memory entity carries source metadata. Required for clean disconnect wipes.
+
+```ts
+type MemoryEntity = {
+  id: string
+  kind: 'person' | 'doc' | 'project' | 'org' | 'concept'
+  sources: Array<{
+    service: string          // e.g. "notion", "slack"
+    ref: string              // provider-specific ID
+    lastSeen: string         // ISO timestamp
+  }>
+  synthesizedAt: string
+  // ... entity-kind-specific fields
+}
+
+type Relationship = {
+  source: MemoryEntityId
+  target: MemoryEntityId
+  kind: 'collaborates_with' | 'mentioned_in' | 'reports_to' | ...
+  provenance: Array<{ service: string; ref: string }>
+}
+```
+
+**Rule:** entity survives if `sources.length >= 1` post-wipe. Relationship survives if `provenance.length >= 1`. Enables nuclear disconnect of one service without corrupting cross-service graph.
 
 ### Extraction pipeline
 
@@ -76,10 +122,37 @@ Triggered by:
 - `[2026-04-14]` On-tool-use extraction runs inline — don't block user prompts; fire-and-forget async
 - `[2026-04-14]` Cleanup pass (stale fact flagging) runs weekly, not daily
 
+## Disconnect Semantics (D11, D12, D15)
+
+Two-step design:
+
+### Narrow (default): "Disconnect Notion"
+- Revoke refresh token at Notion
+- Clear `(userId, notion)` from keychain
+- Tear down MCP connection
+- **Derived data stays:** memory entities tagged `source: notion` persist; vault files mirrored stay
+- Reconnect = seamless resume
+
+### Nuclear (explicit, separate action): "Wipe Notion data"
+Runs as a memory pipeline pass, not a raw file delete:
+
+1. Enumerate entities where `sources` includes `notion`
+2. For each: filter `sources` array excluding `notion`; if empty → mark for deletion
+3. Enumerate relationships similarly via `provenance` array
+4. Cascade: orphaned entities (no incoming/outgoing edges) flagged for next sweep
+5. Delete `.tinker/mirrors/notion/` directory
+6. Re-run synthesis pass excluding `notion` source — repairs orphaned edges
+
+UI must show entity/file counts before executing:
+> "This will delete 47 memory entities, 12 mirrored vault files, 231 cross-references. User-authored notes stay. This cannot be undone."
+
+Never touch top-level user-authored markdown, regardless of what source originally seeded it.
+
 ## Out of Scope ([[decisions]])
 
 - `[2026-04-14]` Vector embeddings for semantic search — use FTS + wikilink traversal in v1; add vectors only if recall is insufficient
 - `[2026-04-14]` Cross-tool identity resolution (email ↔ Linear ↔ GitHub user) in v1 — string-match by email/name
+- `[2026-04-19]` Auto-suggesting wipes on disconnect — always user-explicit
 
 ## Open Questions
 
@@ -113,4 +186,5 @@ Triggered by:
 - [[ramp-glass]] — 24hr synthesis reference
 - [[04-native-scheduler]] — triggers the daily sweep
 - [[01-sso-connector-layer]] — provides the MCP integrations memory mines
-- [[decisions]] — what's out of scope
+- [[08-mcp-proxy-layer]] — source of MCP tool responses
+- [[decisions]] — D11, D12, D13 provenance + disconnect semantics
