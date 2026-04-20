@@ -1,7 +1,6 @@
-import type { OpencodeClient } from '@opencode-ai/sdk/v2/client';
+import type { OpencodeClient, Part } from '@opencode-ai/sdk/v2/client';
 import type { ScheduledJob, ScheduledJobRun, ScheduledJobStore, ScheduledOutputSink, VaultService } from '@tinker/shared-types';
 import { countSkippedRuns, getFutureRunAfter } from './schedule.js';
-import { runPromptWithClient } from './opencode.js';
 
 export type SchedulerEngineOptions = {
   jobStore: ScheduledJobStore;
@@ -24,21 +23,43 @@ export type SchedulerEngine = {
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 const DEFAULT_RUN_GRACE_MS = 90_000;
 
+const runPromptWithClient = async (
+  client: OpencodeClient,
+  title: string,
+  prompt: string,
+): Promise<string> => {
+  const created = await client.session.create({ title: `Scheduled: ${title}` });
+  const session = created.data;
+  if (!session) throw new Error('OpenCode did not return a session for scheduled job.');
+
+  const response = await client.session.prompt({
+    sessionID: session.id,
+    parts: [{ type: 'text', text: prompt }],
+  });
+  const payload = response.data;
+  if (!payload) throw new Error('OpenCode did not return output for scheduled job.');
+
+  const text = payload.parts
+    .filter((part: Part): part is Extract<Part, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('')
+    .trim();
+  return text.length > 0 ? text : 'Run completed without text output.';
+};
+
 const getNoteTitleFromPath = (path: string): string => {
-  const normalized = path.replace(/\\/gu, '/');
-  const leaf = normalized.split('/').filter(Boolean).at(-1) ?? 'Scheduled Output';
+  const leaf = path.replace(/\\/gu, '/').split('/').filter(Boolean).at(-1) ?? 'Scheduled Output';
   return leaf.replace(/\.md$/iu, '') || 'Scheduled Output';
 };
 
-const formatTimestamp = (value: string): string => {
-  return new Intl.DateTimeFormat(undefined, {
+const formatTimestamp = (value: string): string =>
+  new Intl.DateTimeFormat(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value));
-};
 
 const buildVaultAppendBody = (
   existingBody: string | null,
@@ -56,33 +77,11 @@ const buildVaultAppendBody = (
 
 const truncateNotificationBody = (value: string): string => {
   const trimmed = value.trim().replace(/\s+/gu, ' ');
-  if (trimmed.length <= 180) {
-    return trimmed;
-  }
-
-  return `${trimmed.slice(0, 177)}...`;
+  return trimmed.length <= 180 ? trimmed : `${trimmed.slice(0, 177)}...`;
 };
 
-const serializeError = (error: unknown): string => {
-  return error instanceof Error ? error.message : String(error);
-};
-
-const appendToVaultSink = async (
-  vaultService: VaultService | null,
-  sink: Extract<ScheduledOutputSink, { type: 'vault-append' }>,
-  job: ScheduledJob,
-  finishedAt: string,
-  outputText: string,
-): Promise<void> => {
-  if (!vaultService) {
-    throw new Error(`Vault sink "${sink.path}" requires a connected vault.`);
-  }
-
-  const existingNote = await vaultService.readNote(sink.path);
-  const nextBody = buildVaultAppendBody(existingNote?.body ?? null, sink.path, job.name, finishedAt, outputText);
-
-  await vaultService.writeNote(sink.path, existingNote?.frontmatter ?? {}, nextBody);
-};
+const serializeError = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 const deliverOutput = async (
   job: ScheduledJob,
@@ -96,12 +95,14 @@ const deliverOutput = async (
   for (const sink of job.outputSinks) {
     try {
       if (sink.type === 'vault-append') {
-        await appendToVaultSink(options.vaultService, sink, job, finishedAt, outputText);
+        if (!options.vaultService) {
+          throw new Error(`Vault sink "${sink.path}" requires a connected vault.`);
+        }
+        const existingNote = await options.vaultService.readNote(sink.path);
+        const nextBody = buildVaultAppendBody(existingNote?.body ?? null, sink.path, job.name, finishedAt, outputText);
+        await options.vaultService.writeNote(sink.path, existingNote?.frontmatter ?? {}, nextBody);
       } else if (sink.type === 'notification') {
-        await options.notify?.({
-          title: sink.title,
-          body: truncateNotificationBody(outputText),
-        });
+        await options.notify?.({ title: sink.title, body: truncateNotificationBody(outputText) });
       }
 
       deliveredSinks.push(sink);
@@ -132,9 +133,7 @@ export const createSchedulerEngine = (options: SchedulerEngineOptions): Schedule
     trigger: ScheduledJobRun['trigger'],
     scheduledFor: string,
   ): Promise<void> => {
-    if (activeJobs.has(job.id)) {
-      return;
-    }
+    if (activeJobs.has(job.id)) return;
 
     activeJobs.add(job.id);
     const startedAt = now().toISOString();
@@ -224,10 +223,7 @@ export const createSchedulerEngine = (options: SchedulerEngineOptions): Schedule
   };
 
   const tick = async (): Promise<void> => {
-    if (ticking) {
-      return;
-    }
-
+    if (ticking) return;
     ticking = true;
 
     try {
@@ -240,7 +236,6 @@ export const createSchedulerEngine = (options: SchedulerEngineOptions): Schedule
           await skipMissedJob(job, nowDate);
           continue;
         }
-
         await runJob(job, 'schedule', job.nextRunAt);
       }
     } finally {
@@ -250,14 +245,9 @@ export const createSchedulerEngine = (options: SchedulerEngineOptions): Schedule
 
   return {
     start(): void {
-      if (intervalId !== null) {
-        return;
-      }
-
+      if (intervalId !== null) return;
       void tick();
-      intervalId = setInterval(() => {
-        void tick();
-      }, pollIntervalMs);
+      intervalId = setInterval(() => { void tick(); }, pollIntervalMs);
     },
 
     stop(): void {
@@ -271,10 +261,7 @@ export const createSchedulerEngine = (options: SchedulerEngineOptions): Schedule
 
     async runNow(jobId: string): Promise<void> {
       const job = await options.jobStore.getJob(jobId);
-      if (!job) {
-        throw new Error('Scheduled job no longer exists.');
-      }
-
+      if (!job) throw new Error('Scheduled job no longer exists.');
       await runJob(job, 'manual', now().toISOString());
     },
   };
