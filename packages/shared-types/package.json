@@ -11,7 +11,6 @@
     "./memory": "./src/memory.ts",
     "./skill": "./src/skill.ts",
     "./scheduler": "./src/scheduler.ts",
-    "./skill": "./src/skill.ts",
     "./sso": "./src/sso.ts",
     "./vault": "./src/vault.ts"
   },

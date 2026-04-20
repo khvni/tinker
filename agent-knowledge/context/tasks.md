@@ -74,7 +74,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | Task | Priority | Status | Depends on | Notes |
 |------|----------|--------|------------|-------|
-| Scaffold `packages/attention` + store | p2 | review | [[10-tinker-panes]] | `[2026-04-20]` `@tinker/attention` scaffold landed with exhaustive decision-table tests. Pane-frame/tab-dot wiring still separate follow-up. |
+| Scaffold `packages/attention` + store | p2 | done | [[10-tinker-panes]] | `[2026-04-20]` `@tinker/attention` scaffold merged with exhaustive decision-table tests (13 passing). Pane-frame/tab-dot wiring still separate follow-up. |
 | Hook attention into `@tinker/panes` pane frames | p2 | not started | attention scaffold | Pane edge ring + tab dot subscribe. |
 | Scaffold `packages/workspace-sidebar` | p2 | not started | attention scaffold | Vertical card list, metadata rows, drag reorder. |
 | Expose workspace metadata API over host-service | p2 | not started | host-service scaffold + workspace-sidebar | `POST /workspace.metadata` from contributors; `GET /workspace.cards` for the sidebar. |
@@ -93,7 +93,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | Task | Priority | Status | Notes |
 |------|----------|--------|-------|
-| Design `<Textarea>` primitive + migrate raw textarea surfaces | p2 | review | Follow-up to [[09-design-system]] so Chat composer, Scheduler prompt, Dojo skill body, and MarkdownEditor stop shipping raw `<textarea>` elements. `[2026-04-20]` `@tinker/design` now exports `<Textarea>` and playground covers it. |
+| Design `<Textarea>` primitive + migrate raw textarea surfaces | p2 | done | Follow-up to [[09-design-system]] so Chat composer, Scheduler prompt, Dojo skill body, and MarkdownEditor stop shipping raw `<textarea>` elements. `[2026-04-20]` `@tinker/design` exports `<Textarea>` + playground coverage; all four call sites migrated; merged to main. |
 | Tauri sidecar lifecycle (start/health-check/stop OpenCode) | p1 | in progress | PRD §2.1, §2.2; adopt two-phase readiness + proxy-safe loopback health checks from [[opencode-desktop-review]] |
 | FirstRun UX (sign-in → vault choice → workspace) | p1 | not started | PRD runtime flow "First launch" |
 | Memory injection in bridge package | p1 | in progress | PRD §2.4 — `packages/bridge` |
