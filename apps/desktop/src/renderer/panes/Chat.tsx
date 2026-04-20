@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { Badge, Button } from '@tinker/design';
+import { Badge, Button, Textarea } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities, slugify } from '@tinker/memory';
 import type { SkillDraft, SkillStore } from '@tinker/shared-types';
@@ -316,8 +316,9 @@ export const Chat = ({
       </div>
 
       <div className="tinker-composer">
-        <textarea
+        <Textarea
           value={input}
+          rows={4}
           placeholder="Ask about the vault, your project, or the next change to make."
           onChange={(event) => setInput(event.currentTarget.value)}
           disabled={busy || !modelConnected}

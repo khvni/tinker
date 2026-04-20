@@ -8,6 +8,7 @@ import {
   SegmentedControl,
   StatusDot,
   TextInput,
+  Textarea,
   Toggle,
   type BadgeVariant,
   type StatusDotState,
@@ -123,6 +124,7 @@ const ComponentsTab = (): JSX.Element => {
   const [toggleOff, setToggleOff] = useState(false);
   const [textValue, setTextValue] = useState('');
   const [searchValue, setSearchValue] = useState('');
+  const [textareaValue, setTextareaValue] = useState('Multi-line note.\nSecond line stays aligned to same token set.');
 
   return (
     <div className="ds-sections">
@@ -268,6 +270,19 @@ const ComponentsTab = (): JSX.Element => {
           </div>
         </Row>
       </Section>
+
+      <Section label="Textarea">
+        <Row>
+          <div className="ds-input-wrap">
+            <Textarea
+              rows={5}
+              placeholder="Write more than one line..."
+              value={textareaValue}
+              onChange={(event) => setTextareaValue(event.target.value)}
+            />
+          </div>
+        </Row>
+      </Section>
     </div>
   );
 };
@@ -280,7 +295,7 @@ const SURFACE_SWATCHES: ReadonlyArray<Swatch> = [
   { name: 'bg-primary', varName: '--color-bg-primary', hex: '#1a1612', note: 'canvas' },
   { name: 'bg-elevated', varName: '--color-bg-elevated', hex: '#221d17', note: 'sidebar / titlebar' },
   { name: 'bg-panel', varName: '--color-bg-panel', hex: '#16120e', note: 'recessed surface' },
-  { name: 'bg-input', varName: '--color-bg-input', hex: '#120f0c', note: 'TextInput / secondary icon bg' },
+  { name: 'bg-input', varName: '--color-bg-input', hex: '#120f0c', note: 'TextInput / Textarea / secondary icon bg' },
   { name: 'bg-hover', varName: '--color-bg-hover', hex: '#25201a', note: 'interactive hover' },
 ];
 
@@ -520,7 +535,9 @@ const ChatTab = (): JSX.Element => {
       </div>
 
       <div className="ds-chat__composer">
-        <TextInput
+        <Textarea
+          rows={3}
+          resize="none"
           placeholder="Message the workspace…"
           value={message}
           onChange={(event) => setMessage(event.target.value)}

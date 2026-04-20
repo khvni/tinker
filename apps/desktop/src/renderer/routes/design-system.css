@@ -430,7 +430,7 @@
 
 .ds-chat__composer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--color-border-subtle);
@@ -439,6 +439,11 @@
 }
 
 .ds-chat__composer > .tk-textinput,
+.ds-chat__composer > .tk-textarea,
 .ds-chat__composer > .ds-input-wrap {
   flex: 1;
+}
+
+.ds-chat__composer > .tk-textarea {
+  min-height: 72px;
 }

@@ -270,24 +270,8 @@ textarea {
   gap: var(--space-2);
 }
 
-.tinker-composer textarea {
+.tinker-composer > .tk-textarea {
   min-height: 100px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-default);
-  padding: var(--space-3);
-  resize: vertical;
-  background: var(--color-bg-input);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
-  transition: border-color var(--duration-fast) var(--ease-standard);
-}
-
-.tinker-composer textarea:focus-visible {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-ring);
 }
 
 .tinker-list {
@@ -648,23 +632,6 @@ textarea {
 .tinker-markdown-editor {
   flex: 1;
   min-height: 0;
-  width: 100%;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-default);
-  padding: var(--space-4);
-  resize: none;
-  background: var(--color-bg-input);
-  color: var(--color-text-primary);
-  box-sizing: border-box;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
-}
-
-.tinker-markdown-editor:focus-visible {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-ring);
 }
 
 .tinker-table-wrap {

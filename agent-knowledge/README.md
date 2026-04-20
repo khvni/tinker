@@ -64,7 +64,7 @@ agent-knowledge/
 
 ## UI Discipline (non-negotiable)
 
-- **All UI uses `@tinker/design`.** Every button is `<Button>`, every status chip is `<Badge>`, every tab strip is `<SegmentedControl>`, every on/off is `<Toggle>`, every field is `<TextInput>` / `<SearchInput>`, every indicator dot is `<StatusDot>`. No hand-rolled equivalents.
+- **All UI uses `@tinker/design`.** Every button is `<Button>`, every status chip is `<Badge>`, every tab strip is `<SegmentedControl>`, every on/off is `<Toggle>`, every single-line field is `<TextInput>` / `<SearchInput>`, every multi-line field is `<Textarea>`, every indicator dot is `<StatusDot>`. No hand-rolled equivalents.
 - **All color/spacing/radius/font values come from CSS tokens** (`--color-*`, `--space-*`, `--radius-*`, `--font-*`) defined in `@tinker/design/styles/tokens.css`. No inline hex, no parallel palette, no alt font stacks.
 - **Playground is canonical** — `apps/desktop/src/renderer/routes/design-system.tsx` (served at `?route=design-system`). Any primitive change must update the playground in the same PR.
 - **See [[09-design-system]] and [[decisions]] D14/D15** for the full rule set before touching any UI file.

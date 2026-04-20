@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
-import { Badge, Button, TextInput } from '@tinker/design';
+import { Badge, Button, TextInput, Textarea } from '@tinker/design';
 import { getFutureRunAfter, getSchedulePreview, parseScheduleInput } from '@tinker/scheduler';
 import type { ScheduledJob, ScheduledJobRun, ScheduledJobStore, ScheduledOutputSink } from '@tinker/shared-types';
 
@@ -429,9 +429,8 @@ export const SchedulerPane = ({
 
               <label className="tinker-field">
                 <span>Prompt</span>
-                <textarea
+                <Textarea
                   className="tinker-markdown-editor"
-                  style={{ minHeight: 120 }}
                   value={form.prompt}
                   onChange={onTextChange('prompt')}
                   placeholder="Summarize yesterday's calendar and unread email. Append concise summary."

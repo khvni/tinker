@@ -6,6 +6,7 @@ import {
   SearchInput,
   SegmentedControl,
   TextInput,
+  Textarea,
   Toggle,
   type SegmentedControlOption,
 } from '@tinker/design';
@@ -472,7 +473,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </label>
           <label className="tinker-field">
             <span>Skill body (markdown)</span>
-            <textarea
+            <Textarea
               className="tinker-markdown-editor"
               required
               rows={14}

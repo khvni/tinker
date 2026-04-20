@@ -11,3 +11,4 @@ export {
 export { Toggle, type ToggleProps } from './Toggle.js';
 export { TextInput, type TextInputProps } from './TextInput.js';
 export { SearchInput, type SearchInputProps } from './SearchInput.js';
+export { Textarea, type TextareaProps, type TextareaResize } from './Textarea.js';
