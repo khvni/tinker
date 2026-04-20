@@ -100,17 +100,13 @@ const MEMORY_EXTRACTION_SCHEMA = {
 } as const;
 
 const readSessionID = (event: Event): string | undefined => {
-  if ('sessionID' in event.properties && typeof event.properties.sessionID === 'string') {
-    return event.properties.sessionID;
+  const props = event.properties as { sessionID?: unknown; part?: { sessionID?: unknown } };
+  if (typeof props.sessionID === 'string') {
+    return props.sessionID;
   }
-
-  if ('part' in event.properties) {
-    const { part } = event.properties;
-    if (part && typeof part === 'object' && 'sessionID' in part && typeof part.sessionID === 'string') {
-      return part.sessionID;
-    }
+  if (typeof props.part?.sessionID === 'string') {
+    return props.part.sessionID;
   }
-
   return undefined;
 };
 
@@ -201,13 +197,10 @@ const waitForSessionCompletion = async (client: SessionClient, sessionID: string
 
     if (event.type === 'session.error') {
       const error = event.properties.error;
-      if (error && 'data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
-        const message = error.data.message;
-        if (typeof message === 'string' && message.length > 0) {
-          throw new Error(message);
-        }
+      const data = (error as { data?: { message?: unknown } } | undefined)?.data;
+      if (typeof data?.message === 'string' && data.message.length > 0) {
+        throw new Error(data.message);
       }
-
       throw new Error(error?.name ?? 'OpenCode memory extraction failed.');
     }
   }

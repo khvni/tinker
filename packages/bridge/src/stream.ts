@@ -9,17 +9,13 @@ export type TinkerStreamEvent =
   | { type: 'error'; message: string };
 
 const readSessionID = (event: Event): string | undefined => {
-  if ('sessionID' in event.properties && typeof event.properties.sessionID === 'string') {
-    return event.properties.sessionID;
+  const props = event.properties as { sessionID?: unknown; part?: { sessionID?: unknown } };
+  if (typeof props.sessionID === 'string') {
+    return props.sessionID;
   }
-
-  if ('part' in event.properties) {
-    const { part } = event.properties;
-    if (part && typeof part === 'object' && 'sessionID' in part && typeof part.sessionID === 'string') {
-      return part.sessionID;
-    }
+  if (typeof props.part?.sessionID === 'string') {
+    return props.part.sessionID;
   }
-
   return undefined;
 };
 
@@ -60,18 +56,13 @@ const asFileWrites = (part: Part): TinkerStreamEvent[] => {
 
 const readErrorMessage = (event: Extract<Event, { type: 'session.error' }>): string => {
   const error = event.properties.error;
-
   if (!error) {
     return 'OpenCode reported an unknown session error.';
   }
-
-  if ('data' in error && error.data && typeof error.data === 'object' && 'message' in error.data) {
-    const message = error.data.message;
-    if (typeof message === 'string' && message.length > 0) {
-      return message;
-    }
+  const data = (error as { data?: { message?: unknown } }).data;
+  if (typeof data?.message === 'string' && data.message.length > 0) {
+    return data.message;
   }
-
   return error.name;
 };
 

@@ -1,29 +1,21 @@
 import type { OpencodeClient } from '@opencode-ai/sdk/v2/client';
 import type { Entity } from '@tinker/shared-types';
-import type { EntitySource } from '@tinker/shared-types/memory';
-
-const readStringArray = (value: unknown): string[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter((item): item is string => typeof item === 'string');
-};
 
 const entitySummary = (entity: Entity): string => {
+  const { attributes } = entity;
   const aliases = entity.aliases.length > 0 ? ` aliases=${entity.aliases.join(', ')}` : '';
-  const sources = entity.sources
-    .map((source: EntitySource) => `${source.integration}:${source.externalId}`)
-    .join(', ');
+  const sources = entity.sources.map((source) => `${source.integration}:${source.externalId}`).join(', ');
   const relativePath =
-    typeof entity.attributes.relativePath === 'string' && entity.attributes.relativePath.length > 0
-      ? ` path=${entity.attributes.relativePath}`
+    typeof attributes.relativePath === 'string' && attributes.relativePath.length > 0
+      ? ` path=${attributes.relativePath}`
       : '';
   const excerpt =
-    typeof entity.attributes.excerpt === 'string' && entity.attributes.excerpt.length > 0
-      ? `\n  excerpt: ${entity.attributes.excerpt}`
+    typeof attributes.excerpt === 'string' && attributes.excerpt.length > 0
+      ? `\n  excerpt: ${attributes.excerpt}`
       : '';
-  const links = readStringArray(entity.attributes.links);
+  const links = Array.isArray(attributes.links)
+    ? attributes.links.filter((item): item is string => typeof item === 'string')
+    : [];
   const linkSummary = links.length > 0 ? `\n  links: ${links.map((link) => `[[${link}]]`).join(', ')}` : '';
 
   return `- ${entity.name} [${entity.kind}]${aliases}${relativePath}${sources ? ` sources=${sources}` : ''}${excerpt}${linkSummary}`;
