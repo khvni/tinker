@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { Badge, Button } from '@tinker/design';
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent } from 'dockview-react';
 import { resolveVaultPath, type MemoryRunState } from '@tinker/memory';
 import {
@@ -521,17 +522,23 @@ export const Workspace = ({
           <h1>Tinker</h1>
         </div>
         <div className="tinker-inline-actions">
-          <button className="tinker-button-secondary" type="button" onClick={openSchedulerPane} disabled={!dockviewApi}>
+          <Button variant="secondary" size="s" onClick={openSchedulerPane} disabled={!dockviewApi}>
             Open scheduler
-          </button>
-          <button className="tinker-button-secondary" type="button" onClick={openNewChatPane} disabled={!dockviewApi}>
+          </Button>
+          <Button variant="secondary" size="s" onClick={openNewChatPane} disabled={!dockviewApi}>
             New chat tab
-          </button>
+          </Button>
         </div>
         <div className="tinker-header-meta">
-          <span className="tinker-pill">{modelConnected ? 'GPT-5.4 connected' : 'GPT-5.4 disconnected'}</span>
-          <span className="tinker-pill">{sessions.google?.email ?? sessions.github?.email ?? 'Offline mode'}</span>
-          <span className="tinker-pill">{vaultPath ?? 'No vault selected'}</span>
+          <Badge variant={modelConnected ? 'success' : 'default'} size="small">
+            {modelConnected ? 'GPT-5.4 connected' : 'GPT-5.4 disconnected'}
+          </Badge>
+          <Badge variant="default" size="small">
+            {sessions.google?.email ?? sessions.github?.email ?? 'Offline mode'}
+          </Badge>
+          <Badge variant="default" size="small">
+            {vaultPath ?? 'No vault selected'}
+          </Badge>
         </div>
       </header>
 

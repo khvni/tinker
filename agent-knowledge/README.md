@@ -57,8 +57,17 @@ agent-knowledge/
     ├── 04-native-scheduler.md
     ├── 05-sensei-skill-discovery.md
     ├── 06-subagent-orchestration.md
-    └── 07-workspace-persistence.md
+    ├── 07-workspace-persistence.md
+    ├── 08-mcp-proxy-layer.md
+    └── 09-design-system.md
 ```
+
+## UI Discipline (non-negotiable)
+
+- **All UI uses `@tinker/design`.** Every button is `<Button>`, every status chip is `<Badge>`, every tab strip is `<SegmentedControl>`, every on/off is `<Toggle>`, every field is `<TextInput>` / `<SearchInput>`, every indicator dot is `<StatusDot>`. No hand-rolled equivalents.
+- **All color/spacing/radius/font values come from CSS tokens** (`--color-*`, `--space-*`, `--radius-*`, `--font-*`) defined in `@tinker/design/styles/tokens.css`. No inline hex, no parallel palette, no alt font stacks.
+- **Playground is canonical** — `apps/desktop/src/renderer/routes/design-system.tsx` (served at `?route=design-system`). Any primitive change must update the playground in the same PR.
+- **See [[09-design-system]] and [[decisions]] D14/D15** for the full rule set before touching any UI file.
 
 ## Conventions
 

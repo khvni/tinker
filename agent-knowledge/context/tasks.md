@@ -32,6 +32,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 | 05 | Sensei skill discovery (recommend skills based on role + connected tools) | p2 | not started | [[05-sensei-skill-discovery]] | Depends on Dojo being built first |
 | 06 | Sub-agent orchestration (OpenCode-native multi-agent patterns) | p2 | not started | [[06-subagent-orchestration]] | Use OpenCode SDK sub-agent primitives; no Latent Briefing (see [[decisions]]) |
 | 07 | Workspace persistence + split-pane UI (Dockview) | p1 | review | [[07-workspace-persistence]] | Debounced layout save, version-gated hydration with default fallback, agent-created files auto-open via Chat stream → Workspace dispatcher; follow-ups landed: auto-open toggle in Settings, multi-session chat tabs, syntax-highlighted code tabs, file-open helper tests, bridge stream coverage |
+| 09 | Design system enforcement (`@tinker/design` tokens + primitives everywhere) | p1 | done | [[09-design-system]] | `[2026-04-19]` Renderer styles.css rebound to design tokens; legacy `--tinker-*` palette removed; every pane/renderer now consumes `<Button>`, `<Badge>`, `<TextInput>`, `<Toggle>`, `<SegmentedControl>`; playground at `?route=design-system` is the canonical reference; reinforced by D14 + D15 in [[decisions]] |
 
 ## Cross-cutting / Infrastructure
 

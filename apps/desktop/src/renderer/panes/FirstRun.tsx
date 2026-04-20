@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { Button } from '@tinker/design';
 import type { SSOStatus } from '@tinker/shared-types';
 import type { MCPStatus } from '../components/IntegrationsStrip.js';
 import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
@@ -60,9 +61,9 @@ export const FirstRun = ({
             </p>
             {modelAuthMessage ? <p className="tinker-muted">{modelAuthMessage}</p> : null}
             <div className="tinker-inline-actions">
-              <button className="tinker-button" type="button" onClick={() => void onConnectModel()} disabled={modelAuthBusy}>
+              <Button variant="primary" onClick={() => void onConnectModel()} disabled={modelAuthBusy}>
                 {modelConnected ? 'Reconnect GPT-5.4' : modelAuthBusy ? 'Connecting…' : 'Connect GPT-5.4'}
-              </button>
+              </Button>
             </div>
           </article>
 
@@ -72,12 +73,12 @@ export const FirstRun = ({
               Google unlocks Gmail, Calendar, Drive. GitHub unlocks repos, issues, and PRs. Both stay optional.
             </p>
             <div className="tinker-inline-actions">
-              <button className="tinker-button-secondary" type="button" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
+              <Button variant="secondary" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
                 {googleAuthBusy ? 'Signing in…' : sessions.google ? 'Reconnect Google' : 'Sign in with Google'}
-              </button>
-              <button className="tinker-button-secondary" type="button" onClick={() => void onConnectGithub()} disabled={githubAuthBusy}>
+              </Button>
+              <Button variant="secondary" onClick={() => void onConnectGithub()} disabled={githubAuthBusy}>
                 {githubAuthBusy ? 'Signing in…' : sessions.github ? 'Reconnect GitHub' : 'Sign in with GitHub'}
-              </button>
+              </Button>
             </div>
             {googleAuthMessage ? <p className="tinker-muted">{googleAuthMessage}</p> : null}
             {githubAuthMessage ? <p className="tinker-muted">{githubAuthMessage}</p> : null}
@@ -87,22 +88,22 @@ export const FirstRun = ({
             <h3>3. Pick a vault</h3>
             <p className="tinker-muted">{vaultPath ?? 'Choose existing vault or create new local knowledge base.'}</p>
             <div className="tinker-inline-actions">
-              <button className="tinker-button-secondary" type="button" onClick={() => void onSelectVault()}>
+              <Button variant="secondary" onClick={() => void onSelectVault()}>
                 Select existing vault
-              </button>
-              <button className="tinker-button-ghost" type="button" onClick={() => void onCreateVault()}>
+              </Button>
+              <Button variant="ghost" onClick={() => void onCreateVault()}>
                 Create default vault
-              </button>
+              </Button>
             </div>
           </article>
         </div>
 
         <IntegrationsStrip mcpStatus={mcpStatus} sessions={sessions} />
 
-        <div className="tinker-actions" style={{ marginTop: '1.5rem' }}>
-          <button className="tinker-button" type="button" onClick={onContinue}>
+        <div className="tinker-actions" style={{ marginTop: 'var(--space-6)' }}>
+          <Button variant="primary" onClick={onContinue}>
             Open workspace
-          </button>
+          </Button>
         </div>
       </section>
     </main>

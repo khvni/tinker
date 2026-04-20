@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
+import { Badge } from '@tinker/design';
 import type { MemoryStore } from '@tinker/shared-types';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { relativeVaultPath, resolveVaultPath, walkVaultFiles } from '@tinker/memory';
@@ -137,7 +138,7 @@ export const VaultBrowser = ({ params, vaultRevision }: VaultBrowserProps): JSX.
           <p className="tinker-eyebrow">Vault</p>
           <h2>{vaultPath ? getPanelTitleForPath(vaultPath) : 'No vault connected'}</h2>
         </div>
-        <span className="tinker-pill">{files.length} files</span>
+        <Badge variant="default" size="small">{files.length} files</Badge>
       </header>
 
       {error ? <p className="tinker-muted">{error}</p> : null}

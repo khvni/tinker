@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import {
+  Badge,
+  Button,
+  SearchInput,
+  SegmentedControl,
+  TextInput,
+  Toggle,
+  type SegmentedControlOption,
+} from '@tinker/design';
 import { isGitAvailable, syncSkills } from '@tinker/memory';
 import type {
   IDockviewPanelProps,
@@ -17,11 +26,17 @@ type DojoParams = {
 
 type DojoProps = IDockviewPanelProps<DojoParams>;
 
-type ViewMode = 'list' | 'preview' | 'author' | 'git';
+type ViewMode = 'browse' | 'author' | 'git';
 
 const EMPTY_DRAFT: SkillDraft = { slug: '', description: '', body: '' };
 
 const emptyGitConfig: SkillGitConfig = { remoteUrl: '', branch: 'main' };
+
+const MODE_OPTIONS: ReadonlyArray<SegmentedControlOption<ViewMode>> = [
+  { value: 'browse', label: 'Browse' },
+  { value: 'author', label: 'Author' },
+  { value: 'git', label: 'Git sync' },
+];
 
 const formatTimestamp = (value: string): string => {
   const parsed = new Date(value);
@@ -42,7 +57,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [query, setQuery] = useState('');
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
-  const [mode, setMode] = useState<ViewMode>(initialFocus === 'author' ? 'author' : 'list');
+  const [mode, setMode] = useState<ViewMode>(initialFocus === 'author' ? 'author' : 'browse');
   const [draft, setDraft] = useState<SkillDraft>(initialDraft ?? EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -155,7 +170,6 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
       await refreshSkills();
       if (selectedSlug === skill.slug) {
         setSelectedSlug(null);
-        setMode('list');
       }
       setStatus(`Uninstalled ${skill.title}.`);
       if (wasActive) {
@@ -183,7 +197,6 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
       const installed = await guardStore().installFromFile(selection);
       await refreshSkills();
       setSelectedSlug(installed.slug);
-      setMode('preview');
       setStatus(`Installed ${installed.title}.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
@@ -208,7 +221,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
       await refreshSkills();
       setSelectedSlug(saved.slug);
       setDraft(EMPTY_DRAFT);
-      setMode('preview');
+      setMode('browse');
       setStatus(`Saved ${saved.title}.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
@@ -302,51 +315,33 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           <p className="tinker-eyebrow">Dojo</p>
           <h2>Skill marketplace</h2>
         </div>
-        <span className="tinker-pill">
+        <Badge variant="default" size="small">
           {skills.length} installed · {activeCount} active
-        </span>
+        </Badge>
       </header>
 
-      <nav className="tinker-dojo-tabs">
-        <button
-          type="button"
-          className={`tinker-dojo-tab ${mode === 'list' || mode === 'preview' ? 'tinker-dojo-tab--active' : ''}`}
-          onClick={() => setMode('list')}
-        >
-          Browse
-        </button>
-        <button
-          type="button"
-          className={`tinker-dojo-tab ${mode === 'author' ? 'tinker-dojo-tab--active' : ''}`}
-          onClick={() => setMode('author')}
-        >
-          Author
-        </button>
-        <button
-          type="button"
-          className={`tinker-dojo-tab ${mode === 'git' ? 'tinker-dojo-tab--active' : ''}`}
-          onClick={() => setMode('git')}
-        >
-          Git sync
-        </button>
-      </nav>
+      <SegmentedControl<ViewMode>
+        value={mode}
+        onChange={setMode}
+        options={MODE_OPTIONS}
+        label="Dojo view"
+      />
 
       {status ? <p className="tinker-dojo-status">{status}</p> : null}
       {error ? <p className="tinker-dojo-error">{error}</p> : null}
 
-      {mode === 'list' || mode === 'preview' ? (
+      {mode === 'browse' ? (
         <div className="tinker-dojo-body">
           <aside className="tinker-dojo-list">
             <div className="tinker-dojo-toolbar">
-              <input
-                className="tinker-input"
+              <SearchInput
                 placeholder="Search skills"
                 value={query}
                 onChange={(event) => setQuery(event.currentTarget.value)}
               />
-              <button className="tinker-button-secondary" type="button" onClick={() => void handleInstallFromFile()} disabled={busy}>
+              <Button variant="secondary" size="s" onClick={() => void handleInstallFromFile()} disabled={busy}>
                 Install from file
-              </button>
+              </Button>
             </div>
 
             {filteredSkills.length === 0 ? (
@@ -366,14 +361,15 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
                   <button
                     type="button"
                     className="tinker-dojo-item-main"
-                    onClick={() => {
-                      setSelectedSlug(skill.slug);
-                      setMode('preview');
-                    }}
+                    onClick={() => setSelectedSlug(skill.slug)}
                   >
                     <div className="tinker-dojo-item-header">
                       <span className="tinker-dojo-item-title">{skill.title}</span>
-                      {skill.active ? <span className="tinker-pill tinker-pill--accent">active</span> : null}
+                      {skill.active ? (
+                        <Badge variant="accent" size="small">
+                          active
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="tinker-dojo-item-description">{skill.description || 'No description.'}</p>
                     {skill.tools.length > 0 ? (
@@ -381,23 +377,15 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
                     ) : null}
                   </button>
                   <div className="tinker-dojo-item-actions">
-                    <label className="tinker-dojo-toggle">
-                      <input
-                        type="checkbox"
-                        checked={skill.active}
-                        onChange={() => void handleToggleActive(skill)}
-                        disabled={busy}
-                      />
-                      <span>Active</span>
-                    </label>
-                    <button
-                      type="button"
-                      className="tinker-button-ghost"
-                      onClick={() => void handleUninstall(skill)}
+                    <Toggle
+                      checked={skill.active}
+                      onChange={() => void handleToggleActive(skill)}
                       disabled={busy}
-                    >
+                      label={`Toggle ${skill.title} active`}
+                    />
+                    <Button variant="ghost" size="s" onClick={() => void handleUninstall(skill)} disabled={busy}>
                       Uninstall
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}
@@ -414,9 +402,9 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
                     <p className="tinker-muted">Updated {formatTimestamp(selected.lastModified)}</p>
                   </div>
                   <div className="tinker-inline-actions">
-                    <button type="button" className="tinker-button-secondary" onClick={handleEditSelected}>
+                    <Button variant="secondary" size="s" onClick={handleEditSelected}>
                       Edit
-                    </button>
+                    </Button>
                   </div>
                 </header>
                 <pre className="tinker-dojo-body-text">{selected.body}</pre>
@@ -438,8 +426,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
         >
           <label className="tinker-field">
             <span>Name (kebab-case slug)</span>
-            <input
-              className="tinker-input"
+            <TextInput
               required
               value={draft.slug}
               onChange={(event) => setDraft((current) => ({ ...current, slug: event.currentTarget.value }))}
@@ -447,8 +434,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </label>
           <label className="tinker-field">
             <span>Description</span>
-            <input
-              className="tinker-input"
+            <TextInput
               required
               value={draft.description}
               onChange={(event) => setDraft((current) => ({ ...current, description: event.currentTarget.value }))}
@@ -456,8 +442,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </label>
           <label className="tinker-field">
             <span>Tools (comma separated, optional)</span>
-            <input
-              className="tinker-input"
+            <TextInput
               value={(draft.tools ?? []).join(', ')}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -472,8 +457,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </label>
           <label className="tinker-field">
             <span>Tags (comma separated, optional)</span>
-            <input
-              className="tinker-input"
+            <TextInput
               value={(draft.tags ?? []).join(', ')}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -489,7 +473,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           <label className="tinker-field">
             <span>Skill body (markdown)</span>
             <textarea
-              className="tinker-input tinker-input--textarea"
+              className="tinker-markdown-editor"
               required
               rows={14}
               value={draft.body}
@@ -497,12 +481,12 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
             />
           </label>
           <div className="tinker-inline-actions">
-            <button type="submit" className="tinker-button" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? 'Saving…' : 'Save skill'}
-            </button>
-            <button type="button" className="tinker-button-ghost" onClick={() => setDraft(EMPTY_DRAFT)}>
+            </Button>
+            <Button variant="ghost" onClick={() => setDraft(EMPTY_DRAFT)}>
               Clear
-            </button>
+            </Button>
           </div>
         </form>
       ) : null}
@@ -516,8 +500,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </p>
           <label className="tinker-field">
             <span>Remote URL</span>
-            <input
-              className="tinker-input"
+            <TextInput
               value={gitConfig.remoteUrl}
               placeholder="git@github.com:team/dojo.git"
               onChange={(event) => setGitConfig((current) => ({ ...current, remoteUrl: event.currentTarget.value }))}
@@ -525,16 +508,14 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </label>
           <label className="tinker-field">
             <span>Branch</span>
-            <input
-              className="tinker-input"
+            <TextInput
               value={gitConfig.branch}
               onChange={(event) => setGitConfig((current) => ({ ...current, branch: event.currentTarget.value }))}
             />
           </label>
           <label className="tinker-field">
             <span>Author name (optional)</span>
-            <input
-              className="tinker-input"
+            <TextInput
               value={gitConfig.authorName ?? ''}
               onChange={(event) =>
                 setGitConfig((current) => {
@@ -547,8 +528,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </label>
           <label className="tinker-field">
             <span>Author email (optional)</span>
-            <input
-              className="tinker-input"
+            <TextInput
               type="email"
               value={gitConfig.authorEmail ?? ''}
               onChange={(event) =>
@@ -561,17 +541,16 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
             />
           </label>
           <div className="tinker-inline-actions">
-            <button type="button" className="tinker-button-secondary" onClick={() => void handleSaveGitConfig()} disabled={busy}>
+            <Button variant="secondary" onClick={() => void handleSaveGitConfig()} disabled={busy}>
               Save remote
-            </button>
-            <button
-              type="button"
-              className="tinker-button"
+            </Button>
+            <Button
+              variant="primary"
               onClick={() => void handleSync()}
               disabled={busy || gitConfig.remoteUrl.trim().length === 0}
             >
               {busy ? 'Syncing…' : 'Sync now'}
-            </button>
+            </Button>
           </div>
 
           {syncReport ? (

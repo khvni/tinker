@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
+import { Badge, Button } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities, slugify } from '@tinker/memory';
 import type { SkillDraft, SkillStore } from '@tinker/shared-types';
@@ -279,11 +280,13 @@ export const Chat = ({
         </div>
         <div className="tinker-inline-actions">
           {onOpenNewChat ? (
-            <button className="tinker-button-secondary" type="button" onClick={onOpenNewChat}>
+            <Button variant="secondary" size="s" onClick={onOpenNewChat}>
               New chat tab
-            </button>
+            </Button>
           ) : null}
-          <span className="tinker-pill">{status}</span>
+          <Badge variant="default" size="small">
+            {status}
+          </Badge>
         </div>
       </header>
 
@@ -301,13 +304,9 @@ export const Chat = ({
             <p className="tinker-message-text">{message.text}</p>
             {message.role === 'assistant' && message.text.trim().length > 0 ? (
               <div className="tinker-message-actions">
-                <button
-                  type="button"
-                  className="tinker-button-ghost tinker-button-ghost--small"
-                  onClick={() => handleSaveAsSkill(message)}
-                >
+                <Button variant="ghost" size="s" onClick={() => handleSaveAsSkill(message)}>
                   Save as skill
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
@@ -324,14 +323,13 @@ export const Chat = ({
           disabled={busy || !modelConnected}
         />
         <div className="tinker-inline-actions">
-          <button
-            className="tinker-button"
-            type="button"
+          <Button
+            variant="primary"
             onClick={sendMessage}
             disabled={busy || !modelConnected || input.trim().length === 0}
           >
             {busy ? 'Streaming…' : 'Send message'}
-          </button>
+          </Button>
         </div>
       </div>
     </section>
