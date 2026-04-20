@@ -186,6 +186,18 @@ textarea {
   white-space: pre-wrap;
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
+  animation: tinker-message-in var(--duration-base) var(--ease-standard) both;
+}
+
+@keyframes tinker-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tinker-message--user {
@@ -229,6 +241,14 @@ textarea {
   border-radius: var(--radius-md);
   padding: var(--space-4);
   background: var(--color-bg-elevated);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
+}
+
+.tinker-list-item:hover {
+  border-color: var(--color-border-default);
+  background: var(--color-bg-hover);
 }
 
 .tinker-list-item h3 {
@@ -293,6 +313,7 @@ textarea {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-panel);
+  transition: border-color var(--duration-fast) var(--ease-standard);
 }
 
 .tinker-integration-chip strong,
@@ -885,5 +906,15 @@ textarea {
 
   .tinker-integrations-strip__header {
     flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
