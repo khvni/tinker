@@ -51,15 +51,8 @@ const MODEL_CONNECT_POLL_INTERVAL_MS = 1_500;
 const MODEL_CONNECT_TIMEOUT_MS = 180_000;
 const VAULT_REINDEX_DEBOUNCE_MS = 300;
 const OPENCODE_AUTH_HOST = 'auth.openai.com';
-const EMPTY_SESSIONS: SSOStatus = { google: null, github: null };
 const EMPTY_PROVIDER_BUSY: ProviderBusyState = { google: false, github: false };
 const EMPTY_PROVIDER_MESSAGES: ProviderMessageState = { google: null, github: null };
-
-const wait = (ms: number): Promise<void> => {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-};
 
 const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSOStatus => {
   return {
@@ -178,7 +171,9 @@ const waitForModelConnection = async (connection: OpencodeConnection, vaultPath:
       return true;
     }
 
-    await wait(MODEL_CONNECT_POLL_INTERVAL_MS);
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, MODEL_CONNECT_POLL_INTERVAL_MS);
+    });
   }
 
   return false;
