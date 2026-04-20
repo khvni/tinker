@@ -44,3 +44,10 @@ apps/desktop/src-tauri/resources/auth-sidecar.mjs
 # Logs
 *.log
 logs/
+
+# Local-only reference material (personal notes, copyrighted articles, third-party references)
+.local-reference/
+
+# Local agent instructions (per-machine overrides, not shared)
+CLAUDE.local.md
+AGENTS.local.md
