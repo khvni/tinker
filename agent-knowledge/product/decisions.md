@@ -134,6 +134,76 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
 - **Why**: Matches "workspace, not a chat window" tone — desktop-first, quiet, long-session-friendly. Amber is distinct from the cyan-on-dark AI-slop default. Host Grotesk carries geometric warmth without looking like every other Inter/DM Sans clone.
 - **How to apply**: Never reintroduce `Space Grotesk`, `Inter`, `Avenir Next`, or radial cyan gradients. Never add light-mode branches without a design decision first. If a light mode lands, it's a token-layer change in `@tinker/design`, not a per-app override.
 
+### `[2026-04-19]` D16 — Replace Dockview with `@tinker/panes`
+- **Decision**: Retire `dockview-react` as the workspace layout engine. `@tinker/panes` (recursive split tree + tabs + zustand store) is the only sanctioned layout primitive going forward. Existing panes migrate feature-by-feature; no big-bang rip-out.
+- **Why**: Dockview solves VS Code-style dockable panels with floating windows and cross-group tab merging — capabilities Tinker does not need per PRD. The cost we paid was:
+  - Workspace state serialization is opaque (whatever Dockview emits).
+  - Tab ordering + pane focus semantics live in a third-party runtime we don't fully own.
+  - Plugging cmux-style attention rings and Superset-style workspace metadata into Dockview means fighting its APIs.
+  - Layout persistence schema leaks Dockview's internal model into `packages/shared-types`, making migrations brittle.
+- **How to apply**:
+  - New panes register with `PaneRegistry` keyed by `pane.kind`.
+  - Layout state serializes via `selectWorkspaceSnapshot()`; persistence uses the `WorkspaceState<TData>` type, not Dockview's JSON.
+  - Migration order (parallel agents): Chat → Today → Scheduler → Settings → Dojo → VaultBrowser → file renderers. Each migration is its own PR with the matching pane moving to a `kind` in the registry.
+  - Don't add new `dockview-react` imports. Don't extend `packages/shared-types/LayoutState.dockviewModel`.
+  - Remove the `dockview-react` dependency in the PR that ships the last migrated pane.
+- **Reference**: See `agent-knowledge/reference/panes-heritage.md` for the architectural synthesis (cmux + OpenCode + Superset) behind this choice.
+
+### `[2026-04-19]` D17 — Device / Host service split
+- **Decision**: Separate the process that runs workspace state from the process that displays it. `@tinker/host-service` (standalone server: workspace CRUD, vault + memory I/O, OpenCode sidecar lifecycle, git ops) is spawned and adopted by the Tauri shell but is deployable without Electron/Tauri awareness.
+- **Why**: Three pressures converge on this:
+  - Headless mode (Ramp Glass's "works while you don't") needs a host with no window.
+  - A future mobile companion app should be a device connecting to a laptop host, not a second desktop.
+  - Our current `@tinker/bridge` + Rust sidecar conflate workspace logic with presentation; every new feature (e.g. scheduled prompts) accumulates coupling.
+- **How to apply**:
+  - Host owns: workspace lifecycle, vault indexing, memory store, OpenCode sidecar lifecycle, git operations, scheduled jobs, integration credential store.
+  - Device owns: Tauri shell, renderer UI, platform bridges (dialogs, clipboard, notifications), tray/menu, updater.
+  - Host identity (`hostId`, `hostName`) is intrinsic — generated at first run from machine metadata. NEVER passed in as config.
+  - Host exposes a PSK-authenticated HTTP/WS surface with `health.check`, `host.info`, `workspace.*`, and streaming endpoints for terminal + filesystem + chat.
+  - Coordinator pattern for sidecar: spawn → health-poll → record `{pid, port, secret}` → discard ChildProcess handle → `unref` so it survives app quit → manifest-file-based adoption across restarts. No mutate-then-call managers; pass `SpawnConfig` per call.
+  - Don't build a cloud sync layer yet (see D18). But don't close the door either — keep host interfaces cloud-reachable in principle.
+- **Reference**: `agent-knowledge/features/11-host-service.md`.
+
+### `[2026-04-19]` D18 — Defer cloud sync / ElectricSQL
+- **Decision**: No cloud sync, no ElectricSQL proxy, no device-to-device pairing in v1. The host/device split (D17) must be buildable without this, but the sync runtime stays off the roadmap.
+- **Why**: Local-first principle still overrides. Glass's collab features came after Ramp validated the single-user story. Adding sync prematurely = premature schema lock-in + cloud dependency.
+- **How to apply**: If you're about to add `electric-sql`, a WebSocket sync client, or a "share workspace" flow — stop. Revisit once we have opinionated user behavior to sync.
+
+### `[2026-04-19]` D19 — Workspace attention coordinator
+- **Decision**: Every workspace surface gets a single attention coordinator (`@tinker/attention`) modeled after cmux's `WorkspaceAttentionCoordinator`. Unread rings, focus flashes, manual-unread toggles, and notification-arrival decisions go through it.
+- **Why**: Notification UX rots fast without a coordinator — panes ring when they shouldn't, flashes compete, focus-state isn't respected. cmux already solved this; we codify the rules.
+- **How to apply**:
+  - Pane generates a signal via `attention.signal({ paneId, reason })`.
+  - Coordinator decides `flash | skip` based on focus state + competing indicators.
+  - Navigation flashes (teal) get suppressed when a notification flash (blue) is active on the same workspace.
+  - Rendering hooks: pane edge ring, tab dot, workspace sidebar card badge. All three read from the same store.
+- **Reference**: `agent-knowledge/features/12-attention-coordinator.md`.
+
+### `[2026-04-19]` D20 — `ask_user` overlay for agent-initiated clarifications
+- **Decision**: Any clarification an agent needs from the user mid-run renders as an interactive overlay with clickable options, not plain-text prose the user has to type a reply to.
+- **Why**: Superset shipped this for a reason — plain-text questions get lost in a chat log. Overlays force the decision and give the agent a typed response.
+- **How to apply**:
+  - Agent emits an `ask_user` event with `{ id, prompt, options[] }`.
+  - Chat pane pauses streaming + renders overlay.
+  - User click resolves to a typed answer that the agent resumes on.
+  - Keyboard-navigable; Esc does NOT dismiss (must pick an option) unless `options` includes `{id: 'cancel'}`.
+  - Don't use this for freeform input — use a textbox pane for that.
+
+### `[2026-04-19]` D21 — Co-located component folder convention
+- **Decision**: One folder per component. `ComponentName/` contains `ComponentName.tsx`, `index.ts` barrel, co-located `ComponentName.test.tsx`, `ComponentName.module.css` (when needed), and any component-local hooks / utils under `ComponentName/{hooks,utils}/`.
+- **Why**: Cuts time spent discovering tests, makes deletion safe (remove the folder, gone), and matches Superset's AGENTS.md structure which multiple parallel agents can follow without conflict.
+- **How to apply**:
+  - Used once under a parent → nest under the parent's `components/`.
+  - Used in 2+ places → promote to the smallest shared parent's `components/`.
+  - Last-resort shared location is `apps/desktop/src/renderer/components/` or `packages/design/src/components/`.
+  - Exception: `packages/design` primitives may stay as flat files (`Button.tsx` + `Button.css`) because they predate this rule and are already flat.
+  - Don't create multi-component files. One component per file.
+
+### `[2026-04-19]` D22 — No mutate-then-call managers
+- **Decision**: Never stage state onto a service before invoking it (`mgr.setConfig(x); mgr.start()`). Pass config as arguments to each call.
+- **Why**: Temporal coupling hides bugs. The mutate + call pair often races with restart/retry logic and makes unit-testing impossible.
+- **How to apply**: New APIs take `(config, args)`. Retry logic calls with a fresh config object, not a bound value.
+
 ## Open Questions (not yet decided)
 
 - **Scheduler implementation**: in-process TypeScript cron vs. OS-level (launchd/Task Scheduler/systemd). Leaning in-process for cross-platform simplicity; revisit when app sleep/wake behavior is tested.

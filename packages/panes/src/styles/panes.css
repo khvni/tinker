@@ -1,0 +1,294 @@
+/* @tinker/panes styles — consume @tinker/design tokens only. */
+
+.tinker-panes-workspace {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  color: var(--color-text-base, inherit);
+  background: var(--color-surface-base, transparent);
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+.tinker-panes-tabstrip {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  border-bottom: 1px solid var(--color-border-base, rgba(255, 255, 255, 0.08));
+  background: var(--color-surface-raised-base, transparent);
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  min-height: 36px;
+}
+
+.tinker-panes-tabstrip__tabs {
+  display: flex;
+  gap: var(--space-1, 4px);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.tinker-panes-tabstrip__actions {
+  display: flex;
+  gap: var(--space-1, 4px);
+  align-items: center;
+}
+
+.tinker-panes-tabstrip__action {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-weak, inherit);
+  border-radius: var(--radius-sm, 4px);
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  font: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.tinker-panes-tabstrip__action:hover:not(:disabled) {
+  background: var(--color-surface-raised-base-hover, rgba(255, 255, 255, 0.06));
+  color: var(--color-text-strong, inherit);
+}
+
+.tinker-panes-tabstrip__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tinker-panes-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--color-text-weak, inherit);
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+  max-width: 240px;
+  white-space: nowrap;
+}
+
+.tinker-panes-tab:hover {
+  background: var(--color-surface-raised-base-hover, rgba(255, 255, 255, 0.06));
+  color: var(--color-text-base, inherit);
+}
+
+.tinker-panes-tab--active {
+  background: var(--color-surface-sunken, rgba(255, 255, 255, 0.08));
+  color: var(--color-text-strong, inherit);
+  border-color: var(--color-border-strong, rgba(255, 255, 255, 0.2));
+}
+
+.tinker-panes-tab:focus-visible {
+  outline: 2px solid var(--color-accent-base, currentColor);
+  outline-offset: 2px;
+}
+
+.tinker-panes-tab[data-drop-target] {
+  box-shadow: inset 2px 0 0 var(--color-accent-base, currentColor);
+}
+
+.tinker-panes-tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tinker-panes-tab__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-weak, inherit);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tinker-panes-tab__close:hover {
+  background: var(--color-surface-raised-base-hover, rgba(255, 255, 255, 0.1));
+  color: var(--color-text-strong, inherit);
+}
+
+.tinker-panes-surface {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-base, transparent);
+}
+
+.tinker-panes-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  color: var(--color-text-weak, inherit);
+}
+
+.tinker-panes-split {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.tinker-panes-split--row {
+  grid-template-rows: 1fr;
+}
+
+.tinker-panes-split--column {
+  grid-template-columns: 1fr;
+}
+
+.tinker-panes-resize {
+  appearance: none;
+  border: none;
+  background: var(--color-border-base, rgba(255, 255, 255, 0.08));
+  padding: 0;
+  margin: 0;
+  cursor: col-resize;
+  position: relative;
+  touch-action: none;
+}
+
+.tinker-panes-resize:focus-visible {
+  outline: 2px solid var(--color-accent-base, currentColor);
+  outline-offset: -2px;
+}
+
+.tinker-panes-resize--row {
+  width: 4px;
+  cursor: col-resize;
+  align-self: stretch;
+}
+
+.tinker-panes-resize--column {
+  height: 4px;
+  cursor: row-resize;
+  justify-self: stretch;
+}
+
+.tinker-panes-resize:hover,
+.tinker-panes-resize:active {
+  background: var(--color-accent-base, currentColor);
+}
+
+.tinker-panes-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--color-surface-base, transparent);
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.tinker-panes-frame--active {
+  border-color: var(--color-accent-base, currentColor);
+  box-shadow: 0 0 0 1px var(--color-accent-base, currentColor) inset;
+}
+
+.tinker-panes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  background: var(--color-surface-raised-base, transparent);
+  border-bottom: 1px solid var(--color-border-base, rgba(255, 255, 255, 0.08));
+  cursor: grab;
+  user-select: none;
+}
+
+.tinker-panes-header:active {
+  cursor: grabbing;
+}
+
+.tinker-panes-title {
+  font-size: var(--font-size-sm, 13px);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-strong, inherit);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+
+.tinker-panes-close {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text-weak, inherit);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 var(--space-1, 4px);
+  line-height: 1;
+}
+
+.tinker-panes-close:hover {
+  color: var(--color-text-strong, inherit);
+}
+
+.tinker-panes-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+.tinker-panes-drop {
+  pointer-events: none;
+  position: absolute;
+  background: var(--color-accent-base, currentColor);
+  opacity: 0.2;
+  transition: opacity 120ms ease;
+}
+
+.tinker-panes-drop--left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+}
+
+.tinker-panes-drop--right {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 40%;
+}
+
+.tinker-panes-drop--top {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 40%;
+}
+
+.tinker-panes-drop--bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40%;
+}
+
+.tinker-panes-missing {
+  padding: var(--space-3, 12px);
+  color: var(--color-text-weak, inherit);
+}

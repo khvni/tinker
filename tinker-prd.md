@@ -16,7 +16,7 @@
 
 ## 1. Product Summary
 
-Tinker is a desktop AI workspace. The shell is Tauri v2, the UI is React + Dockview, and OpenCode runs as a localhost sidecar. The user can connect Google for integrations, pick or create a local vault, and keep working even if no integrations are configured.
+Tinker is a desktop AI workspace. The shell is Tauri v2, the UI is React + `@tinker/panes` (recursive split-tree + tabs; supersedes Dockview per [[decisions]] D16), and OpenCode runs as a localhost sidecar. The user can connect Google for integrations, pick or create a local vault, and keep working even if no integrations are configured.
 
 The app is not a cloud dashboard. It is a local workspace that happens to talk to a model.
 
@@ -60,34 +60,42 @@ Core traits:
   - entities
   - relationships
   - FTS-backed entity search
-  - saved Dockview layouts
+  - saved workspace layouts (`@tinker/panes` `WorkspaceState<TData>` snapshots)
 - The vault remains the human-readable source of truth for notes and summaries.
 
 ### 2.5 Workspace
 
-- Dockview provides split panes and tab movement.
+- `@tinker/panes` provides the recursive split tree, movable tabs, and the per-pane renderer registry. Dockview is being retired per [[decisions]] D16 — new panes register a `kind`, no new `dockview-react` imports.
 - The default layout is Chat + Today.
-- Layout serializes into SQLite and restores on relaunch.
+- Layout serializes into SQLite as `WorkspaceState<TData>` snapshots and restores on relaunch.
 - First run walks the user through sign-in, vault choice, and opening the workspace.
+- The architecture splits into **device** (Tauri shell, renderer) and **host service** (workspace state, vault, scheduler, OpenCode lifecycle) per [[decisions]] D17. Headless mode + future mobile companion depend on this boundary.
 
 ---
 
 ## 3. Architecture
 
 ```text
-Tauri Window
+Device — Tauri Window
   |- React renderer
-  |- Dockview workspace
-  |- @tinker/bridge for memory injection + stream shaping
-  |- @tinker/memory for SQLite and vault indexing
-  |- direct HTTP + SSE to OpenCode at localhost
+  |- @tinker/panes workspace (tabs + recursive split tree)
+  |- @tinker/host-client (typed RPC + stream shaping)
+  |- platform bridges (dialogs, tray, notifications, keychain writes)
 
-Tauri Rust core
-  |- starts OpenCode sidecar
-  |- health-checks localhost
+Device — Tauri Rust core
+  |- spawns + adopts the host service (coordinator pattern, per D17 + D22)
   |- runs Google loopback OAuth
-  |- exposes small invoke commands
   |- manages keychain-backed token storage plugin
+  |- OS-level primitives only
+
+Host service (packages/host-service)
+  |- workspace CRUD
+  |- vault indexing + memory (SQLite-backed)
+  |- OpenCode sidecar lifecycle
+  |- git operations
+  |- scheduled jobs
+  |- chat runtime + memory injection
+  |- exposes PSK-authenticated HTTP/WS surface
 
 OpenCode sidecar
   |- GPT-5.4 via Codex OAuth
@@ -128,15 +136,23 @@ OpenCode sidecar
 ```text
 tinker/
   apps/
-    desktop/
+    desktop/                 # Device (Tauri shell)
       src/
         bindings.ts
         renderer/
-      src-tauri/
+      src-tauri/             # Rust coordinator for host-service + OpenCode
   packages/
+    panes/                   # recursive split-tree workspace (retires dockview-react)
+    design/                  # tokens + primitives
+    host-service/            # (planned) standalone workspace runtime
+    host-client/             # (planned) typed RPC + WS client for the host
+    bridge/                  # stream shaping + memory injection (to be split)
+    memory/                  # SQLite + vault indexing (moving under host-service)
+    scheduler/               # in-process cron (moving under host-service)
+    attention/               # (planned) workspace attention coordinator
+    workspace-sidebar/       # (planned) vertical workspace nav
+    auth-sidecar/            # Better Auth local sidecar (identity)
     shared-types/
-    bridge/
-    memory/
   opencode.json
   tinker-prd.md
   CLAUDE.md
@@ -149,10 +165,11 @@ tinker/
 
 - The app launches through `pnpm tauri dev`.
 - FirstRun renders and can reach the workspace without crashing.
-- Chat and Today panes render in Dockview.
-- Layout state persists across restarts.
+- Chat and Today panes render through `@tinker/panes` (Dockview-migrated or freshly registered).
+- Layout state persists across restarts using `WorkspaceState<TData>` snapshots.
 - The renderer does not depend on preload globals or custom IPC channels for app logic.
 - The workspace still loads when sign-in fails or is skipped.
+- The `@tinker/panes` demo at `?route=panes-demo` renders, supports tab add/close/move and pane split/close, and its test suite (`pnpm --filter @tinker/panes test`) stays green.
 
 ---
 
