@@ -292,11 +292,11 @@ const ComponentsTab = (): JSX.Element => {
 type Swatch = { name: string; varName: string; hex: string; note?: string };
 
 const SURFACE_SWATCHES: ReadonlyArray<Swatch> = [
-  { name: 'bg-primary', varName: '--color-bg-primary', hex: '#fdfbf7', note: 'canvas · dark #1a1612' },
+  { name: 'bg-primary', varName: '--color-bg-primary', hex: '#fefcf8', note: 'canvas · dark #1a1612' },
   { name: 'bg-elevated', varName: '--color-bg-elevated', hex: '#ffffff', note: 'cards / modals · dark #221d17' },
-  { name: 'bg-panel', varName: '--color-bg-panel', hex: '#f6f1e8', note: 'sidebar · dark #16120e' },
+  { name: 'bg-panel', varName: '--color-bg-panel', hex: '#f9f5ec', note: 'sidebar · dark #16120e' },
   { name: 'bg-input', varName: '--color-bg-input', hex: '#ffffff', note: 'inputs · dark #120f0c' },
-  { name: 'bg-hover', varName: '--color-bg-hover', hex: '#f1ebe0', note: 'interactive hover · dark #25201a' },
+  { name: 'bg-hover', varName: '--color-bg-hover', hex: '#f4efe4', note: 'interactive hover · dark #25201a' },
 ];
 
 const TEXT_SWATCHES: ReadonlyArray<Swatch> = [

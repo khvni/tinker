@@ -16,12 +16,12 @@
 :root {
   color-scheme: light;
 
-  /* bg (warm paper — gravitating toward white, a whisper of warmth) */
-  --color-bg-primary: #fdfbf7;
+  /* bg (near-white with a whisper of warmth — not sterile, not yellowed) */
+  --color-bg-primary: #fefcf8;
   --color-bg-elevated: #ffffff;
-  --color-bg-panel: #f6f1e8;
+  --color-bg-panel: #f9f5ec;
   --color-bg-input: #ffffff;
-  --color-bg-hover: #f1ebe0;
+  --color-bg-hover: #f4efe4;
 
   /* border (ink alpha) */
   --color-border-subtle: rgba(26, 22, 18, 0.06);
