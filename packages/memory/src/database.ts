@@ -113,7 +113,3 @@ export const getDatabase = async (sqlUrl = DEFAULT_SQL_URL): Promise<Database> =
 
   return databasePromise;
 };
-
-export const resetDatabaseCache = (): void => {
-  databasePromise = null;
-};
