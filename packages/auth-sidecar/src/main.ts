@@ -356,10 +356,6 @@ const finishOAuth = async (request: Request): Promise<Response> => {
   }
 };
 
-const forwardAuthRequest = async (request: Request): Promise<Response> => {
-  return auth.handler(request);
-};
-
 const startSignIn = async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
   const provider = url.pathname.split('/').pop();
@@ -442,7 +438,7 @@ const handleRequest = async (request: Request): Promise<Response> => {
   }
 
   if (url.pathname.startsWith('/api/auth/')) {
-    return forwardAuthRequest(request);
+    return auth.handler(request);
   }
 
   if (url.pathname.startsWith('/desktop/sign-in/')) {
