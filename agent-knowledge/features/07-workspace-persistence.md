@@ -7,6 +7,8 @@ priority: p1
 
 # Feature 07 — Workspace Persistence + Split-Pane UI
 
+> **Layout engine superseded by [[D16]] / [[10-tinker-panes]].** Dockview references below reflect the first implementation; persistence requirements still apply but serialize via `WorkspaceState<TData>` from `@tinker/panes`, not `event.api.toJSON()`. Per-pane migration rows in `context/tasks.md`.
+
 Code-editor-style workspace. Not a chat window. Layout survives restart. Renders everything inline.
 
 ## Goal

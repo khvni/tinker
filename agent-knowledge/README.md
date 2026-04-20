@@ -50,16 +50,7 @@ agent-knowledge/
 │   ├── feature-gap-table.md      # Claude Code vs Cowork vs Glass vs Tinker
 │   ├── ramp-ai-adoption.md       # Why Glass exists (org adoption playbook)
 │   └── ai-agent-harnesses.md     # OpenClaw / Hermes / Cowork landscape
-└── features/                     # Feature specs with reasoning
-    ├── 01-sso-connector-layer.md
-    ├── 02-dojo-skill-marketplace.md
-    ├── 03-memory-pipeline.md
-    ├── 04-native-scheduler.md
-    ├── 05-sensei-skill-discovery.md
-    ├── 06-subagent-orchestration.md
-    ├── 07-workspace-persistence.md
-    ├── 08-mcp-proxy-layer.md
-    └── 09-design-system.md
+└── features/                     # Feature specs with reasoning (01–15)
 ```
 
 ## UI Discipline (non-negotiable)
