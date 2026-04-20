@@ -1,7 +1,7 @@
 export const typography = {
   family: {
-    sans: '"Inter", "Space Grotesk", "SF Pro Text", "Segoe UI", system-ui, sans-serif',
-    mono: '"JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace',
+    sans: '"Host Grotesk Variable", "Host Grotesk", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
+    mono: 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace',
   },
   size: {
     xs: '11px',

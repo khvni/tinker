@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import '@fontsource-variable/host-grotesk';
 import 'dockview-react/dist/styles/dockview.css';
 import { App } from './App.js';
 import { DesignSystem } from './routes/design-system.js';

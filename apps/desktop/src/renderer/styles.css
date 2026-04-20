@@ -42,8 +42,8 @@ textarea {
   font: inherit;
 }
 
-input:not([type='checkbox']),
-textarea {
+.tinker-app input:not([type='checkbox']),
+.tinker-app textarea {
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.85rem 0.95rem;

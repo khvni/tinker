@@ -1,25 +1,28 @@
 .tk-badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+  gap: 5px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   font-family: var(--font-sans);
   font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-tight);
+  line-height: 1;
   white-space: nowrap;
 }
 
 .tk-badge--size-small {
-  height: 18px;
-  padding: 0 var(--space-2);
+  min-height: 24px;
+  height: 24px;
+  padding: 0 10px;
   font-size: var(--font-size-xs);
 }
 
 .tk-badge--size-medium {
-  height: 22px;
-  padding: 0 var(--space-3);
-  font-size: var(--font-size-sm);
+  min-height: 32px;
+  height: 32px;
+  padding: 0 14px;
+  font-size: var(--font-size-md);
 }
 
 .tk-badge__icon {
@@ -32,7 +35,7 @@
 
 .tk-badge--default {
   background: var(--color-bg-input);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   border-color: var(--color-border-subtle);
 }
 

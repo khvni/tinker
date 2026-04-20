@@ -7,7 +7,7 @@
 
 .tk-searchinput__icon {
   position: absolute;
-  left: var(--space-3);
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-text-muted);
@@ -15,7 +15,7 @@
 }
 
 .tk-searchinput__input {
-  padding-left: calc(var(--space-3) + 14px + var(--space-1));
+  padding-left: calc(16px + 14px + 8px);
 }
 
 .tk-searchinput__input::-webkit-search-cancel-button {

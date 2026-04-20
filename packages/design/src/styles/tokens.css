@@ -1,29 +1,30 @@
 :root {
   color-scheme: dark;
 
-  /* bg */
-  --color-bg-primary: #0f0f12;
-  --color-bg-elevated: #16161b;
-  --color-bg-panel: #1b1b22;
-  --color-bg-input: #212128;
-  --color-bg-hover: #24242c;
+  /* bg (warm near-black) */
+  --color-bg-primary: #1a1612;
+  --color-bg-elevated: #221d17;
+  --color-bg-panel: #16120e;
+  --color-bg-input: #120f0c;
+  --color-bg-hover: #25201a;
 
-  /* border */
-  --color-border-subtle: rgba(255, 255, 255, 0.06);
-  --color-border-default: rgba(255, 255, 255, 0.1);
-  --color-border-strong: rgba(255, 255, 255, 0.18);
+  /* border (warm-tinted white alpha) */
+  --color-border-subtle: rgba(255, 240, 220, 0.06);
+  --color-border-default: rgba(255, 240, 220, 0.1);
+  --color-border-strong: rgba(255, 240, 220, 0.18);
 
-  /* text */
-  --color-text-primary: #f4f4f5;
-  --color-text-secondary: #a1a1aa;
-  --color-text-muted: #71717a;
-  --color-text-inverse: #0f0f12;
+  /* text (warm neutrals) */
+  --color-text-primary: #f5efe6;
+  --color-text-secondary: #a8a097;
+  --color-text-muted: #6f665c;
+  --color-text-inverse: #1a1612;
 
-  /* accent (yellow/lime) */
-  --color-accent: #d9f25f;
-  --color-accent-strong: #c8e548;
-  --color-accent-soft: rgba(217, 242, 95, 0.16);
-  --color-accent-ink: #16160a;
+  /* accent (amber) */
+  --color-accent: #f9c041;
+  --color-accent-strong: #e5ad2d;
+  --color-accent-soft: rgba(249, 192, 65, 0.18);
+  --color-accent-ring: rgba(249, 192, 65, 0.35);
+  --color-accent-ink: #201402;
 
   /* semantic */
   --color-success: #4ade80;
@@ -37,7 +38,7 @@
   --color-skill: #a78bfa;
   --color-skill-soft: rgba(167, 139, 250, 0.2);
   --color-claude: #f2c94c;
-  --color-muted: #6b7280;
+  --color-muted: #6b625a;
 
   /* spacing (4px base) */
   --space-0: 0;
@@ -59,8 +60,8 @@
   --radius-pill: 9999px;
 
   /* typography */
-  --font-sans: "Inter", "Space Grotesk", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  --font-sans: "Host Grotesk Variable", "Host Grotesk", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
   --font-size-xs: 11px;
   --font-size-sm: 12px;
   --font-size-base: 13px;

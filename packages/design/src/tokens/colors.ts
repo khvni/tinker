@@ -1,27 +1,28 @@
 export const colors = {
   bg: {
-    primary: '#0f0f12',
-    elevated: '#16161b',
-    panel: '#1b1b22',
-    input: '#212128',
-    hover: '#24242c',
+    primary: '#1a1612',
+    elevated: '#221d17',
+    panel: '#16120e',
+    input: '#120f0c',
+    hover: '#25201a',
   },
   border: {
-    subtle: 'rgba(255, 255, 255, 0.06)',
-    default: 'rgba(255, 255, 255, 0.1)',
-    strong: 'rgba(255, 255, 255, 0.18)',
+    subtle: 'rgba(255, 240, 220, 0.06)',
+    default: 'rgba(255, 240, 220, 0.1)',
+    strong: 'rgba(255, 240, 220, 0.18)',
   },
   text: {
-    primary: '#f4f4f5',
-    secondary: '#a1a1aa',
-    muted: '#71717a',
-    inverse: '#0f0f12',
+    primary: '#f5efe6',
+    secondary: '#a8a097',
+    muted: '#6f665c',
+    inverse: '#1a1612',
   },
   accent: {
-    base: '#d9f25f',
-    strong: '#c8e548',
-    soft: 'rgba(217, 242, 95, 0.16)',
-    ink: '#16160a',
+    base: '#f9c041',
+    strong: '#e5ad2d',
+    soft: 'rgba(249, 192, 65, 0.18)',
+    ring: 'rgba(249, 192, 65, 0.35)',
+    ink: '#201402',
   },
   semantic: {
     success: '#4ade80',
@@ -35,7 +36,7 @@ export const colors = {
     skill: '#a78bfa',
     skillSoft: 'rgba(167, 139, 250, 0.2)',
     claude: '#f2c94c',
-    muted: '#6b7280',
+    muted: '#6b625a',
   },
 } as const;
 

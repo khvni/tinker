@@ -2,6 +2,10 @@
   --toggle-width: 34px;
   --toggle-height: 20px;
   --toggle-knob: 14px;
+  --toggle-on-bg: var(--color-info);
+  --toggle-off-bg: var(--color-bg-input);
+  --toggle-off-border: var(--color-border-default);
+  --toggle-knob-bg: #ffffff;
 
   position: relative;
   width: var(--toggle-width);
@@ -12,24 +16,37 @@
   cursor: pointer;
   transition: background var(--duration-base) var(--ease-standard);
   flex-shrink: 0;
-}
-
-.tk-toggle--on {
-  background: var(--color-info);
+  background: var(--toggle-on-bg);
 }
 
 .tk-toggle--off {
-  background: var(--color-bg-input);
-  border: 1px solid var(--color-border-default);
+  background: var(--toggle-off-bg);
+  border: 1px solid var(--toggle-off-border);
 }
 
-.tk-toggle--dim {
-  opacity: 0.6;
+/* Dim = reduced emphasis, same hue family */
+.tk-toggle--dim.tk-toggle--on {
+  --toggle-on-bg: rgba(96, 165, 250, 0.45);
+  --toggle-knob-bg: rgba(255, 255, 255, 0.85);
+}
+.tk-toggle--dim.tk-toggle--off {
+  --toggle-off-bg: rgba(255, 255, 255, 0.06);
+  --toggle-off-border: rgba(255, 255, 255, 0.08);
+  --toggle-knob-bg: rgba(255, 255, 255, 0.65);
 }
 
+/* Disabled = fully inert, still colour-consistent */
 .tk-toggle--disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+}
+.tk-toggle--disabled.tk-toggle--on {
+  --toggle-on-bg: rgba(96, 165, 250, 0.3);
+  --toggle-knob-bg: rgba(255, 255, 255, 0.6);
+}
+.tk-toggle--disabled.tk-toggle--off {
+  --toggle-off-bg: rgba(255, 255, 255, 0.04);
+  --toggle-off-border: rgba(255, 255, 255, 0.06);
+  --toggle-knob-bg: rgba(255, 255, 255, 0.45);
 }
 
 .tk-toggle__knob {
@@ -39,10 +56,11 @@
   width: var(--toggle-knob);
   height: var(--toggle-knob);
   border-radius: var(--radius-pill);
-  background: #ffffff;
+  background: var(--toggle-knob-bg);
   transform: translateY(-50%);
-  transition: left var(--duration-base) var(--ease-standard);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: left var(--duration-base) var(--ease-standard),
+    background var(--duration-base) var(--ease-standard);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .tk-toggle--on .tk-toggle__knob {

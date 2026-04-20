@@ -1,11 +1,15 @@
 .ds-root {
   display: grid;
   grid-template-columns: 48px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01", "ss03";
 }
 
 .ds-sidebar {
@@ -29,6 +33,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .ds-titlebar {
@@ -77,8 +83,10 @@
 
 .ds-content {
   flex: 1;
+  min-height: 0;
   padding: var(--space-6) var(--space-8);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .ds-sections {
@@ -154,4 +162,283 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
+}
+
+.ds-spin {
+  animation: ds-spin 0.9s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes ds-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Colors tab */
+.ds-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.ds-swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.ds-swatch__chip {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.ds-swatch__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ds-swatch__name {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ds-swatch__hex {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.ds-swatch__note {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Typography tab */
+.ds-type-family {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.ds-type-family__name {
+  margin: 0;
+  font-size: var(--font-size-xxl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.ds-type-family__stack {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.ds-type-family__specimen {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+}
+
+.ds-type-scale {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ds-type-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.ds-type-row__sample {
+  flex-shrink: 0;
+}
+
+.ds-type-row__meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
+}
+
+.ds-type-row__meta code {
+  color: var(--color-text-secondary);
+}
+
+/* Spacing tab */
+.ds-space-scale {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ds-space-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ds-space-row__bar {
+  display: inline-block;
+  height: 16px;
+  background: var(--color-accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.ds-space-row__meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.ds-space-row__meta code {
+  color: var(--color-text-secondary);
+}
+
+.ds-radius-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.ds-radius-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.ds-radius-item__chip {
+  width: 56px;
+  height: 56px;
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border-default);
+}
+
+.ds-radius-item__meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* Chat tab */
+.ds-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 680px;
+  height: 100%;
+  min-height: 0;
+}
+
+.ds-chat__memory {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.ds-chat__memory-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-chat__log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.ds-msg {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  max-width: 86%;
+}
+
+.ds-msg--user {
+  align-self: flex-end;
+  background: var(--color-accent-soft);
+  color: var(--color-text-primary);
+  border-color: rgba(249, 192, 65, 0.28);
+}
+
+.ds-msg--assistant {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.ds-msg--assistant p {
+  margin: 0;
+}
+
+.ds-msg__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.ds-msg--system {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-pill);
+}
+
+.ds-chat__composer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.ds-chat__composer > .tk-textinput,
+.ds-chat__composer > .ds-input-wrap {
+  flex: 1;
 }

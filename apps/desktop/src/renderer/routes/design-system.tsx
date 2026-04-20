@@ -42,7 +42,7 @@ const STATUS_DOTS: ReadonlyArray<{ state: StatusDotState; label: string }> = [
   { state: 'warning', label: 'Warning' },
   { state: 'danger', label: 'Danger' },
   { state: 'info', label: 'Info' },
-  { state: 'claude', label: 'Claude' },
+  { state: 'claude', label: 'OpenCode' },
   { state: 'skill', label: 'Skill' },
   { state: 'pulse', label: 'Pulse' },
 ];
@@ -54,14 +54,9 @@ const PlusIcon = () => (
 );
 
 const SettingsIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
-    <path
-      d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M3.4 12.6l1.3-1.3M11.3 4.7l1.3-1.3"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-    />
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" />
   </svg>
 );
 
@@ -72,9 +67,31 @@ const TrashIcon = () => (
 );
 
 const RefreshIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path d="M13 8a5 5 0 1 1-1.5-3.55L13 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    <path d="M13 3v3h-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+    <path d="M21 4v5h-5" />
+  </svg>
+);
+
+const SpinnerIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    className="ds-spin"
+    aria-hidden="true"
+  >
+    <path d="M12 3a9 9 0 1 0 9 9" />
   </svg>
 );
 
@@ -103,7 +120,7 @@ const Row = ({ children }: { children: ReactNode }): JSX.Element => (
 const ComponentsTab = (): JSX.Element => {
   const [segValue, setSegValue] = useState<'first' | 'second' | 'third'>('first');
   const [toggleOn, setToggleOn] = useState(true);
-  const [toggleDim, setToggleDim] = useState(false);
+  const [toggleOff, setToggleOff] = useState(false);
   const [textValue, setTextValue] = useState('');
   const [searchValue, setSearchValue] = useState('');
 
@@ -142,15 +159,15 @@ const ComponentsTab = (): JSX.Element => {
           <IconButton variant="secondary" icon={<SettingsIcon />} label="Settings" />
           <IconButton variant="secondary" icon={<RefreshIcon />} label="Refresh" />
           <IconButton variant="primary" icon={<PlusIcon />} label="Add" />
-          <IconButton variant="secondary" icon={<PlusIcon />} label="Add ghost" />
+          <IconButton variant="secondary" icon={<PlusIcon />} label="Add outlined" />
           <IconButton variant="danger" icon={<TrashIcon />} label="Delete" />
-          <IconButton variant="ghost" icon={<SettingsIcon />} label="More" />
-          <IconButton variant="secondary" icon={<RefreshIcon />} label="Sync" />
+          <IconButton variant="secondary" icon={<SettingsIcon />} label="More" />
+          <IconButton variant="ghost" icon={<SpinnerIcon />} label="Loading" />
         </Row>
         <Row>
-          <IconButton variant="secondary" size="s" icon={<SettingsIcon />} label="Settings small" />
-          <IconButton variant="secondary" size="s" icon={<SettingsIcon />} label="Settings small 2" />
-          <IconButton variant="secondary" size="s" icon={<SettingsIcon />} label="Settings small 3" />
+          <IconButton variant="ghost" size="s" icon={<SettingsIcon />} label="Settings small" />
+          <IconButton variant="ghost" size="m" icon={<SettingsIcon />} label="Settings medium" />
+          <IconButton variant="ghost" size="l" icon={<SettingsIcon />} label="Settings large" />
         </Row>
       </Section>
 
@@ -163,8 +180,6 @@ const ComponentsTab = (): JSX.Element => {
           ))}
         </Row>
         <Row>
-          <Badge size="small">Small</Badge>
-          <Badge size="medium">Medium</Badge>
           <Badge variant="success" icon={<CheckIcon />}>
             With Icon
           </Badge>
@@ -220,7 +235,7 @@ const ComponentsTab = (): JSX.Element => {
             <span className="ds-status-item__label">Enabled</span>
           </span>
           <span className="ds-toggle-item">
-            <Toggle checked={toggleDim} onChange={setToggleDim} label="Disabled look toggle" dim />
+            <Toggle checked={toggleOff} onChange={setToggleOff} label="Disabled look toggle" />
             <span className="ds-status-item__label">Disabled look</span>
           </span>
           <span className="ds-toggle-item">
@@ -257,12 +272,284 @@ const ComponentsTab = (): JSX.Element => {
   );
 };
 
-const PlaceholderTab = ({ label }: { label: string }): JSX.Element => (
-  <div className="ds-placeholder">
-    <p className="ds-placeholder__title">{label}</p>
-    <p className="ds-placeholder__hint">Placeholder — implement in a later pass.</p>
+/* ------------------------- Colors ------------------------- */
+
+type Swatch = { name: string; varName: string; hex: string; note?: string };
+
+const SURFACE_SWATCHES: ReadonlyArray<Swatch> = [
+  { name: 'bg-primary', varName: '--color-bg-primary', hex: '#1a1612', note: 'canvas' },
+  { name: 'bg-elevated', varName: '--color-bg-elevated', hex: '#221d17', note: 'sidebar / titlebar' },
+  { name: 'bg-panel', varName: '--color-bg-panel', hex: '#16120e', note: 'recessed surface' },
+  { name: 'bg-input', varName: '--color-bg-input', hex: '#120f0c', note: 'TextInput / secondary icon bg' },
+  { name: 'bg-hover', varName: '--color-bg-hover', hex: '#25201a', note: 'interactive hover' },
+];
+
+const TEXT_SWATCHES: ReadonlyArray<Swatch> = [
+  { name: 'text-primary', varName: '--color-text-primary', hex: '#f5efe6' },
+  { name: 'text-secondary', varName: '--color-text-secondary', hex: '#a8a097' },
+  { name: 'text-muted', varName: '--color-text-muted', hex: '#6f665c' },
+  { name: 'text-inverse', varName: '--color-text-inverse', hex: '#1a1612', note: 'text on accent' },
+];
+
+const ACCENT_SWATCHES: ReadonlyArray<Swatch> = [
+  { name: 'accent', varName: '--color-accent', hex: '#f9c041', note: 'primary CTA, active states' },
+  { name: 'accent-strong', varName: '--color-accent-strong', hex: '#e5ad2d', note: 'hover' },
+  { name: 'accent-soft', varName: '--color-accent-soft', hex: 'rgba(249,192,65,0.18)', note: 'tint fills' },
+  { name: 'accent-ink', varName: '--color-accent-ink', hex: '#201402', note: 'ink on accent' },
+];
+
+const SEMANTIC_SWATCHES: ReadonlyArray<Swatch> = [
+  { name: 'success', varName: '--color-success', hex: '#4ade80' },
+  { name: 'error', varName: '--color-error', hex: '#ef4444' },
+  { name: 'warning', varName: '--color-warning', hex: '#f59e0b' },
+  { name: 'info', varName: '--color-info', hex: '#60a5fa', note: 'Toggle ON' },
+  { name: 'skill', varName: '--color-skill', hex: '#a78bfa' },
+  { name: 'claude', varName: '--color-claude', hex: '#f2c94c', note: 'OpenCode dot' },
+  { name: 'muted', varName: '--color-muted', hex: '#6b625a' },
+];
+
+const SwatchTile = ({ swatch }: { swatch: Swatch }): JSX.Element => (
+  <div className="ds-swatch">
+    <div className="ds-swatch__chip" style={{ background: `var(${swatch.varName})` }} />
+    <div className="ds-swatch__meta">
+      <span className="ds-swatch__name">{swatch.name}</span>
+      <span className="ds-swatch__hex">{swatch.hex}</span>
+      {swatch.note ? <span className="ds-swatch__note">{swatch.note}</span> : null}
+    </div>
   </div>
 );
+
+const ColorsTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Surfaces">
+      <div className="ds-swatch-grid">
+        {SURFACE_SWATCHES.map((s) => (
+          <SwatchTile key={s.name} swatch={s} />
+        ))}
+      </div>
+    </Section>
+    <Section label="Text">
+      <div className="ds-swatch-grid">
+        {TEXT_SWATCHES.map((s) => (
+          <SwatchTile key={s.name} swatch={s} />
+        ))}
+      </div>
+    </Section>
+    <Section label="Accent (amber)">
+      <div className="ds-swatch-grid">
+        {ACCENT_SWATCHES.map((s) => (
+          <SwatchTile key={s.name} swatch={s} />
+        ))}
+      </div>
+    </Section>
+    <Section label="Semantic + status">
+      <div className="ds-swatch-grid">
+        {SEMANTIC_SWATCHES.map((s) => (
+          <SwatchTile key={s.name} swatch={s} />
+        ))}
+      </div>
+    </Section>
+  </div>
+);
+
+/* ---------------------- Typography ----------------------- */
+
+const TYPE_SIZES: ReadonlyArray<{ name: string; varName: string; px: string }> = [
+  { name: 'xxl', varName: '--font-size-xxl', px: '28px' },
+  { name: 'xl', varName: '--font-size-xl', px: '20px' },
+  { name: 'lg', varName: '--font-size-lg', px: '16px' },
+  { name: 'md', varName: '--font-size-md', px: '14px' },
+  { name: 'base', varName: '--font-size-base', px: '13px' },
+  { name: 'sm', varName: '--font-size-sm', px: '12px' },
+  { name: 'xs', varName: '--font-size-xs', px: '11px' },
+];
+
+const TYPE_WEIGHTS: ReadonlyArray<{ name: string; varName: string; num: string }> = [
+  { name: 'regular', varName: '--font-weight-regular', num: '400' },
+  { name: 'medium', varName: '--font-weight-medium', num: '500' },
+  { name: 'semibold', varName: '--font-weight-semibold', num: '600' },
+  { name: 'bold', varName: '--font-weight-bold', num: '700' },
+];
+
+const TypographyTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Family">
+      <div className="ds-type-family">
+        <p className="ds-type-family__name">Host Grotesk Variable</p>
+        <p className="ds-type-family__stack">
+          --font-sans = Host Grotesk Variable, -apple-system, BlinkMacSystemFont, Inter, system-ui
+        </p>
+        <p className="ds-type-family__specimen">The quick brown fox jumps over the lazy dog.</p>
+      </div>
+    </Section>
+
+    <Section label="Size scale">
+      <div className="ds-type-scale">
+        {TYPE_SIZES.map((s) => (
+          <div key={s.name} className="ds-type-row" style={{ fontSize: `var(${s.varName})` }}>
+            <span className="ds-type-row__sample">Raise the floor</span>
+            <span className="ds-type-row__meta">
+              {s.name} · {s.px} · <code>{s.varName}</code>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Section>
+
+    <Section label="Weight">
+      <div className="ds-type-scale">
+        {TYPE_WEIGHTS.map((w) => (
+          <div key={w.name} className="ds-type-row" style={{ fontWeight: `var(${w.varName})` as unknown as number }}>
+            <span className="ds-type-row__sample">Tinker workspace</span>
+            <span className="ds-type-row__meta">
+              {w.name} · {w.num} · <code>{w.varName}</code>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Section>
+
+    <Section label="Label (uppercase, tracked)">
+      <p className="ds-section__label" style={{ margin: 0 }}>
+        Section eyebrow
+      </p>
+      <p className="ds-type-row__meta" style={{ marginTop: 6 }}>
+        font-size xs · weight semibold · letter-spacing 0.08em · uppercase
+      </p>
+    </Section>
+  </div>
+);
+
+/* ------------------------ Spacing ------------------------ */
+
+const SPACE_SCALE: ReadonlyArray<{ name: string; varName: string; px: string }> = [
+  { name: 'space-1', varName: '--space-1', px: '4px' },
+  { name: 'space-2', varName: '--space-2', px: '8px' },
+  { name: 'space-3', varName: '--space-3', px: '12px' },
+  { name: 'space-4', varName: '--space-4', px: '16px' },
+  { name: 'space-5', varName: '--space-5', px: '20px' },
+  { name: 'space-6', varName: '--space-6', px: '24px' },
+  { name: 'space-8', varName: '--space-8', px: '32px' },
+  { name: 'space-10', varName: '--space-10', px: '40px' },
+  { name: 'space-12', varName: '--space-12', px: '48px' },
+];
+
+const RADIUS_SCALE: ReadonlyArray<{ name: string; varName: string; px: string }> = [
+  { name: 'xs', varName: '--radius-xs', px: '4px' },
+  { name: 'sm', varName: '--radius-sm', px: '6px' },
+  { name: 'md', varName: '--radius-md', px: '8px' },
+  { name: 'lg', varName: '--radius-lg', px: '12px' },
+  { name: 'pill', varName: '--radius-pill', px: '9999px' },
+];
+
+const SpacingTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Scale (4px base)">
+      <div className="ds-space-scale">
+        {SPACE_SCALE.map((s) => (
+          <div key={s.name} className="ds-space-row">
+            <span className="ds-space-row__bar" style={{ width: `var(${s.varName})` }} />
+            <span className="ds-space-row__meta">
+              {s.name} · {s.px} · <code>{s.varName}</code>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Section>
+
+    <Section label="Radius">
+      <div className="ds-radius-grid">
+        {RADIUS_SCALE.map((r) => (
+          <div key={r.name} className="ds-radius-item">
+            <div className="ds-radius-item__chip" style={{ borderRadius: `var(${r.varName})` }} />
+            <span className="ds-radius-item__meta">
+              {r.name} · {r.px}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Section>
+  </div>
+);
+
+/* -------------------------- Chat ------------------------- */
+
+const ChatTab = (): JSX.Element => {
+  const [message, setMessage] = useState('');
+  return (
+    <div className="ds-chat">
+      <div className="ds-chat__memory">
+        <StatusDot state="claude" />
+        <span className="ds-chat__memory-text">
+          Memory loaded · 3 recent entities · vault indexed 4m ago
+        </span>
+        <Badge variant="skill" size="small">
+          sensei
+        </Badge>
+      </div>
+
+      <div className="ds-chat__log">
+        <div className="ds-msg ds-msg--user">
+          Pull yesterday&apos;s spend anomalies from Ramp, draft a Slack summary.
+        </div>
+
+        <div className="ds-msg ds-msg--assistant">
+          <div className="ds-msg__meta">
+            <StatusDot state="claude" />
+            <span>OpenCode · gpt-5.4</span>
+            <Badge variant="info" size="small">
+              MCP: ramp
+            </Badge>
+          </div>
+          <p>Found 4 anomalies over $2k. Top offender: vendor &ldquo;Acme Cloud&rdquo; (+312% vs 7d avg). Drafting summary.</p>
+          <Row>
+            <Button variant="primary" size="s">
+              Post to #finance
+            </Button>
+            <Button variant="ghost" size="s">
+              Edit draft
+            </Button>
+            <ClickableBadge variant="info">To-Dos · 2/3</ClickableBadge>
+          </Row>
+        </div>
+
+        <div className="ds-msg ds-msg--system">
+          <StatusDot state="pulse" />
+          <span>Scheduling daily sweep at 08:00 · see Today pane</span>
+        </div>
+      </div>
+
+      <div className="ds-chat__composer">
+        <TextInput
+          placeholder="Message the workspace…"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+        />
+        <IconButton variant="ghost" size="m" icon={<SettingsIcon />} label="Composer settings" />
+        <Button variant="primary" size="m" leadingIcon={<PlusIcon />}>
+          Send
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+/* ----------------------- Router ------------------------- */
+
+const renderTab = (tab: PlaygroundTab): JSX.Element => {
+  switch (tab) {
+    case 'colors':
+      return <ColorsTab />;
+    case 'typography':
+      return <TypographyTab />;
+    case 'spacing':
+      return <SpacingTab />;
+    case 'components':
+      return <ComponentsTab />;
+    case 'chat':
+      return <ChatTab />;
+  }
+};
 
 export const DesignSystem = (): JSX.Element => {
   const [tab, setTab] = useState<PlaygroundTab>('components');
@@ -299,9 +586,7 @@ export const DesignSystem = (): JSX.Element => {
           })}
         </nav>
 
-        <div className="ds-content">
-          {tab === 'components' ? <ComponentsTab /> : <PlaceholderTab label={TABS.find((t) => t.value === tab)?.label ?? ''} />}
-        </div>
+        <div className="ds-content">{renderTab(tab)}</div>
       </main>
     </div>
   );

@@ -1,15 +1,28 @@
-button.tk-badge {
+button.tk-badge--clickable {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  font-family: inherit;
   cursor: pointer;
+  border-radius: var(--radius-pill);
   transition: filter var(--duration-fast) var(--ease-standard),
-    background var(--duration-fast) var(--ease-standard);
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
 
-button.tk-badge:hover {
-  filter: brightness(1.1);
+button.tk-badge--clickable:hover {
+  filter: brightness(1.08);
 }
 
-button.tk-badge:focus-visible {
-  outline: 2px solid var(--color-accent);
+/* Default variant mirrors the Secondary button — explicit bg hover, no filter */
+button.tk-badge--clickable.tk-badge--default:hover {
+  filter: none;
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+button.tk-badge--clickable:focus-visible {
+  outline: 2px solid var(--color-accent-ring);
   outline-offset: 2px;
 }
 
