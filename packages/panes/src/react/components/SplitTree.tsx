@@ -1,4 +1,4 @@
-import { useCallback, useRef, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import type { DropEdge, LayoutNode, SplitPath, Tab } from '../../types.js';
 import { DEFAULT_RATIO, clampRatio } from '../../core/utils/layout.js';
 import type { PaneRegistry } from '../types.js';
@@ -11,7 +11,7 @@ type SplitTreeProps<TData> = {
   readonly onFocusPane: (paneId: string) => void;
   readonly onClosePane: (paneId: string) => void;
   readonly onSetRatio: (path: SplitPath, ratio: number) => void;
-  readonly onDropPaneOnPane?: (info: { sourcePaneId: string; targetPaneId: string; edge: DropEdge }) => void;
+  readonly onDropPaneOnPane: (info: { sourcePaneId: string; targetPaneId: string; edge: DropEdge }) => void;
 };
 
 export const SplitTree = <TData,>(props: SplitTreeProps<TData>): ReactNode => {
@@ -34,6 +34,7 @@ const SplitNode = <TData,>({
   onDropPaneOnPane,
 }: SplitNodeProps<TData>): ReactNode => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
 
   const getContainerSize = useCallback((): number => {
     const element = containerRef.current;
@@ -63,12 +64,9 @@ const SplitNode = <TData,>({
         definition={definition}
         onActivate={() => onFocusPane(pane.id)}
         onClose={() => onClosePane(pane.id)}
-        {...(onDropPaneOnPane
-          ? {
-              onDropPane: ({ sourcePaneId, edge }: { sourcePaneId: string; edge: DropEdge }) =>
-                onDropPaneOnPane({ sourcePaneId, targetPaneId: pane.id, edge }),
-            }
-          : {})}
+        onDropPane={({ sourcePaneId, edge }) =>
+          onDropPaneOnPane({ sourcePaneId, targetPaneId: pane.id, edge })
+        }
       />
     );
   }
@@ -85,18 +83,17 @@ const SplitNode = <TData,>({
   return (
     <div
       ref={containerRef}
+      data-resizing={isResizing || undefined}
       className={`tinker-panes-split tinker-panes-split--${node.orientation}`}
       style={gridTemplate}
     >
       <SplitNode
-        {...{
-          tab,
-          registry,
-          onFocusPane,
-          onClosePane,
-          onSetRatio,
-          ...(onDropPaneOnPane ? { onDropPaneOnPane } : {}),
-        }}
+        tab={tab}
+        registry={registry}
+        onFocusPane={onFocusPane}
+        onClosePane={onClosePane}
+        onSetRatio={onSetRatio}
+        onDropPaneOnPane={onDropPaneOnPane}
         node={node.a}
         path={[...path, 'a']}
       />
@@ -105,16 +102,16 @@ const SplitNode = <TData,>({
         ratio={ratio}
         onChange={(next) => onSetRatio(path, next)}
         getContainerSize={getContainerSize}
+        onResizeStart={() => setIsResizing(true)}
+        onResizeEnd={() => setIsResizing(false)}
       />
       <SplitNode
-        {...{
-          tab,
-          registry,
-          onFocusPane,
-          onClosePane,
-          onSetRatio,
-          ...(onDropPaneOnPane ? { onDropPaneOnPane } : {}),
-        }}
+        tab={tab}
+        registry={registry}
+        onFocusPane={onFocusPane}
+        onClosePane={onClosePane}
+        onSetRatio={onSetRatio}
+        onDropPaneOnPane={onDropPaneOnPane}
         node={node.b}
         path={[...path, 'b']}
       />

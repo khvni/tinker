@@ -150,36 +150,6 @@ export const PanesDemo = (): JSX.Element => {
     });
   }, [paneCounter, store]);
 
-  const handleDropPane = useCallback(
-    ({
-      tabId,
-      sourcePaneId,
-      targetPaneId,
-      edge,
-    }: {
-      tabId: string;
-      sourcePaneId: string;
-      targetPaneId: string;
-      edge: 'top' | 'right' | 'bottom' | 'left';
-    }) => {
-      // Demo: relocate the source pane by closing + re-adding beside the drop target.
-      const state = store.getState();
-      const tab = state.tabs.find((candidate) => candidate.id === tabId);
-      const pane = tab?.panes[sourcePaneId];
-      if (!tab || !pane) return;
-      if (sourcePaneId === targetPaneId) return;
-      const replacementId = `${sourcePaneId}-moved-${Date.now()}`;
-      store.getState().actions.closePane(tabId, sourcePaneId);
-      store.getState().actions.splitPane(tabId, targetPaneId, edge, {
-        id: replacementId,
-        kind: pane.kind,
-        data: pane.data,
-        ...(pane.title ? { title: pane.title } : {}),
-      });
-    },
-    [store],
-  );
-
   return (
     <main className="panes-demo-shell">
       <header className="panes-demo-header">
@@ -214,7 +184,6 @@ export const PanesDemo = (): JSX.Element => {
           store={store}
           registry={registry}
           ariaLabel="Tinker panes demo"
-          onDropPaneOnPane={handleDropPane}
           tabStripActions={[
             { id: 'new-tab', label: 'New tab', onSelect: addTab, icon: '+' },
           ]}

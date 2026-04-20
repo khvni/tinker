@@ -79,6 +79,18 @@ export type WorkspaceActions<TData> = {
   /** Resize a split. `path` references the split node itself, not a leaf. */
   readonly setSplitRatio: (tabId: string, path: SplitPath, ratio: number) => void;
 
+  /**
+   * Move an existing pane to a new position relative to another pane in the
+   * same tab. The pane id and data are preserved, so the React subtree stays
+   * mounted across the move. No-op when `sourcePaneId === targetPaneId`.
+   */
+  readonly movePane: (
+    tabId: string,
+    sourcePaneId: string,
+    targetPaneId: string,
+    edge: DropEdge,
+  ) => void;
+
   /** Move focus in a direction within the active tab. Returns the new pane id or null. */
   readonly focusNeighbor: (direction: FocusDirection) => string | null;
 };
@@ -285,6 +297,36 @@ export const createWorkspaceStore = <TData>(
         if (!tab) return;
         const nextLayout = setRatioAtPath(tab.layout, path, clampRatio(ratio));
         set(setTab(current, tabId, (existing) => ({ ...existing, layout: nextLayout })));
+      },
+      movePane: (tabId, sourcePaneId, targetPaneId, edge) => {
+        if (sourcePaneId === targetPaneId) return;
+        const current = get();
+        const tab = current.tabs.find((candidate) => candidate.id === tabId);
+        if (!tab) return;
+        if (!tab.panes[sourcePaneId] || !tab.panes[targetPaneId]) return;
+
+        // Remove the source leaf from the tree (collapses empty parents).
+        const withoutSource = removePaneFromLayout(tab.layout, sourcePaneId);
+        if (!withoutSource) return; // source was the sole leaf — nothing to move onto
+
+        const targetPath = findPanePath(withoutSource, targetPaneId);
+        if (!targetPath) return; // target was nested inside the removed subtree (impossible)
+
+        const nextLayout = splitAtPath(
+          withoutSource,
+          targetPath,
+          leaf(sourcePaneId),
+          edge,
+          DEFAULT_RATIO,
+        );
+
+        set(
+          setTab(current, tabId, (existing) => ({
+            ...existing,
+            layout: nextLayout,
+            activePaneId: sourcePaneId,
+          })),
+        );
       },
       focusNeighbor: (direction) => {
         const current = get();

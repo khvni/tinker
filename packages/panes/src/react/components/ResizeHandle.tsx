@@ -9,6 +9,8 @@ export type ResizeHandleProps = {
   readonly onChange: (ratio: number) => void;
   /** Pixel size of the split container along the relevant axis. Needed to translate drag deltas to ratio deltas. */
   readonly getContainerSize: () => number;
+  readonly onResizeStart?: () => void;
+  readonly onResizeEnd?: () => void;
   readonly ariaLabel?: string;
 };
 
@@ -17,6 +19,8 @@ export const ResizeHandle = ({
   ratio,
   onChange,
   getContainerSize,
+  onResizeStart,
+  onResizeEnd,
   ariaLabel,
 }: ResizeHandleProps) => {
   const dragStateRef = useRef<{
@@ -35,8 +39,9 @@ export const ResizeHandle = ({
         startRatio: ratio,
         pointerId: event.pointerId,
       };
+      onResizeStart?.();
     },
-    [orientation, ratio],
+    [onResizeStart, orientation, ratio],
   );
 
   const handlePointerMove = useCallback(
@@ -53,12 +58,16 @@ export const ResizeHandle = ({
     [getContainerSize, onChange, orientation],
   );
 
-  const handlePointerUp = useCallback((event: PointerEvent<HTMLButtonElement>) => {
-    const state = dragStateRef.current;
-    if (!state) return;
-    event.currentTarget.releasePointerCapture(state.pointerId);
-    dragStateRef.current = null;
-  }, []);
+  const handlePointerUp = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      const state = dragStateRef.current;
+      if (!state) return;
+      event.currentTarget.releasePointerCapture(state.pointerId);
+      dragStateRef.current = null;
+      onResizeEnd?.();
+    },
+    [onResizeEnd],
+  );
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {

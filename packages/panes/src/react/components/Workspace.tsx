@@ -61,10 +61,14 @@ export const Workspace = <TData,>(props: WorkspaceProps<TData>): ReactNode => {
   const handleDrop = useCallback(
     ({ sourcePaneId, targetPaneId, edge }: { sourcePaneId: string; targetPaneId: string; edge: DropEdge }) => {
       if (!activeTab) return;
-      if (!props.onDropPaneOnPane) return;
-      props.onDropPaneOnPane({ tabId: activeTab.id, sourcePaneId, targetPaneId, edge });
+      const custom = props.onDropPaneOnPane;
+      if (custom) {
+        custom({ tabId: activeTab.id, sourcePaneId, targetPaneId, edge });
+        return;
+      }
+      actions.movePane(activeTab.id, sourcePaneId, targetPaneId, edge);
     },
-    [activeTab, props],
+    [actions, activeTab, props],
   );
 
   return (
@@ -94,7 +98,7 @@ export const Workspace = <TData,>(props: WorkspaceProps<TData>): ReactNode => {
             onFocusPane={handleFocusPane}
             onClosePane={handleClosePane}
             onSetRatio={handleSetRatio}
-            {...(props.onDropPaneOnPane ? { onDropPaneOnPane: handleDrop } : {})}
+            onDropPaneOnPane={handleDrop}
           />
         ) : (
           <div className="tinker-panes-empty">

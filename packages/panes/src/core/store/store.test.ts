@@ -153,6 +153,93 @@ describe('workspace store', () => {
     expect(store.getState().tabs[0]?.panes['pA']?.data.label).toBe('hydrated');
   });
 
+  it('movePane relocates without changing pane id or data', () => {
+    const store = openDefault();
+    const originalData = store.getState().tabs[0]?.panes['p1']?.data;
+    store.getState().actions.splitPane(
+      't1',
+      'p1',
+      'right',
+      { id: 'p2', kind: 'today', data: { label: 'today' } },
+    );
+    store.getState().actions.splitPane(
+      't1',
+      'p2',
+      'bottom',
+      { id: 'p3', kind: 'timer', data: { label: 'timer' } },
+    );
+
+    const before = store.getState().tabs[0];
+    if (!before) throw new Error('tab');
+    expect(Object.keys(before.panes).sort()).toEqual(['p1', 'p2', 'p3']);
+
+    store.getState().actions.movePane('t1', 'p1', 'p3', 'left');
+
+    const after = store.getState().tabs[0];
+    if (!after) throw new Error('tab after');
+    // Same panes (no id churn).
+    expect(Object.keys(after.panes).sort()).toEqual(['p1', 'p2', 'p3']);
+    // Data ref preserved — no copy.
+    expect(after.panes['p1']?.data).toBe(originalData);
+    // Active is the moved pane.
+    expect(after.activePaneId).toBe('p1');
+    // Layout tree changed (different structure than before).
+    expect(JSON.stringify(after.layout)).not.toBe(JSON.stringify(before.layout));
+  });
+
+  it('movePane is a no-op when source equals target', () => {
+    const store = openDefault();
+    store.getState().actions.splitPane(
+      't1',
+      'p1',
+      'right',
+      { id: 'p2', kind: 'today', data: { label: 'today' } },
+    );
+    const before = JSON.stringify(store.getState().tabs[0]);
+    store.getState().actions.movePane('t1', 'p1', 'p1', 'right');
+    const after = JSON.stringify(store.getState().tabs[0]);
+    expect(after).toBe(before);
+  });
+
+  it('movePane does nothing when target is unknown', () => {
+    const store = openDefault();
+    store.getState().actions.splitPane(
+      't1',
+      'p1',
+      'right',
+      { id: 'p2', kind: 'today', data: { label: 'today' } },
+    );
+    const before = JSON.stringify(store.getState().tabs[0]);
+    store.getState().actions.movePane('t1', 'p1', 'missing', 'left');
+    expect(JSON.stringify(store.getState().tabs[0])).toBe(before);
+  });
+
+  it('movePane collapses the source parent after removal', () => {
+    const store = openDefault();
+    store.getState().actions.splitPane(
+      't1',
+      'p1',
+      'right',
+      { id: 'p2', kind: 'today', data: { label: 'today' } },
+    );
+    store.getState().actions.splitPane(
+      't1',
+      'p2',
+      'bottom',
+      { id: 'p3', kind: 'timer', data: { label: 'timer' } },
+    );
+    // Move p2 next to p1 (left side). p3 should promote out of the column split.
+    store.getState().actions.movePane('t1', 'p2', 'p1', 'top');
+    const layout = store.getState().tabs[0]?.layout;
+    if (!layout) throw new Error('layout');
+    // p3 should no longer live inside a split with a dead sibling — must be a leaf at some level.
+    const stringified = JSON.stringify(layout);
+    expect(stringified).toContain('"paneId":"p3"');
+    // No orphan empty splits: every split node has both branches non-empty (invariant).
+    const hasEmptyBranch = /"a":null|"b":null/.test(stringified);
+    expect(hasEmptyBranch).toBe(false);
+  });
+
   it('focusNeighbor moves focus within active tab', () => {
     const store = openDefault();
     store.getState().actions.splitPane(
