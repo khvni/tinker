@@ -1,6 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from 'react';
 import type { DropTarget, StackId } from '../../types.js';
-import { findStack } from '../../core/utils/layout.js';
 import { useWorkspaceActions, useWorkspaceSelector } from '../hooks/useWorkspaceStore.js';
 import type { WorkspaceProps } from '../types.js';
 import { SplitTree } from './SplitTree.js';
@@ -53,31 +52,14 @@ export const Workspace = <TData,>(props: WorkspaceProps<TData>): ReactNode => {
   const handleDrop = useCallback(
     ({ sourcePaneId, targetStackId, target }: { sourcePaneId: string; targetStackId: StackId; target: DropTarget }) => {
       if (!activeTab) return;
-
-      // Modern hook — if the consumer supplied one, they drive movement themselves.
-      const custom = props.onDropPane;
-      if (custom) {
-        custom({ tabId: activeTab.id, sourcePaneId, targetStackId, target });
+      // If the consumer supplied an intercept, let them drive movement themselves.
+      if (props.onDropPane) {
+        props.onDropPane({ tabId: activeTab.id, sourcePaneId, targetStackId, target });
         return;
       }
-
-      // Legacy pane-on-pane bridge — resolve a representative target pane from
-      // the target stack so shim callers keep working while they migrate.
-      const legacy = props.onDropPaneOnPane;
-      if (legacy) {
-        const targetStack = findStack(activeTab.layout, targetStackId);
-        const representative = targetStack?.activePaneId ?? targetStack?.paneIds[0];
-        if (representative) {
-          const edge: 'top' | 'right' | 'bottom' | 'left' | 'center' =
-            target.kind === 'edge' ? target.edge : 'center';
-          legacy({ tabId: activeTab.id, sourcePaneId, targetPaneId: representative, edge });
-          return;
-        }
-      }
-
       actions.movePane(activeTab.id, sourcePaneId, targetStackId, target);
     },
-    [actions, activeTab, props.onDropPane, props.onDropPaneOnPane],
+    [actions, activeTab, props.onDropPane],
   );
 
   return (

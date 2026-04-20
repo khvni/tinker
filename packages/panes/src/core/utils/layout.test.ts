@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_RATIO,
+  classifyBodyDrop,
   clampRatio,
   collapseEmptyStacks,
   collectPaneIds,
@@ -248,6 +249,28 @@ describe('getSpatialNeighborStackId', () => {
     const root = splitNode(top, b, 'column', 0.5);
     expect(getSpatialNeighborStackId(root, 'tl', 'down')).toBe('b');
     expect(getSpatialNeighborStackId(root, 'tr', 'down')).toBe('b');
+  });
+});
+
+describe('classifyBodyDrop', () => {
+  const rect = { left: 0, top: 0, width: 100, height: 100 };
+  it('returns center when pointer is inside the inner 44% square', () => {
+    expect(classifyBodyDrop(rect, 50, 50)).toEqual({ kind: 'center' });
+  });
+  it('returns left edge near the left border', () => {
+    expect(classifyBodyDrop(rect, 5, 50)).toEqual({ kind: 'edge', edge: 'left' });
+  });
+  it('returns right edge near the right border', () => {
+    expect(classifyBodyDrop(rect, 95, 50)).toEqual({ kind: 'edge', edge: 'right' });
+  });
+  it('returns top edge near the top border', () => {
+    expect(classifyBodyDrop(rect, 50, 5)).toEqual({ kind: 'edge', edge: 'top' });
+  });
+  it('returns bottom edge near the bottom border', () => {
+    expect(classifyBodyDrop(rect, 50, 95)).toEqual({ kind: 'edge', edge: 'bottom' });
+  });
+  it('returns null when rect has zero size', () => {
+    expect(classifyBodyDrop({ left: 0, top: 0, width: 0, height: 0 }, 0, 0)).toBeNull();
   });
 });
 

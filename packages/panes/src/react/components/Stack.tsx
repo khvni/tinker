@@ -9,17 +9,10 @@ import {
   type ReactNode,
 } from 'react';
 import type { DropTarget, Pane, StackId, StackNode, Tab } from '../../types.js';
+import { classifyBodyDrop, type BodyDrop } from '../../core/utils/layout.js';
 import type { PaneDefinition, PaneRegistry } from '../types.js';
 
 const PANE_DRAG_MIME = 'application/x-tinker-pane';
-const STACK_DRAG_MIME = 'application/x-tinker-stack';
-
-/**
- * Fraction of the body that counts as "edge" vs. "center" when a drag hovers a
- * stack. 0.28 means the outer 28% on every side is an edge zone and the inner
- * 44% square is the center. Mirrors Dockview's `_rootDropTarget` geometry.
- */
-const EDGE_ZONE_FRACTION = 0.28;
 
 type StackProps<TData> = {
   readonly tab: Tab<TData>;
@@ -30,35 +23,6 @@ type StackProps<TData> = {
   readonly onClosePane: (paneId: string) => void;
   readonly onReorderPaneInStack: (paneId: string, toIndex: number) => void;
   readonly onDropPane: (info: { sourcePaneId: string; targetStackId: StackId; target: DropTarget }) => void;
-};
-
-type BodyDropState = { readonly kind: 'edge'; readonly edge: 'top' | 'right' | 'bottom' | 'left' } | { readonly kind: 'center' } | null;
-
-/**
- * Classify a pointer position inside the stack body into one of five drop
- * zones. Returns `null` when the dataTransfer payload isn't a pane.
- */
-const classifyBodyDrop = (rect: DOMRect, clientX: number, clientY: number): BodyDropState => {
-  const ratioX = (clientX - rect.left) / rect.width;
-  const ratioY = (clientY - rect.top) / rect.height;
-  if (Number.isNaN(ratioX) || Number.isNaN(ratioY)) return null;
-
-  const insideCenter =
-    ratioX > EDGE_ZONE_FRACTION &&
-    ratioX < 1 - EDGE_ZONE_FRACTION &&
-    ratioY > EDGE_ZONE_FRACTION &&
-    ratioY < 1 - EDGE_ZONE_FRACTION;
-  if (insideCenter) return { kind: 'center' };
-
-  const distLeft = ratioX;
-  const distRight = 1 - ratioX;
-  const distTop = ratioY;
-  const distBottom = 1 - ratioY;
-  const min = Math.min(distLeft, distRight, distTop, distBottom);
-  if (min === distLeft) return { kind: 'edge', edge: 'left' };
-  if (min === distRight) return { kind: 'edge', edge: 'right' };
-  if (min === distTop) return { kind: 'edge', edge: 'top' };
-  return { kind: 'edge', edge: 'bottom' };
 };
 
 const resolveTitle = <TData,>(definition: PaneDefinition<TData>, pane: Pane<TData>): string => {
@@ -83,7 +47,7 @@ export const Stack = <TData,>({
   onDropPane,
 }: StackProps<TData>): ReactNode => {
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  const [bodyDrop, setBodyDrop] = useState<BodyDropState>(null);
+  const [bodyDrop, setBodyDrop] = useState<BodyDrop | null>(null);
   const [tabInsertIndex, setTabInsertIndex] = useState<number | null>(null);
 
   const activePaneId = node.activePaneId;
@@ -160,8 +124,7 @@ export const Stack = <TData,>({
     (index: number) => (event: DragEvent<HTMLDivElement>) => {
       if (!isPaneDrag(event)) return;
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      const midpoint = rect.left + rect.width / 2;
-      const effectiveIndex = event.clientX < midpoint ? index : index + 1;
+      const effectiveIndex = event.clientX < rect.left + rect.width / 2 ? index : index + 1;
       setTabInsertIndex(effectiveIndex);
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
@@ -170,20 +133,6 @@ export const Stack = <TData,>({
   );
 
   const handleTabBarLeave = useCallback(() => setTabInsertIndex(null), []);
-
-  /**
-   * Compute the insert index from pointer X across the tab-bar. Walk every
-   * tab element; pick the first whose midpoint is to the right of the
-   * pointer. Falling through means "append at end".
-   */
-  const computeInsertIndexFromPointer = (tabListEl: HTMLElement, clientX: number): number => {
-    const tabEls = tabListEl.querySelectorAll('[role="tab"][data-pane-id]');
-    for (let i = 0; i < tabEls.length; i += 1) {
-      const rect = (tabEls[i] as HTMLElement).getBoundingClientRect();
-      if (clientX < rect.left + rect.width / 2) return i;
-    }
-    return tabEls.length;
-  };
 
   const handleTabDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
@@ -195,8 +144,18 @@ export const Stack = <TData,>({
 
       // Compute authoritative insert index at drop time (pointer-accurate,
       // not reliant on React state propagation from the last dragover).
+      // Walk every tab element; pick the first whose midpoint is to the right
+      // of the pointer. Falling through means "append at end".
       const tabListEl = event.currentTarget as HTMLElement;
-      const insertIndex = computeInsertIndexFromPointer(tabListEl, event.clientX);
+      const tabEls = tabListEl.querySelectorAll('[role="tab"][data-pane-id]');
+      let insertIndex = tabEls.length;
+      for (let i = 0; i < tabEls.length; i += 1) {
+        const rect = (tabEls[i] as HTMLElement).getBoundingClientRect();
+        if (event.clientX < rect.left + rect.width / 2) {
+          insertIndex = i;
+          break;
+        }
+      }
 
       // If source belongs to this stack, prefer a pure reorder.
       if (node.paneIds.includes(sourcePaneId)) {
@@ -348,7 +307,3 @@ const ActivePaneRenderer = <TData,>({ tab, pane, registry, isActive }: ActivePan
   const RenderContent = definition.render;
   return <RenderContent tabId={tab.id} pane={pane} isActive={isActive} />;
 };
-
-// Helper exported for tests — pure drop classification of pointer position.
-export const __classifyBodyDropForTests = classifyBodyDrop;
-export const __MIMES = { PANE_DRAG_MIME, STACK_DRAG_MIME };

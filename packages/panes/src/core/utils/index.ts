@@ -1,13 +1,14 @@
 export {
   DEFAULT_RATIO,
+  EDGE_ZONE_FRACTION,
   branchFromEdge,
   clampRatio,
+  classifyBodyDrop,
   collapseEmptyStacks,
   collectPaneIds,
   collectStacks,
   findStack,
   findStackContainingPane,
-  findStackPath,
   firstPaneId,
   firstStackId,
   getSpatialNeighborStackId,
@@ -15,7 +16,6 @@ export {
   isSplit,
   isStack,
   movePaneToStack,
-  nodeAtPath,
   orientationFromEdge,
   removePaneFromStack,
   reorderPaneInStack,
@@ -24,6 +24,5 @@ export {
   splitNode,
   splitStackOnEdge,
   stack,
-  __resetIdCounterForTests,
 } from './layout.js';
-export type { MovePaneResult } from './layout.js';
+export type { BodyDrop, MovePaneResult } from './layout.js';

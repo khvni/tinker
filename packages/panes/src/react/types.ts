@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import type { DropEdge, DropTarget, Pane, StackId, Tab } from '../types.js';
+import type { DropTarget, Pane, StackId, Tab } from '../types.js';
 import type { WorkspaceStore } from '../core/store/store.js';
 
 export type PaneRendererProps<TData> = {
@@ -45,15 +45,8 @@ export type WorkspaceProps<TData> = {
   readonly registry: PaneRegistry<TData>;
   /** Rendered on the right side of the workspace tab strip. Good spot for "+" or menu. */
   readonly tabStripActions?: ReadonlyArray<TabStripAction>;
-  /** Intercept a pane drop. Return without calling preventDefault to let the default movePane run. */
+  /** Intercept a pane drop. If supplied, the consumer drives movement themselves. */
   readonly onDropPane?: (event: DropPaneEvent) => void;
-  /** Legacy pane-on-pane drop hook; retained for consumer shim compatibility. */
-  readonly onDropPaneOnPane?: (info: {
-    readonly tabId: string;
-    readonly sourcePaneId: string;
-    readonly targetPaneId: string;
-    readonly edge: DropEdge;
-  }) => void;
   /** Rendered when no tabs exist. */
   readonly emptyState?: ReactNode;
   /** Accessible label for the overall workspace region. */

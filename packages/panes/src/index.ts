@@ -17,14 +17,15 @@ export type {
 } from './types.js';
 export {
   DEFAULT_RATIO,
+  EDGE_ZONE_FRACTION,
   branchFromEdge,
   clampRatio,
+  classifyBodyDrop,
   collapseEmptyStacks,
   collectPaneIds,
   collectStacks,
   findStack,
   findStackContainingPane,
-  findStackPath,
   firstPaneId,
   firstStackId,
   getSpatialNeighborStackId,
@@ -32,7 +33,6 @@ export {
   isSplit,
   isStack,
   movePaneToStack,
-  nodeAtPath,
   orientationFromEdge,
   removePaneFromStack,
   reorderPaneInStack,
@@ -42,12 +42,10 @@ export {
   splitStackOnEdge,
   stack,
 } from './core/utils/index.js';
-export type { MovePaneResult } from './core/utils/index.js';
+export type { BodyDrop, MovePaneResult } from './core/utils/index.js';
 export {
   createWorkspaceStore,
   findActiveTab,
-  findLayoutRoot,
-  findTabContainingPane,
   selectWorkspaceSnapshot,
 } from './core/store/index.js';
 export type {

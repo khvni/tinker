@@ -38,11 +38,6 @@ const newSplitId = (): string => {
   return `spl-${Date.now().toString(36)}-${idCounter.toString(36)}`;
 };
 
-/** Test-only hook so snapshot tests can make ids deterministic. */
-export const __resetIdCounterForTests = (): void => {
-  idCounter = 0;
-};
-
 // ────────────────────────────────────────────────────────────────────────────
 // Node constructors
 // ────────────────────────────────────────────────────────────────────────────
@@ -417,4 +412,51 @@ export const getSpatialNeighborStackId = (
   eligible.sort((left, right) => distance(left) - distance(right));
   const first = eligible[0];
   return first ? first.stackId : null;
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// Drop-zone classification (pure — lives here so it's testable + shared)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fraction of the body that counts as "edge" vs. "center" when a drag hovers a
+ * stack. 0.28 means the outer 28% on every side is an edge zone and the inner
+ * 44% square is the center. Mirrors Dockview's `_rootDropTarget` geometry.
+ */
+export const EDGE_ZONE_FRACTION = 0.28;
+
+export type BodyDrop =
+  | { readonly kind: 'edge'; readonly edge: 'top' | 'right' | 'bottom' | 'left' }
+  | { readonly kind: 'center' };
+
+/**
+ * Classify a pointer position inside a stack body rect into one of five drop
+ * zones (four edges + center). Returns `null` when the pointer coords are
+ * non-finite.
+ */
+export const classifyBodyDrop = (
+  rect: { readonly left: number; readonly top: number; readonly width: number; readonly height: number },
+  clientX: number,
+  clientY: number,
+): BodyDrop | null => {
+  const ratioX = (clientX - rect.left) / rect.width;
+  const ratioY = (clientY - rect.top) / rect.height;
+  if (Number.isNaN(ratioX) || Number.isNaN(ratioY)) return null;
+
+  const insideCenter =
+    ratioX > EDGE_ZONE_FRACTION &&
+    ratioX < 1 - EDGE_ZONE_FRACTION &&
+    ratioY > EDGE_ZONE_FRACTION &&
+    ratioY < 1 - EDGE_ZONE_FRACTION;
+  if (insideCenter) return { kind: 'center' };
+
+  const distLeft = ratioX;
+  const distRight = 1 - ratioX;
+  const distTop = ratioY;
+  const distBottom = 1 - ratioY;
+  const min = Math.min(distLeft, distRight, distTop, distBottom);
+  if (min === distLeft) return { kind: 'edge', edge: 'left' };
+  if (min === distRight) return { kind: 'edge', edge: 'right' };
+  if (min === distTop) return { kind: 'edge', edge: 'top' };
+  return { kind: 'edge', edge: 'bottom' };
 };

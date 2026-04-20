@@ -103,16 +103,6 @@ export type WorkspaceActions<TData> = {
     targetStackId: StackId,
     target: DropTarget,
   ) => void;
-  /**
-   * Back-compat helper: move a pane to the position of another pane using the
-   * old edge vocabulary. "center" / "top" / "right" / "bottom" / "left".
-   */
-  readonly movePaneRelativeToPane: (
-    tabId: TabId,
-    sourcePaneId: PaneId,
-    targetPaneId: PaneId,
-    edge: 'top' | 'right' | 'bottom' | 'left' | 'center',
-  ) => void;
 
   // Keyboard nav
   readonly focusNeighbor: (direction: FocusDirection) => PaneId | null;
@@ -153,6 +143,26 @@ const buildPane = <TData>(input: CreatePaneInput<TData>): Pane<TData> => ({
   ...(input.title === undefined ? {} : { title: input.title }),
   ...(input.pinned === undefined ? {} : { pinned: input.pinned }),
 });
+
+/**
+ * Pick the next active stack+pane after a close/remove. Prefers the currently
+ * active stack if still present; falls back left-first through the tree.
+ */
+const resolveActive = <TData>(
+  layout: LayoutNode,
+  panes: Readonly<Record<PaneId, Pane<TData>>>,
+  prevStackId: StackId | null,
+  prevPaneId: PaneId | null,
+): { readonly stackId: StackId | null; readonly paneId: PaneId | null } => {
+  const stackId =
+    prevStackId && findStack(layout, prevStackId) ? prevStackId : firstStackId(layout);
+  const host = stackId ? findStack(layout, stackId) : null;
+  const paneId =
+    prevPaneId && panes[prevPaneId] && host?.paneIds.includes(prevPaneId)
+      ? prevPaneId
+      : host?.activePaneId ?? firstPaneId(layout);
+  return { stackId, paneId };
+};
 
 export const createWorkspaceStore = <TData>(
   options: CreateWorkspaceStoreOptions<TData> = {},
@@ -296,33 +306,21 @@ export const createWorkspaceStore = <TData>(
         if (!tab.panes[paneId]) return;
         const host = findStackContainingPane(tab.layout, paneId);
         if (!host) return;
-        const updatedStack = removePaneFromStack(host, paneId);
-        const layoutWithUpdated = replaceStack(tab.layout, host.id, updatedStack);
+        const layoutWithUpdated = replaceStack(tab.layout, host.id, removePaneFromStack(host, paneId));
         const collapsed = collapseEmptyStacks(layoutWithUpdated);
         if (!collapsed) {
           get().actions.closeTab(tabId);
           return;
         }
         const { [paneId]: _removed, ...remainingPanes } = tab.panes;
-
-        // Decide next active pane + stack.
-        let nextActiveStackId = tab.activeStackId;
-        if (!nextActiveStackId || !findStack(collapsed, nextActiveStackId)) {
-          nextActiveStackId = firstStackId(collapsed);
-        }
-        let nextActivePaneId: PaneId | null = tab.activePaneId;
-        if (!nextActivePaneId || nextActivePaneId === paneId || !remainingPanes[nextActivePaneId]) {
-          const host2 = nextActiveStackId ? findStack(collapsed, nextActiveStackId) : null;
-          nextActivePaneId = host2?.activePaneId ?? firstPaneId(collapsed);
-        }
-
+        const next = resolveActive(collapsed, remainingPanes, tab.activeStackId, tab.activePaneId);
         set(
           setTab(current, tabId, (existing) => ({
             ...existing,
             layout: collapsed,
             panes: remainingPanes,
-            activePaneId: nextActivePaneId,
-            activeStackId: nextActiveStackId,
+            activePaneId: next.paneId,
+            activeStackId: next.stackId,
           })),
         );
       },
@@ -431,20 +429,6 @@ export const createWorkspaceStore = <TData>(
         );
       },
 
-      movePaneRelativeToPane: (tabId, sourcePaneId, targetPaneId, edge) => {
-        if (sourcePaneId === targetPaneId) return;
-        const current = get();
-        const tab = current.tabs.find((candidate) => candidate.id === tabId);
-        if (!tab) return;
-        const targetHost = findStackContainingPane(tab.layout, targetPaneId);
-        if (!targetHost) return;
-        const drop: DropTarget =
-          edge === 'center'
-            ? { kind: 'center' }
-            : { kind: 'edge', edge };
-        get().actions.movePane(tabId, sourcePaneId, targetHost.id, drop);
-      },
-
       focusNeighbor: (direction) => {
         const current = get();
         const tabId = current.activeTabId;
@@ -471,21 +455,6 @@ export const selectWorkspaceSnapshot = <TData>(state: WorkspaceState<TData>): Wo
 export const findActiveTab = <TData>(state: WorkspaceState<TData>): Tab<TData> | null => {
   if (!state.activeTabId) return null;
   return state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
-};
-
-export const findTabContainingPane = <TData>(
-  state: WorkspaceState<TData>,
-  paneId: PaneId,
-): Tab<TData> | null => {
-  for (const tab of state.tabs) {
-    if (tab.panes[paneId]) return tab;
-  }
-  return null;
-};
-
-export const findLayoutRoot = <TData>(state: WorkspaceState<TData>): LayoutNode | null => {
-  const tab = findActiveTab(state);
-  return tab ? tab.layout : null;
 };
 
 // Type guard re-exported to help callers discriminate.
