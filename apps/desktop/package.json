@@ -25,6 +25,7 @@
     "@tinker/bridge": "workspace:*",
     "@tinker/design": "workspace:*",
     "@tinker/memory": "workspace:*",
+    "@tinker/panes": "workspace:*",
     "@tinker/scheduler": "workspace:*",
     "@tinker/shared-types": "workspace:*",
     "dockview-react": "^5.2.0",

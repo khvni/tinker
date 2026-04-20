@@ -17,7 +17,7 @@
 - **OpenCode** runs as a bundled sidecar process. The webview talks to it directly over HTTP + SSE.
 - **Tinker Bridge** (`packages/bridge`) shapes OpenCode stream events and handles memory injection before prompts.
 - **Memory** (`packages/memory`) stores entities, relationships, and layout state in SQLite through Tauri's SQL plugin.
-- **Desktop UI** (`apps/desktop`) is Tauri v2 + React 19 + Dockview.
+- **Desktop UI** (`apps/desktop`) is Tauri v2 + React 19 + `@tinker/panes` (recursive split-tree + tabs; Dockview deprecated, migrating feature-by-feature per [[D16]]).
 
 **Key files to read first:**
 
@@ -71,7 +71,7 @@ How this shows up in practice:
 | Package manager | **pnpm** workspace |
 | Desktop shell | **Tauri v2** |
 | UI | **React 19 + Vite** |
-| Workspace layout | **Dockview** (`dockview-react`) |
+| Workspace layout | **`@tinker/panes`** (recursive split tree + tabs, zustand-backed; Dockview deprecated per [[D16]]) |
 | Agent backend | **OpenCode** sidecar |
 | Bridge SDK | **`@opencode-ai/sdk`** |
 | LLM | **GPT-5.4** via Codex OAuth |
@@ -146,15 +146,36 @@ How this shows up in practice:
 
 ## 8. Workspace UI Invariants
 
-- Dockview only
-- split panes, movable tabs, and restored layout must work
-- the app must stay usable when integrations are disconnected
-- no modal-heavy core flows
-- dark, focused UI with persistent workspace state
+- `@tinker/panes` is the only sanctioned layout engine (per [[D16]]). Don't add `dockview-react` imports. Migration is in-flight — existing Dockview panes keep working until their per-pane PR lands.
+- Split panes, movable tabs, and restored layout must work. Pane payload is typed (`Pane<TData>`); each `kind` registers a renderer in a `PaneRegistry`.
+- Workspace state serializes via `selectWorkspaceSnapshot()`; persistence uses `WorkspaceState<TData>` from `@tinker/panes`, not Dockview's JSON (see [[07-workspace-persistence]] follow-ups).
+- The app must stay usable when integrations are disconnected.
+- No modal-heavy core flows. Agent-initiated clarifications use the `ask_user` overlay (per [[D20]]), not freeform chat prompts.
+- Dark, focused UI with persistent workspace state. All colors/spacing/radius/font values come from `@tinker/design` tokens (per [[D14]] / [[D15]]).
 
 ---
 
-## 9. Git Workflow
+## 9. Architecture — device vs host (per [[D17]])
+
+- **Device** (Tauri shell / `apps/desktop`) owns: window, tray, menu, dialogs, clipboard, notifications, updater, keychain **writes**, renderer UI.
+- **Host** (`packages/host-service`, scaffolded) owns: workspace lifecycle, vault indexing, memory store, OpenCode sidecar lifecycle, git ops, scheduler, chat runtime + memory injection. Deployable standalone (no Tauri awareness).
+- **Host identity is intrinsic** — generated from machine metadata at first run. Never passed in as config.
+- **No mutate-then-call managers** (per [[D22]]). Pass config per-call; retries use a fresh config object.
+- **Coordinator pattern** for spawned processes: spawn → health-poll → record `{pid, port, secret}` → `unref` → manifest-file adoption across restarts. Never retain the `ChildProcess` handle.
+- **No cloud sync yet** (per [[D18]]). Keep host interfaces cloud-reachable in principle; don't build the runtime.
+
+---
+
+## 10. File + folder conventions (per [[D21]])
+
+- One folder per component. `ComponentName/` holds `ComponentName.tsx`, `index.ts` barrel, `ComponentName.test.tsx`, and any local hooks/utils/css.
+- Used once → nest under parent's `components/`. Used 2+ → promote to smallest shared parent's `components/`.
+- `packages/design` primitives stay flat (`Button.tsx` + `Button.css`) as a grandfathered exception.
+- One component per file. No multi-component files.
+
+---
+
+## 11. Git Workflow
 
 - Remote docs should point at `https://github.com/khvni/tinker.git`
 - Default branch: `main`
@@ -164,7 +185,7 @@ How this shows up in practice:
 
 ---
 
-## 10. Knowledge Base Discipline
+## 12. Knowledge Base Discipline
 
 - **Before building**: check `agent-knowledge/features/NN-*.md` for the matching spec + out-of-scope boundaries.
 - **Before deciding**: check `agent-knowledge/product/decisions.md` — if a decision's already been made, respect it unless you're intentionally reopening it (then update the log).
@@ -173,7 +194,7 @@ How this shows up in practice:
 - **Updating tasks**: move entries in `agent-knowledge/context/tasks.md` as you start, block, or complete work.
 - **New reference material**: when you fetch an external article / research / vendor doc that informs architecture, process into `agent-knowledge/reference/*.md` per the conventions in `agent-knowledge/README.md`.
 
-## 11. Things That Will Tempt You
+## 13. Things That Will Tempt You
 
 - "Let me call the OpenAI API directly." No. Use OpenCode.
 - "Let me put business logic in Rust." No. Rust is system plumbing only.
@@ -181,4 +202,10 @@ How this shows up in practice:
 - "Let me preserve the old desktop shell behind a flag." No. The old shell is deleted.
 - "Let me add non-GPT providers." No. GPT-5.4 via Codex OAuth is the path.
 - "Let me store tokens in a file." No. Use the system keychain.
+- "Let me add `dockview-react` back for this one pane." No. Register a `kind` in `PaneRegistry` per [[D16]].
+- "Let me stash config on the coordinator and call start later." No. Pass config per call per [[D22]].
+- "Let me derive `hostId` from a config field." No. Intrinsic only per [[D17]].
+- "Let me ship a sync layer alongside host/device split." No. Deferred per [[D18]].
+- "Let me collapse the folder-per-component rule for this trivial button." No. Follow [[D21]] even for trivial components; the exception is `packages/design` primitives only.
+- "Let me ask the user a question by printing plain text in chat." No. Use the `ask_user` overlay per [[D20]].
 
