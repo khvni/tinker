@@ -113,19 +113,17 @@ const deliverOutput = async (
   return { deliveredSinks, errors };
 };
 
-const buildRunRecord = (run: ScheduledJobRun): ScheduledJobRun => run;
-
 export const createSchedulerEngine = (options: SchedulerEngineOptions): SchedulerEngine => {
   const now = options.now ?? (() => new Date());
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const runGraceMs = options.runGraceMs ?? DEFAULT_RUN_GRACE_MS;
   const activeJobs = new Set<string>();
-  let intervalId: number | null = null;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
   let ticking = false;
 
   const saveJobAndRun = async (job: ScheduledJob, run: ScheduledJobRun): Promise<void> => {
     await options.jobStore.saveJob(job);
-    await options.jobStore.recordRun(buildRunRecord(run));
+    await options.jobStore.recordRun(run);
     options.onMutation?.();
   };
 
@@ -257,14 +255,14 @@ export const createSchedulerEngine = (options: SchedulerEngineOptions): Schedule
       }
 
       void tick();
-      intervalId = window.setInterval(() => {
+      intervalId = setInterval(() => {
         void tick();
       }, pollIntervalMs);
     },
 
     stop(): void {
       if (intervalId !== null) {
-        window.clearInterval(intervalId);
+        clearInterval(intervalId);
         intervalId = null;
       }
     },

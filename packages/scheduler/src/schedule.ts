@@ -168,7 +168,7 @@ export const validateScheduleExpression = (expression: string, timezone: string,
   if (second.getTime() - first.getTime() < 60_000) {
     throw new Error('Every-minute schedules are too aggressive for Tinker. Use five minutes or slower.');
   }
-}
+};
 
 export const parseScheduleInput = (input: string, timezone: string, currentDate = new Date()): ParsedSchedule => {
   const naturalLanguage = tryParseNaturalLanguage(input);
