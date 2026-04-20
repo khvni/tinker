@@ -1,4 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
+import { Badge, Button } from '@tinker/design';
 import type { MemoryRunState } from '@tinker/memory';
 import type { Entity, MemoryStore, ScheduledJobStore, ScheduledTodayEntry } from '@tinker/shared-types';
 
@@ -74,17 +75,19 @@ export const Today = ({
           <p className="tinker-muted">{formatSweepStatus(memorySweepState)}</p>
         </div>
         <div className="tinker-inline-actions">
-          <span className="tinker-pill">{vaultPath ? 'Vault connected' : 'No vault yet'}</span>
-          <button
-            className="tinker-button-ghost tinker-button-ghost--small"
-            type="button"
+          <Badge variant={vaultPath ? 'success' : 'default'} size="small">
+            {vaultPath ? 'Vault connected' : 'No vault yet'}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="s"
             onClick={() => {
               void onRunMemorySweep();
             }}
             disabled={!vaultPath || memorySweepBusy}
           >
             {memorySweepBusy ? 'Sweeping…' : 'Run memory sweep'}
-          </button>
+          </Button>
         </div>
       </header>
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
+import { Badge, Button, TextInput } from '@tinker/design';
 import { getFutureRunAfter, getSchedulePreview, parseScheduleInput } from '@tinker/scheduler';
 import type { ScheduledJob, ScheduledJobRun, ScheduledJobStore, ScheduledOutputSink } from '@tinker/shared-types';
 
@@ -319,10 +320,12 @@ export const SchedulerPane = ({
           <h2>Run prompts while Tinker stays open</h2>
         </div>
         <div className="tinker-inline-actions">
-          <span className="tinker-pill">Jobs fire only while app open</span>
-          <button className="tinker-button" type="button" onClick={openCreate}>
+          <Badge variant="default" size="small">
+            Jobs fire only while app open
+          </Badge>
+          <Button variant="primary" onClick={openCreate}>
             Create scheduled prompt
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -351,23 +354,23 @@ export const SchedulerPane = ({
               </button>
 
               <div className="tinker-inline-actions">
-                <button className="tinker-button-secondary" type="button" onClick={() => void toggleEnabled(job)}>
+                <Button variant="secondary" size="s" onClick={() => void toggleEnabled(job)}>
                   {job.enabled ? 'Disable' : 'Enable'}
-                </button>
-                <button className="tinker-button-secondary" type="button" onClick={() => openEdit(job)}>
+                </Button>
+                <Button variant="secondary" size="s" onClick={() => openEdit(job)}>
                   Edit
-                </button>
-                <button
-                  className="tinker-button-secondary"
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="s"
                   onClick={() => void runNow(job)}
                   disabled={runBusyJobId === job.id}
                 >
                   {runBusyJobId === job.id ? 'Running…' : 'Run now'}
-                </button>
-                <button className="tinker-button-ghost" type="button" onClick={() => void deleteJob(job)}>
+                </Button>
+                <Button variant="ghost" size="s" onClick={() => void deleteJob(job)}>
                   Delete
-                </button>
+                </Button>
               </div>
             </article>
           ))}
@@ -413,20 +416,22 @@ export const SchedulerPane = ({
                 <p className="tinker-eyebrow">{form.id ? 'Edit job' : 'Create job'}</p>
                 <h2>Scheduled prompt</h2>
               </div>
-              <button className="tinker-button-ghost" type="button" onClick={closeDialog}>
+              <Button variant="ghost" size="s" onClick={closeDialog}>
                 Close
-              </button>
+              </Button>
             </header>
 
             <form className="tinker-form" onSubmit={(event) => void handleSubmit(event)}>
               <label className="tinker-field">
                 <span>Name</span>
-                <input value={form.name} onChange={onTextChange('name')} placeholder="Daily standup summary" />
+                <TextInput value={form.name} onChange={onTextChange('name')} placeholder="Daily standup summary" />
               </label>
 
               <label className="tinker-field">
                 <span>Prompt</span>
                 <textarea
+                  className="tinker-markdown-editor"
+                  style={{ minHeight: 120 }}
                   value={form.prompt}
                   onChange={onTextChange('prompt')}
                   placeholder="Summarize yesterday's calendar and unread email. Append concise summary."
@@ -435,7 +440,7 @@ export const SchedulerPane = ({
 
               <label className="tinker-field">
                 <span>Schedule</span>
-                <input
+                <TextInput
                   value={form.scheduleInput}
                   onChange={onTextChange('scheduleInput')}
                   placeholder="every weekday at 8am or 0 8 * * 1-5"
@@ -444,9 +449,9 @@ export const SchedulerPane = ({
 
               <div className="tinker-inline-actions">
                 {DEFAULT_SCHEDULE_HINTS.map((hint) => (
-                  <button key={hint} className="tinker-button-ghost" type="button" onClick={() => updateForm({ scheduleInput: hint })}>
+                  <Button key={hint} variant="ghost" size="s" onClick={() => updateForm({ scheduleInput: hint })}>
                     {hint}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -470,7 +475,7 @@ export const SchedulerPane = ({
                 {form.todayEnabled ? (
                   <label className="tinker-field">
                     <span>Today section</span>
-                    <input value={form.todaySection} onChange={onTextChange('todaySection')} placeholder="Scheduled" />
+                    <TextInput value={form.todaySection} onChange={onTextChange('todaySection')} placeholder="Scheduled" />
                   </label>
                 ) : null}
 
@@ -486,7 +491,7 @@ export const SchedulerPane = ({
                 {form.notificationEnabled ? (
                   <label className="tinker-field">
                     <span>Notification title</span>
-                    <input value={form.notificationTitle} onChange={onTextChange('notificationTitle')} placeholder="Tinker update" />
+                    <TextInput value={form.notificationTitle} onChange={onTextChange('notificationTitle')} placeholder="Tinker update" />
                   </label>
                 ) : null}
 
@@ -502,7 +507,7 @@ export const SchedulerPane = ({
                 {form.vaultEnabled ? (
                   <label className="tinker-field">
                     <span>Vault note path</span>
-                    <input value={form.vaultPath} onChange={onTextChange('vaultPath')} placeholder="Daily/Standup.md" />
+                    <TextInput value={form.vaultPath} onChange={onTextChange('vaultPath')} placeholder="Daily/Standup.md" />
                   </label>
                 ) : null}
               </div>
@@ -519,12 +524,12 @@ export const SchedulerPane = ({
               {errorMessage ? <p className="tinker-muted">{errorMessage}</p> : null}
 
               <div className="tinker-inline-actions">
-                <button className="tinker-button" type="submit" disabled={saveBusy}>
+                <Button variant="primary" type="submit" disabled={saveBusy}>
                   {saveBusy ? 'Saving…' : form.id ? 'Save changes' : 'Create job'}
-                </button>
-                <button className="tinker-button-secondary" type="button" onClick={closeDialog} disabled={saveBusy}>
+                </Button>
+                <Button variant="secondary" onClick={closeDialog} disabled={saveBusy}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </form>
           </section>

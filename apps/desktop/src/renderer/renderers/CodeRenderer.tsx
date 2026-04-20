@@ -1,4 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
+import { Badge } from '@tinker/design';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { getCodeLanguage, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
@@ -57,7 +58,7 @@ export const CodeRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): J
           <p className="tinker-eyebrow">Code</p>
           <h2>{path ? getPanelTitleForPath(path) : 'Untitled file'}</h2>
         </div>
-        {path ? <span className="tinker-pill">{language}</span> : null}
+        {path ? <Badge variant="default" size="small">{language}</Badge> : null}
       </header>
 
       {error ? <p className="tinker-muted">{error}</p> : null}

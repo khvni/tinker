@@ -114,6 +114,26 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
 - **Why**: User trust — a disconnect wipe must never delete user's own notes, even if those notes happened to mention content from the disconnected service.
 - **How to apply**: Mirror files written by the app go exclusively into `.tinker/mirrors/<service>/`. Top-level edits are user-only territory.
 
+### `[2026-04-19]` D14 — `@tinker/design` is the single source of UI truth
+- **Decision**: All UI in `apps/desktop` composes primitives from `packages/design` and references CSS variables from `@tinker/design/styles/tokens.css`. No other palette, font stack, or button/chip/tab implementation is allowed.
+- **Why**: Before this refactor, `apps/desktop/src/renderer/styles.css` carried a parallel `--tinker-*` cyan palette, hand-rolled button classes (`.tinker-button`, `.tinker-button-secondary`, `.tinker-button-ghost`), bespoke tab strips, and raw `<input>` fields. That meant two competing design systems lived in-repo. Every pane drifted independently.
+- **How to apply**:
+  - `Button` / `IconButton` for anything that clicks with a label or icon
+  - `Badge` / `ClickableBadge` for status chips (not `.tinker-pill` — that class stays only as a layout shell for edge cases)
+  - `SegmentedControl` for tab strips
+  - `Toggle` for on/off switches
+  - `TextInput` / `SearchInput` for form fields
+  - `StatusDot` for live indicator dots
+  - Surfaces, borders, spacing, radius, typography → read `--color-*` / `--space-*` / `--radius-*` / `--font-*` tokens only
+  - Adding a new token belongs in `packages/design` (separate PR). Never inline hex or `rgba()` in renderer code.
+  - If a primitive is missing, extend `packages/design`; do not build a competing component in the app.
+- **Canonical reference**: `apps/desktop/src/renderer/routes/design-system.tsx` (playground at `?route=design-system`). If the playground breaks, the app breaks.
+
+### `[2026-04-19]` D15 — Dark-only warm palette, Host Grotesk
+- **Decision**: Tinker is dark-only. Accent is amber (`#f9c041`), surfaces are warm near-black (`#1a1612` canvas, `#221d17` elevated). Body font is Host Grotesk Variable.
+- **Why**: Matches "workspace, not a chat window" tone — desktop-first, quiet, long-session-friendly. Amber is distinct from the cyan-on-dark AI-slop default. Host Grotesk carries geometric warmth without looking like every other Inter/DM Sans clone.
+- **How to apply**: Never reintroduce `Space Grotesk`, `Inter`, `Avenir Next`, or radial cyan gradients. Never add light-mode branches without a design decision first. If a light mode lands, it's a token-layer change in `@tinker/design`, not a per-app override.
+
 ## Open Questions (not yet decided)
 
 - **Scheduler implementation**: in-process TypeScript cron vs. OS-level (launchd/Task Scheduler/systemd). Leaning in-process for cross-platform simplicity; revisit when app sleep/wake behavior is tested.

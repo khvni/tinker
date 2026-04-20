@@ -1,4 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
+import { Button } from '@tinker/design';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import type { IDockviewPanelProps } from 'dockview-react';
@@ -86,9 +87,9 @@ export const MarkdownRenderer = ({ api, params, vaultRevision }: MarkdownRendere
           <h2>{path ? getPanelTitleForPath(path) : 'Untitled note'}</h2>
         </div>
         {path ? (
-          <button className="tinker-button-secondary" type="button" onClick={openEditor}>
+          <Button variant="secondary" size="s" onClick={openEditor}>
             Edit note
-          </button>
+          </Button>
         ) : null}
       </header>
 

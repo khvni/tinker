@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import { Badge } from '@tinker/design';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
@@ -100,7 +101,12 @@ export const MarkdownEditor = ({ params, vaultRevision }: MarkdownEditorProps): 
           <p className="tinker-eyebrow">Markdown editor</p>
           <h2>{path ? getPanelTitleForPath(path) : 'Untitled note'}</h2>
         </div>
-        <span className="tinker-pill">{value === savedValue ? status : 'Unsaved changes'}</span>
+        <Badge
+          variant={value === savedValue ? 'default' : 'warning'}
+          size="small"
+        >
+          {value === savedValue ? status : 'Unsaved changes'}
+        </Badge>
       </header>
 
       {error ? <p className="tinker-muted">{error}</p> : null}

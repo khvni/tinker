@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { Button, Toggle } from '@tinker/design';
 import type { SSOStatus } from '@tinker/shared-types';
 import type { MCPStatus } from '../components/IntegrationsStrip.js';
 import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
@@ -69,13 +70,13 @@ export const Settings = ({
           {modelAuthMessage ? <p className="tinker-muted">{modelAuthMessage}</p> : null}
           <div className="tinker-inline-actions">
             {modelConnected ? (
-              <button className="tinker-button-secondary" type="button" onClick={() => void onDisconnectModel()} disabled={modelAuthBusy}>
+              <Button variant="secondary" onClick={() => void onDisconnectModel()} disabled={modelAuthBusy}>
                 Disconnect GPT-5.4
-              </button>
+              </Button>
             ) : (
-              <button className="tinker-button" type="button" onClick={() => void onConnectModel()} disabled={modelAuthBusy}>
+              <Button variant="primary" onClick={() => void onConnectModel()} disabled={modelAuthBusy}>
                 {modelAuthBusy ? 'Connecting…' : 'Connect GPT-5.4'}
-              </button>
+              </Button>
             )}
           </div>
         </article>
@@ -88,13 +89,13 @@ export const Settings = ({
           {googleAuthMessage ? <p className="tinker-muted">{googleAuthMessage}</p> : null}
           <div className="tinker-inline-actions">
             {sessions.google ? (
-              <button className="tinker-button-secondary" type="button" onClick={() => void onDisconnectGoogle()} disabled={googleAuthBusy}>
+              <Button variant="secondary" onClick={() => void onDisconnectGoogle()} disabled={googleAuthBusy}>
                 Disconnect Google
-              </button>
+              </Button>
             ) : (
-              <button className="tinker-button" type="button" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
+              <Button variant="primary" onClick={() => void onConnectGoogle()} disabled={googleAuthBusy}>
                 {googleAuthBusy ? 'Signing in…' : 'Sign in with Google'}
-              </button>
+              </Button>
             )}
           </div>
         </article>
@@ -107,13 +108,13 @@ export const Settings = ({
           {githubAuthMessage ? <p className="tinker-muted">{githubAuthMessage}</p> : null}
           <div className="tinker-inline-actions">
             {sessions.github ? (
-              <button className="tinker-button-secondary" type="button" onClick={() => void onDisconnectGithub()} disabled={githubAuthBusy}>
+              <Button variant="secondary" onClick={() => void onDisconnectGithub()} disabled={githubAuthBusy}>
                 Disconnect GitHub
-              </button>
+              </Button>
             ) : (
-              <button className="tinker-button" type="button" onClick={() => void onConnectGithub()} disabled={githubAuthBusy}>
+              <Button variant="primary" onClick={() => void onConnectGithub()} disabled={githubAuthBusy}>
                 {githubAuthBusy ? 'Signing in…' : 'Sign in with GitHub'}
-              </button>
+              </Button>
             )}
           </div>
         </article>
@@ -122,31 +123,31 @@ export const Settings = ({
           <h3>Vault</h3>
           <p className="tinker-muted">{vaultPath ?? 'No vault selected yet.'}</p>
           <div className="tinker-inline-actions">
-            <button className="tinker-button-secondary" type="button" onClick={() => void onSelectVault()}>
+            <Button variant="secondary" onClick={() => void onSelectVault()}>
               Select existing vault
-            </button>
-            <button className="tinker-button-ghost" type="button" onClick={() => void onCreateVault()}>
+            </Button>
+            <Button variant="ghost" onClick={() => void onCreateVault()}>
               Create default vault
-            </button>
+            </Button>
           </div>
         </article>
 
         <article className="tinker-list-item">
           <h3>Workspace</h3>
           <p className="tinker-muted">Agent-written files open automatically by default. Turn it off if you want manual review first.</p>
-          <div className="tinker-inline-actions">
-            <button
-              className="tinker-button-secondary"
-              type="button"
-              aria-pressed={workspacePreferences.autoOpenAgentWrittenFiles}
-              onClick={() =>
+          <div className="tinker-inline-actions" style={{ gap: 'var(--space-3)' }}>
+            <Toggle
+              checked={workspacePreferences.autoOpenAgentWrittenFiles}
+              onChange={(next) =>
                 onWorkspacePreferencesChange({
-                  autoOpenAgentWrittenFiles: !workspacePreferences.autoOpenAgentWrittenFiles,
+                  autoOpenAgentWrittenFiles: next,
                 })
               }
-            >
+              label="Auto-open agent-written files"
+            />
+            <span className="tinker-muted">
               Auto-open agent-written files: {workspacePreferences.autoOpenAgentWrittenFiles ? 'On' : 'Off'}
-            </button>
+            </span>
           </div>
         </article>
       </div>

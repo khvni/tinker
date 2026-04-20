@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
+import { Badge, Button } from '@tinker/design';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import type { IDockviewPanelProps } from 'dockview-react';
 import Papa, { type ParseResult } from 'papaparse';
@@ -74,9 +75,9 @@ export const CsvRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JS
           <p className="tinker-eyebrow">CSV</p>
           <h2>{path ? getPanelTitleForPath(path) : 'Untitled table'}</h2>
         </div>
-        <span className="tinker-pill">
-          {parsed.rows.length} rows • page {page + 1} / {pageCount}
-        </span>
+        <Badge variant="default" size="small">
+          {parsed.rows.length} rows · page {page + 1} / {pageCount}
+        </Badge>
       </header>
 
       {error ? <p className="tinker-muted">{error}</p> : null}
@@ -106,17 +107,22 @@ export const CsvRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JS
 
           {parsed.rows.length > ROWS_PER_PAGE ? (
             <div className="tinker-inline-actions">
-              <button className="tinker-button-ghost" type="button" onClick={() => setPage((current) => Math.max(0, current - 1))} disabled={page === 0}>
+              <Button
+                variant="ghost"
+                size="s"
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
+                disabled={page === 0}
+              >
                 Previous
-              </button>
-              <button
-                className="tinker-button-secondary"
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
+                size="s"
                 onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
                 disabled={page >= pageCount - 1}
               >
                 Next
-              </button>
+              </Button>
             </div>
           ) : null}
         </>
