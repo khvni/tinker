@@ -35,7 +35,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 | 09 | Design system enforcement (`@tinker/design` tokens + primitives everywhere) | p1 | done | [[09-design-system]] | `[2026-04-19]` Renderer styles.css rebound to design tokens; legacy `--tinker-*` palette removed; every pane/renderer now consumes `<Button>`, `<Badge>`, `<TextInput>`, `<Toggle>`, `<SegmentedControl>`; playground at `?route=design-system` is the canonical reference; reinforced by D14 + D15 in [[decisions]] |
 | 10 | `@tinker/panes` workspace layout primitive | p1 | in progress | [[10-tinker-panes]] | `[2026-04-19]` package scaffolded, 41 tests green, demo route at `?route=panes-demo`. Migration of existing panes is the parallel-agent work below. |
 | 11 | Device ↔ host-service split | p1 | not started | [[11-host-service]] | Spec drafted. Unblocks headless mode + future companion devices. Parallel-agent work enumerated below. |
-| 12 | Workspace attention coordinator | p2 | not started | [[12-attention-coordinator]] | Unread rings + flash decisions ported from cmux. Depends on [[10-tinker-panes]]. |
+| 12 | Workspace attention coordinator | p2 | in progress | [[12-attention-coordinator]] | Unread rings + flash decisions ported from cmux. Depends on [[10-tinker-panes]]. |
 | 13 | Vertical workspace sidebar | p2 | not started | [[13-workspace-sidebar]] | Primary nav. Depends on [[10-tinker-panes]] + [[12-attention-coordinator]]. |
 | 14 | Session history windowing | p2 | not started | [[14-session-history-windowing]] | Bounded paint for long sessions. OpenCode pattern. Depends on Chat pane migrating to `@tinker/panes`. |
 | 15 | Connection gate (splash + retry) | p2 | not started | [[15-connection-gate]] | Blocking → background health check against host-service. Depends on [[11-host-service]]. |
@@ -74,7 +74,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | Task | Priority | Status | Depends on | Notes |
 |------|----------|--------|------------|-------|
-| Scaffold `packages/attention` + store | p2 | not started | [[10-tinker-panes]] | Flash decision rules per [[12-attention-coordinator]]. Unit tests cover the decision table exhaustively. |
+| Scaffold `packages/attention` + store | p2 | review | [[10-tinker-panes]] | `[2026-04-20]` `@tinker/attention` scaffold landed with exhaustive decision-table tests. Pane-frame/tab-dot wiring still separate follow-up. |
 | Hook attention into `@tinker/panes` pane frames | p2 | not started | attention scaffold | Pane edge ring + tab dot subscribe. |
 | Scaffold `packages/workspace-sidebar` | p2 | not started | attention scaffold | Vertical card list, metadata rows, drag reorder. |
 | Expose workspace metadata API over host-service | p2 | not started | host-service scaffold + workspace-sidebar | `POST /workspace.metadata` from contributors; `GET /workspace.cards` for the sidebar. |
