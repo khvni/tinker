@@ -5,7 +5,7 @@ tags: [attention, notifications, ux]
 
 # Feature 12 — Workspace attention coordinator
 
-**Status**: spec drafted `[2026-04-19]`. Depends on [[10-tinker-panes]] landing. Bound to [[D19]].
+**Status**: scaffold landed `[2026-04-20]`; pane-frame + sidebar wiring still pending. Depends on [[10-tinker-panes]] landing. Bound to [[D19]].
 
 ## Why
 
@@ -95,6 +95,13 @@ export function usePaneAttentionState(store: AttentionStore, paneId: string): {
 ```
 
 The store decides whether a signal produces a flash; renderers only consume snapshots.
+
+## Implementation note `[2026-04-20]`
+
+- `packages/attention` now ships a zustand-backed store keyed by `workspaceId` inside one coordinator instance. Active workspace selectors expose the current snapshot; sidebar/panes can still query any workspace explicitly.
+- `unreadPaneIds` is treated as **notification-generated unread**. Final unread render state is `unreadPaneIds ∪ manualUnreadPaneIds`.
+- `manual-unread-dismiss` clears both unread sources for a pane; `notification-dismiss` clears only notification unread so a user-authored manual unread marker survives.
+- Flash lifecycle is in-memory only and auto-clears after the 720ms timing window; tests cover every row in the decision table.
 
 ## Persistence
 

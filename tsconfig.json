@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/shared-types" },
+    { "path": "./packages/attention" },
     { "path": "./packages/bridge" },
     { "path": "./packages/memory" },
     { "path": "./apps/desktop" }
