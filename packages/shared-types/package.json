@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./layout": "./src/layout.ts",
     "./memory": "./src/memory.ts",
+    "./pane": "./src/pane.ts",
     "./skill": "./src/skill.ts",
     "./scheduler": "./src/scheduler.ts",
     "./sso": "./src/sso.ts",
