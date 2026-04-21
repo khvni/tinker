@@ -711,7 +711,7 @@ textarea {
   font-family: var(--font-mono);
 }
 
-.tinker-dojo {
+.tinker-playbook {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -719,19 +719,19 @@ textarea {
   overflow: hidden;
 }
 
-.tinker-dojo-status {
+.tinker-playbook-status {
   color: var(--color-accent);
   margin: 0;
   font-size: var(--font-size-sm);
 }
 
-.tinker-dojo-error {
+.tinker-playbook-error {
   color: var(--color-error);
   margin: 0;
   font-size: var(--font-size-sm);
 }
 
-.tinker-dojo-body {
+.tinker-playbook-body {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.6fr);
   gap: var(--space-3);
@@ -739,26 +739,26 @@ textarea {
   flex: 1;
 }
 
-.tinker-dojo-list {
+.tinker-playbook-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   overflow: auto;
 }
 
-.tinker-dojo-toolbar {
+.tinker-playbook-toolbar {
   display: flex;
   gap: var(--space-2);
   align-items: center;
 }
 
-.tinker-dojo-toolbar > .tk-textinput,
-.tinker-dojo-toolbar > .tk-searchinput {
+.tinker-playbook-toolbar > .tk-textinput,
+.tinker-playbook-toolbar > .tk-searchinput {
   flex: 1;
   min-width: 0;
 }
 
-.tinker-dojo-items {
+.tinker-playbook-items {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -767,7 +767,7 @@ textarea {
   gap: var(--space-2);
 }
 
-.tinker-dojo-item {
+.tinker-playbook-item {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
   padding: var(--space-3);
@@ -777,12 +777,12 @@ textarea {
   gap: var(--space-2);
 }
 
-.tinker-dojo-item--selected {
+.tinker-playbook-item--selected {
   border-color: var(--color-accent-ring);
   background: var(--color-accent-soft);
 }
 
-.tinker-dojo-item-main {
+.tinker-playbook-item-main {
   background: transparent;
   border: 0;
   color: inherit;
@@ -794,38 +794,38 @@ textarea {
   gap: var(--space-1);
 }
 
-.tinker-dojo-item-header {
+.tinker-playbook-item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
 }
 
-.tinker-dojo-item-title {
+.tinker-playbook-item-title {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
-.tinker-dojo-item-description {
+.tinker-playbook-item-description {
   color: var(--color-text-secondary);
   margin: 0;
   font-size: var(--font-size-sm);
 }
 
-.tinker-dojo-item-meta {
+.tinker-playbook-item-meta {
   color: var(--color-text-muted);
   margin: 0;
   font-size: var(--font-size-xs);
 }
 
-.tinker-dojo-item-actions {
+.tinker-playbook-item-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-2);
 }
 
-.tinker-dojo-preview {
+.tinker-playbook-preview {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -833,14 +833,14 @@ textarea {
   padding: var(--space-1);
 }
 
-.tinker-dojo-preview-header {
+.tinker-playbook-preview-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-2);
 }
 
-.tinker-dojo-body-text {
+.tinker-playbook-body-text {
   white-space: pre-wrap;
   word-break: break-word;
   background: var(--color-bg-panel);
@@ -853,8 +853,8 @@ textarea {
   line-height: var(--line-height-relaxed);
 }
 
-.tinker-dojo-author,
-.tinker-dojo-git {
+.tinker-playbook-author,
+.tinker-playbook-git {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -862,7 +862,7 @@ textarea {
   padding-right: var(--space-1);
 }
 
-.tinker-dojo-sync-report {
+.tinker-playbook-sync-report {
   background: var(--color-bg-panel);
   border: 1px solid var(--color-border-subtle);
   padding: var(--space-3);

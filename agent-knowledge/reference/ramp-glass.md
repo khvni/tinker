@@ -60,7 +60,7 @@ Ramp's internal AI productivity suite. Built to make every employee an AI power 
 - `[2026-04-10]` A new account manager doesn't browse 350 skills — Sensei surfaces the 5 that matter on day one
 - `[2026-04-10]` "Rather than expecting people to know what's available, Glass meets them where they are"
 
-**See `features/02-dojo-skill-marketplace.md` and `features/05-sensei-skill-discovery.md`.**
+**See `features/02-playbook-skill-marketplace.md` and `features/05-coach-skill-discovery.md`** (Tinker's analogs; Ramp's product names — Dojo / Sensei — kept only when describing Ramp itself).
 
 ## Memory System
 

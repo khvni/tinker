@@ -23,9 +23,9 @@ Detailed comparison of what each product provides. Use this when deciding scope 
 | Custom connector config | ✅ (MCP JSON) | ⚠️ (UI-limited) | ✅ (internal MCP) | ✅ (`opencode.json`) |
 | **Skills** | | | | |
 | Personal skills | ✅ (SKILL.md) | ✅ | ✅ | ✅ |
-| Org-shared skill marketplace | ❌ | ❌ | ✅ (Dojo, Git-backed) | ✅ (vault + optional Git sync) |
+| Org-shared skill marketplace | ❌ | ❌ | ✅ (Dojo, Git-backed) | ✅ (Playbook — vault + optional Git sync) |
 | Skill versioning | ⚠️ (manual git) | ❌ | ✅ (Git-backed, reviewed) | ✅ (via vault) |
-| Skill discovery / recommendation | ❌ | ❌ | ✅ (Sensei) | ✅ (Sensei-lite) |
+| Skill discovery / recommendation | ❌ | ❌ | ✅ (Sensei) | ✅ (Coach-lite) |
 | **Memory** | | | | |
 | Per-project memory | ✅ (CLAUDE.md) | ✅ (Projects) | ✅ | ✅ (vault + SQLite) |
 | Self-building memory pipeline | ❌ | ❌ | ✅ (24hr synthesis) | ✅ (scheduled entity extraction) |
@@ -54,8 +54,8 @@ Detailed comparison of what each product provides. Use this when deciding scope 
 
 **Build** (moat features):
 - SSO via Better Auth (Google + GitHub + Microsoft) → pre-wired MCP integrations
-- Dojo skill marketplace
-- Sensei skill discovery
+- Playbook skill marketplace ([[02-playbook-skill-marketplace]])
+- Coach skill discovery ([[05-coach-skill-discovery]])
 - Self-building memory pipeline
 - Native scheduler
 - Sub-agent orchestration

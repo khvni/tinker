@@ -17,7 +17,7 @@ import type {
 import type { Skill, SkillDraft, SkillGitConfig, SkillStore, SkillSyncReport } from '@tinker/shared-types';
 import { isValidSkillSlug, slugify } from '@tinker/memory';
 
-type DojoParams = {
+type PlaybookParams = {
   skillStore?: SkillStore;
   vaultPath?: string | null;
   initialDraft?: SkillDraft;
@@ -25,7 +25,7 @@ type DojoParams = {
   focus?: 'list' | 'author';
 };
 
-type DojoProps = IDockviewPanelProps<DojoParams>;
+type PlaybookProps = IDockviewPanelProps<PlaybookParams>;
 
 type ViewMode = 'browse' | 'author' | 'git';
 
@@ -48,7 +48,7 @@ const stableSort = (skills: Skill[]): Skill[] => {
   return [...skills].sort((left, right) => left.title.localeCompare(right.title));
 };
 
-export const Dojo = ({ params }: DojoProps): JSX.Element => {
+export const Playbook = ({ params }: PlaybookProps): JSX.Element => {
   const skillStore = params?.skillStore;
   const vaultPath = params?.vaultPath ?? null;
   const initialDraft = params?.initialDraft;
@@ -258,7 +258,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
         throw new Error('Provide a branch name.');
       }
       await guardStore().setGitConfig(gitConfig);
-      setStatus('Saved Dojo Git configuration.');
+      setStatus('Saved Playbook Git configuration.');
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
@@ -297,11 +297,11 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
 
   if (!vaultPath || !skillStore) {
     return (
-      <section className="tinker-pane tinker-dojo">
+      <section className="tinker-pane tinker-playbook">
         <header className="tinker-pane-header">
           <div>
-            <p className="tinker-eyebrow">Dojo</p>
-            <h2>Connect a vault to open the Dojo</h2>
+            <p className="tinker-eyebrow">Playbook</p>
+            <h2>Connect a vault to open the Playbook</h2>
           </div>
         </header>
         <p className="tinker-muted">Skills live in <code>&lt;vault&gt;/.tinker/skills/</code>. Select or create a vault to get started.</p>
@@ -310,10 +310,10 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
   }
 
   return (
-    <section className="tinker-pane tinker-dojo">
+    <section className="tinker-pane tinker-playbook">
       <header className="tinker-pane-header">
         <div>
-          <p className="tinker-eyebrow">Dojo</p>
+          <p className="tinker-eyebrow">Playbook</p>
           <h2>Skill marketplace</h2>
         </div>
         <Badge variant="default" size="small">
@@ -325,16 +325,16 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
         value={mode}
         onChange={setMode}
         options={MODE_OPTIONS}
-        label="Dojo view"
+        label="Playbook view"
       />
 
-      {status ? <p className="tinker-dojo-status">{status}</p> : null}
-      {error ? <p className="tinker-dojo-error">{error}</p> : null}
+      {status ? <p className="tinker-playbook-status">{status}</p> : null}
+      {error ? <p className="tinker-playbook-error">{error}</p> : null}
 
       {mode === 'browse' ? (
-        <div className="tinker-dojo-body">
-          <aside className="tinker-dojo-list">
-            <div className="tinker-dojo-toolbar">
+        <div className="tinker-playbook-body">
+          <aside className="tinker-playbook-list">
+            <div className="tinker-playbook-toolbar">
               <SearchInput
                 placeholder="Search skills"
                 value={query}
@@ -353,31 +353,31 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
               </p>
             ) : null}
 
-            <ul className="tinker-dojo-items">
+            <ul className="tinker-playbook-items">
               {filteredSkills.map((skill) => (
                 <li
                   key={skill.slug}
-                  className={`tinker-dojo-item ${selectedSlug === skill.slug ? 'tinker-dojo-item--selected' : ''}`}
+                  className={`tinker-playbook-item ${selectedSlug === skill.slug ? 'tinker-playbook-item--selected' : ''}`}
                 >
                   <button
                     type="button"
-                    className="tinker-dojo-item-main"
+                    className="tinker-playbook-item-main"
                     onClick={() => setSelectedSlug(skill.slug)}
                   >
-                    <div className="tinker-dojo-item-header">
-                      <span className="tinker-dojo-item-title">{skill.title}</span>
+                    <div className="tinker-playbook-item-header">
+                      <span className="tinker-playbook-item-title">{skill.title}</span>
                       {skill.active ? (
                         <Badge variant="accent" size="small">
                           active
                         </Badge>
                       ) : null}
                     </div>
-                    <p className="tinker-dojo-item-description">{skill.description || 'No description.'}</p>
+                    <p className="tinker-playbook-item-description">{skill.description || 'No description.'}</p>
                     {skill.tools.length > 0 ? (
-                      <p className="tinker-dojo-item-meta">Tools: {skill.tools.join(', ')}</p>
+                      <p className="tinker-playbook-item-meta">Tools: {skill.tools.join(', ')}</p>
                     ) : null}
                   </button>
-                  <div className="tinker-dojo-item-actions">
+                  <div className="tinker-playbook-item-actions">
                     <Toggle
                       checked={skill.active}
                       onChange={() => void handleToggleActive(skill)}
@@ -393,10 +393,10 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
             </ul>
           </aside>
 
-          <article className="tinker-dojo-preview">
+          <article className="tinker-playbook-preview">
             {selected ? (
               <>
-                <header className="tinker-dojo-preview-header">
+                <header className="tinker-playbook-preview-header">
                   <div>
                     <p className="tinker-eyebrow">{selected.slug}</p>
                     <h3>{selected.title}</h3>
@@ -408,7 +408,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
                     </Button>
                   </div>
                 </header>
-                <pre className="tinker-dojo-body-text">{selected.body}</pre>
+                <pre className="tinker-playbook-body-text">{selected.body}</pre>
               </>
             ) : (
               <p className="tinker-muted">Select a skill to preview its instructions.</p>
@@ -419,7 +419,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
 
       {mode === 'author' ? (
         <form
-          className="tinker-dojo-author"
+          className="tinker-playbook-author"
           onSubmit={(event) => {
             event.preventDefault();
             void handleSaveDraft();
@@ -493,7 +493,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
       ) : null}
 
       {mode === 'git' ? (
-        <div className="tinker-dojo-git">
+        <div className="tinker-playbook-git">
           <p className="tinker-muted">
             {gitAvailable === false
               ? 'Git is not on PATH. Install Git to sync skills.'
@@ -503,7 +503,7 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
             <span>Remote URL</span>
             <TextInput
               value={gitConfig.remoteUrl}
-              placeholder="git@github.com:team/dojo.git"
+              placeholder="git@github.com:team/playbook.git"
               onChange={(event) => setGitConfig((current) => ({ ...current, remoteUrl: event.currentTarget.value }))}
             />
           </label>
@@ -555,12 +555,12 @@ export const Dojo = ({ params }: DojoProps): JSX.Element => {
           </div>
 
           {syncReport ? (
-            <div className="tinker-dojo-sync-report">
+            <div className="tinker-playbook-sync-report">
               <p>{syncReport.message}</p>
               {syncReport.pulled.length > 0 ? <p>Pulled: {syncReport.pulled.join(', ')}</p> : null}
               {syncReport.pushed.length > 0 ? <p>Pushed: {syncReport.pushed.join(', ')}</p> : null}
               {syncReport.conflicts.length > 0 ? (
-                <p className="tinker-dojo-error">Conflicts: {syncReport.conflicts.join(', ')}</p>
+                <p className="tinker-playbook-error">Conflicts: {syncReport.conflicts.join(', ')}</p>
               ) : null}
             </div>
           ) : null}

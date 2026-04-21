@@ -4,7 +4,7 @@ export type TabKind =
   | 'today'
   | 'scheduler'
   | 'settings'
-  | 'dojo'
+  | 'playbook'
   | 'markdown-editor'
   | 'file'
   | 'markdown'

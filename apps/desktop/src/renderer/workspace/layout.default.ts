@@ -8,7 +8,7 @@ type DefaultLayoutOptions = {
 };
 
 // Clean default boot: Chat is always present. If a vault is connected we also
-// surface the vault browser on the left. Scheduler, Settings, Dojo, and Today
+// surface the vault browser on the left. Scheduler, Settings, Playbook, and Today
 // are reachable on-demand via the workspace header — they would only clutter
 // the first-boot view.
 export const applyDefaultLayout = (api: DockviewApi, options: DefaultLayoutOptions): void => {

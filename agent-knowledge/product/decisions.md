@@ -145,7 +145,7 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
 - **How to apply**:
   - New panes register with `PaneRegistry` keyed by `pane.kind`.
   - Layout state serializes via `selectWorkspaceSnapshot()`; persistence uses the `WorkspaceState<TData>` type, not Dockview's JSON.
-  - Migration order (parallel agents): Chat → Today → Scheduler → Settings → Dojo → VaultBrowser → file renderers. Each migration is its own PR with the matching pane moving to a `kind` in the registry.
+  - Migration order (parallel agents): Chat → Today → Scheduler → Settings → Playbook → VaultBrowser → file renderers. Each migration is its own PR with the matching pane moving to a `kind` in the registry.
   - Don't add new `dockview-react` imports. Don't extend `packages/shared-types/LayoutState.dockviewModel`.
   - Remove the `dockview-react` dependency in the PR that ships the last migrated pane.
 - **Reference**: See `agent-knowledge/reference/panes-heritage.md` for the architectural synthesis (cmux + OpenCode + Superset) behind this choice.
@@ -216,10 +216,25 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
   - Don't introduce light-mode branches in component CSS — tokens are theme-aware, components stay theme-neutral.
   - If `prefers-color-scheme` respect becomes desired later, route it through the same `[data-theme]` attribute (set once at app boot), not per-component media queries.
 
+### `[2026-04-20]` D24 — Rename Dojo → Playbook, Sensei → Coach
+- **Decision**: Drop the martial-arts loan. Tinker's skill marketplace is the **Playbook**; the role-based skill discovery layer is **Coach**. Ramp Glass keeps "Dojo" / "Sensei" in its own product; Tinker has its own names.
+- **Why**: Two pressures.
+  1. The martial-arts frame is a direct lift from Ramp — we are consumer-OSS and should not be read as a Glass clone (per [[D1]]). Distinct names reinforce that.
+  2. Dojo/Sensei require cultural-loan vocabulary that doesn't carry equally across audiences. Playbook/Coach is idiomatic English (sports + business) and preserves the same "curated collection + a guide who picks the right one" mental model without the loan.
+- **How to apply**:
+  - Feature files: `02-playbook-skill-marketplace.md` + `05-coach-skill-discovery.md` (old filenames kept as `aliases:` frontmatter for searchability).
+  - Pane + component names: `Playbook.tsx` / `Playbook` component; pane `kind: 'playbook'`.
+  - Future package: `packages/coach` (not scaffolded yet — see [[05-coach-skill-discovery]]).
+  - CSS class prefix: `.tinker-playbook-*` (replaced `.tinker-dojo-*`).
+  - UI copy: eyebrow / heading "Playbook"; prompt-injection header uses "The following Playbook skills are active…".
+  - Reference material about Ramp (`ramp-glass.md`, `ramp-ai-adoption.md`, `claude-cowork.md`) keeps the original "Dojo" / "Sensei" terms when describing Ramp — Tinker's rename does not rewrite history of another product.
+  - Don't reintroduce "Dojo" or "Sensei" for Tinker-context surfaces (UI, features, code, decisions). Old session summaries stay as-is (historical record).
+- **Persistence note**: persisted Dockview layouts predating the rename carry `component: 'dojo'` IDs that will fail to render against the new `'playbook'` registry key. We accept this pre-v1 breakage because the full Dockview schema is being retired under [[D16]] — users re-open the pane (via Chat "Save as skill" or future LeftRail nav) and the new snapshot saves with the correct key. Do not add a backwards-compat alias to the component registry (TypeScript forbids unknown `TabKind` keys anyway).
+
 ## Open Questions (not yet decided)
 
 - **Scheduler implementation**: in-process TypeScript cron vs. OS-level (launchd/Task Scheduler/systemd). Leaning in-process for cross-platform simplicity; revisit when app sleep/wake behavior is tested.
-- **Dojo skill storage**: vault filesystem (human-readable, Git-friendly) vs. SQLite (faster queries). Leaning vault for human readability; Sensei can build an SQLite index on top.
+- **Playbook skill storage**: vault filesystem (human-readable, Git-friendly) vs. SQLite (faster queries). Leaning vault for human readability; Coach can build an SQLite index on top.
 - **Memory pipeline trigger**: time-based (every 24hr) vs. event-based (on tool use) vs. hybrid. Glass uses time-based; Tinker likely hybrid — daily sweep + incremental on tool use.
 
 ## Connections

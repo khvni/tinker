@@ -24,7 +24,7 @@ Port the seven artboards in the Paper file `Tinker Workspace` into the Tinker co
 - **Window** — the app frame. Hosts TitleBar + LeftRail + ContentArea. Singleton.
 - **Pane** — a split region inside ContentArea with its own tab strip. 1..N per window. Can be split horizontally or vertically, moved, resized. Maps to `@tinker/panes` `StackNode`.
 - **Tab** — a content unit inside a pane. 1..N per pane, exactly one active. Can be dragged between panes. Each tab has a `kind` and `data`. Maps to `@tinker/panes` `Pane<TData>`.
-- **Tab kind** — the discriminator that picks a renderer. Existing: `chat`, `today`, `scheduler`, `settings`, `dojo`, `vault-browser`, `markdown-editor`, `markdown`, `html`, `csv`, `image`, `code`, `file`. New: `memory`, `agent`.
+- **Tab kind** — the discriminator that picks a renderer. Existing: `chat`, `today`, `scheduler`, `settings`, `playbook`, `vault-browser`, `markdown-editor`, `markdown`, `html`, `csv`, `image`, `code`, `file`. New: `memory`, `agent`.
 - **`@tinker/panes` `Tab<TData>`** (library type) — top-level workspace tab that owns a recursive layout tree. Do **not** conflate with the user-visible "tab" above. Spec prose uses user terminology; code retains library names.
 
 Paper 9I-0 confirms: one window-level `Tab<TData>` with a Split containing 2 Stacks. Each Stack holds 3 Panes. Library `Pane<TData>` = user "tab"; library `StackNode` = user "pane".
@@ -75,10 +75,10 @@ One subagent; blocks Phase 3a/3b.
 **Deliverables:**
 
 1. Migrate `Workspace.tsx` root from `DockviewReact` to `@tinker/panes` React components. Use `createWorkspaceStore` + `WorkspaceState<TData>` from `@tinker/panes`.
-2. Move each existing `TabKind` renderer (`chat`, `today`, `scheduler`, `settings`, `dojo`, `vault-browser`, `markdown-editor`, `markdown`, `html`, `csv`, `image`, `code`, `file`) off `IDockviewPanelProps` onto a `@tinker/panes`-native renderer registry. Component bodies stay; only the panel wrapper changes.
+2. Move each existing `TabKind` renderer (`chat`, `today`, `scheduler`, `settings`, `playbook`, `vault-browser`, `markdown-editor`, `markdown`, `html`, `csv`, `image`, `code`, `file`) off `IDockviewPanelProps` onto a `@tinker/panes`-native renderer registry. Component bodies stay; only the panel wrapper changes.
 3. Port window + pane chrome as co-located folders under `apps/desktop/src/renderer/workspace/components/`:
    - `TitleBar/` — traffic lights + "Tinker" label + window actions. Hosts theme toggle `IconButton` (sun/moon glyph).
-   - `LeftRail/` — 52px icon rail: Workspaces (active), Explorer, Chats, Skills, Agents, Connections, Memory, divider, NewTab, bottom: Dojo, Analytics, Settings, Avatar.
+   - `LeftRail/` — 52px icon rail: Workspaces (active), Explorer, Chats, Skills, Agents, Connections, Memory, divider, NewTab, bottom: Playbook, Analytics, Settings, Avatar.
    - `PaneTabBar/` — per-pane tab strip. Reskin `@tinker/panes` default tab strip via CSS; no new primitive.
    - `StatusDock/` — LeftPane footer (187px) in 9I-0.
    - `PreviewFrame/` — RightPane body stack: `FileHeader` + `PreviewToolbar` + `PreviewCanvas` + `PreviewFooter` + `PreviewMeta`.

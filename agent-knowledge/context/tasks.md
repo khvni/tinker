@@ -26,10 +26,10 @@ Open work + status + priorities. Agents update this file when starting, progress
 | # | Feature | Priority | Status | Spec | Notes |
 |---|---------|----------|--------|------|-------|
 | 01 | SSO connector layer (Google + GitHub + Microsoft OAuth via Better Auth, pre-wired MCP integrations) | p1 | review | [[01-sso-connector-layer]] | Better Auth local sidecar now owns social OAuth; Rust still owns keychain + loopback bridge. `[2026-04-15]` Google flow hardened. `[2026-04-20]` Decisions log reaffirmed Microsoft as v1 provider alongside Google + GitHub; verify Microsoft provider wiring + IPC handlers. |
-| 02 | Dojo skill marketplace (local + optional Git sync) | p1 | review | [[02-dojo-skill-marketplace]] | Vault-backed skill storage; browser UI; install/publish actions |
+| 02 | Playbook skill marketplace (local + optional Git sync) | p1 | review | [[02-playbook-skill-marketplace]] | Vault-backed skill storage; browser UI; install/publish actions. `[2026-04-20]` Renamed from "Dojo" to "Playbook". |
 | 03 | Self-building memory pipeline (scheduled entity extraction from connected tools) | p2 | review | [[03-memory-pipeline]] | Vault indexing, prompt injection, session append, and daily sweep wired; review daily sweep behavior against live connectors |
 | 04 | Native scheduler (cron-style scheduled prompts) | p1 | review | [[04-native-scheduler]] | In-process scheduler with SQLite-persisted job definitions — migrates under `packages/host-service` per [[D17]] |
-| 05 | Sensei skill discovery (recommend skills based on role + connected tools) | p2 | not started | [[05-sensei-skill-discovery]] | Depends on Dojo being built first |
+| 05 | Coach skill discovery (recommend skills based on role + connected tools) | p2 | not started | [[05-coach-skill-discovery]] | Depends on Playbook being built first. `[2026-04-20]` Renamed from "Sensei" to "Coach". |
 | 06 | Sub-agent orchestration (OpenCode-native multi-agent patterns) | p2 | not started | [[06-subagent-orchestration]] | Use OpenCode SDK sub-agent primitives; no Latent Briefing (see [[decisions]]) |
 | 07 | Workspace persistence + split-pane UI | p1 | review | [[07-workspace-persistence]] | **Layout engine being swapped from Dockview to `@tinker/panes`** per [[D16]]; old implementation stays until all panes migrate. Migration issues below. |
 | 09 | Design system enforcement (`@tinker/design` tokens + primitives everywhere) | p1 | done | [[09-design-system]] | `[2026-04-19]` Renderer styles.css rebound to design tokens; legacy `--tinker-*` palette removed; every pane/renderer now consumes `<Button>`, `<Badge>`, `<TextInput>`, `<Toggle>`, `<SegmentedControl>`; playground at `?route=design-system` is the canonical reference; reinforced by D14 + D15 in [[decisions]] |
@@ -52,8 +52,8 @@ Open work + status + priorities. Agents update this file when starting, progress
 | Migrate Today pane | p1 | not started | Chat migration | Register `{ kind: 'today', render: Today }`. |
 | Migrate Scheduler pane | p1 | not started | Today migration | Register `{ kind: 'scheduler', render: SchedulerPane }`. |
 | Migrate Settings pane | p1 | not started | Scheduler migration | Register `{ kind: 'settings', render: Settings }`. |
-| Migrate Dojo pane | p1 | not started | Settings migration | Register `{ kind: 'dojo', render: Dojo }`. Drop `params` hack. |
-| Migrate VaultBrowser pane | p1 | not started | Dojo migration | Register `{ kind: 'vault-browser', render: VaultBrowser }`. |
+| Migrate Playbook pane | p1 | not started | Settings migration | Register `{ kind: 'playbook', render: Playbook }`. Drop `params` hack. |
+| Migrate VaultBrowser pane | p1 | not started | Playbook migration | Register `{ kind: 'vault-browser', render: VaultBrowser }`. |
 | Migrate file renderers (Code/Csv/Html/Image/Markdown/MarkdownEditor) | p1 | not started | VaultBrowser migration | Each renderer registers a `kind`; `file-open.ts` maps file extension → `pane.kind`. |
 | Retire `dockview-react` + rewire `LayoutState` | p1 | not started | All per-pane migrations above | Remove `dockview-react` dep, replace `LayoutState.dockviewModel` in `@tinker/shared-types` with `WorkspaceState<TinkerPaneData>`, add one-shot schema migration (drop old snapshots). |
 
@@ -93,7 +93,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | Task | Priority | Status | Notes |
 |------|----------|--------|-------|
-| Design `<Textarea>` primitive + migrate raw textarea surfaces | p2 | done | Follow-up to [[09-design-system]] so Chat composer, Scheduler prompt, Dojo skill body, and MarkdownEditor stop shipping raw `<textarea>` elements. `[2026-04-20]` `@tinker/design` exports `<Textarea>` + playground coverage; all four call sites migrated; merged to main. |
+| Design `<Textarea>` primitive + migrate raw textarea surfaces | p2 | done | Follow-up to [[09-design-system]] so Chat composer, Scheduler prompt, Playbook skill body, and MarkdownEditor stop shipping raw `<textarea>` elements. `[2026-04-20]` `@tinker/design` exports `<Textarea>` + playground coverage; all four call sites migrated; merged to main. |
 | Tauri sidecar lifecycle (start/health-check/stop OpenCode) | p1 | in progress | PRD §2.1, §2.2; adopt two-phase readiness + proxy-safe loopback health checks from [[opencode-desktop-review]] |
 | FirstRun UX (sign-in → vault choice → workspace) | p1 | not started | PRD runtime flow "First launch"; `[2026-04-20]` `pnpm dev:web` now detects missing Tauri runtime and shows a browser-preview notice with native actions disabled instead of crashing on `invoke` |
 | Memory injection in bridge package | p1 | in progress | PRD §2.4 — `packages/bridge` |

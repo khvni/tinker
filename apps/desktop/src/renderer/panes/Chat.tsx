@@ -127,12 +127,12 @@ export const Chat = ({
     return session.id;
   };
 
-  const openDojoWithDraft = (seedDraft: SkillDraft): void => {
+  const openPlaybookWithDraft = (seedDraft: SkillDraft): void => {
     if (!dockviewApi) {
       return;
     }
 
-    const existing = dockviewApi.panels.find((panel) => panel.id === 'dojo');
+    const existing = dockviewApi.panels.find((panel) => panel.id === 'playbook');
     if (existing) {
       existing.api.updateParameters({
         skillStore,
@@ -146,9 +146,9 @@ export const Chat = ({
 
     const referencePanelId = dockviewApi.activePanel?.id ?? dockviewApi.panels[0]?.id ?? null;
     dockviewApi.addPanel({
-      id: 'dojo',
-      component: 'dojo',
-      title: 'Dojo',
+      id: 'playbook',
+      component: 'playbook',
+      title: 'Playbook',
       params: {
         skillStore,
         vaultPath,
@@ -172,7 +172,7 @@ export const Chat = ({
       description: deriveSkillDescription(message.text),
       body: message.text,
     };
-    openDojoWithDraft(seed);
+    openPlaybookWithDraft(seed);
   };
 
   const sendMessage = async (): Promise<void> => {

@@ -51,7 +51,7 @@ These are the canonical primitives. Anything new that looks like one of these MU
 
 - `[2026-04-19]` **Import tokens once** — `apps/desktop/src/renderer/styles.css` imports `@tinker/design/styles/tokens.css` at the top. Do not redefine `--color-*`, `--space-*`, `--radius-*`, `--font-*` anywhere else. Ever.
 - `[2026-04-19]` **Use the components** — any button-shaped interactive element uses `<Button>` or `<IconButton>`. Any status chip uses `<Badge>`. Any tab strip uses `<SegmentedControl>`. Any on/off switch uses `<Toggle>`. Single-line text fields use `<TextInput>` / `<SearchInput>`. Multi-line fields use `<Textarea>`. Any state pill with a colored dot uses `<StatusDot>`.
-- `[2026-04-20]` **Textarea rule closed** — Chat composer, Scheduler prompt, Dojo skill body, and `MarkdownEditor` now consume `<Textarea>`. New raw `<textarea>` elements in renderer code are regressions unless extending `@tinker/design` itself.
+- `[2026-04-20]` **Textarea rule closed** — Chat composer, Scheduler prompt, Playbook skill body, and `MarkdownEditor` now consume `<Textarea>`. New raw `<textarea>` elements in renderer code are regressions unless extending `@tinker/design` itself.
 - `[2026-04-19]` **No inline hex or rgba** in renderer code or CSS. Reference the token CSS variables. If a token doesn't exist for the case, add it to the design system in a separate PR — don't inline it.
 - `[2026-04-19]` **No per-app palette shadow** — the old `--tinker-*` palette is gone. If a legacy class still needs styling, rebind it to `--color-*` tokens; do not reintroduce cold cyan or gradient backgrounds.
 - `[2026-04-19]` **Structural classes stay** (`.tinker-pane`, `.tinker-list-item`, `.tinker-vault-entry`, etc.) because they encode layout, not palette. Their color/spacing/radius values must come from tokens only.
@@ -63,7 +63,7 @@ These are the canonical primitives. Anything new that looks like one of these MU
 - `[2026-04-19]` `className="tinker-pill"` as the primary status chip pattern — use `<Badge>`. (The `.tinker-pill` class still exists in `styles.css` for rare layout-only pill shells; prefer `<Badge>` in new code.)
 - `[2026-04-19]` `<input className="tinker-input">` — use `<TextInput>` or `<SearchInput>`.
 - `[2026-04-20]` Raw `<textarea>` in app UI — use `<Textarea>`.
-- `[2026-04-19]` `.tinker-dojo-tab` + `.tinker-dojo-tab--active` hand-rolled tabs — use `<SegmentedControl>`.
+- `[2026-04-19]` `.tinker-playbook-tab` + `.tinker-playbook-tab--active` hand-rolled tabs — use `<SegmentedControl>` (formerly `.tinker-dojo-tab*` before rename per [[decisions]] D24).
 - `[2026-04-19]` Custom `<input type="checkbox">` with a toggle-like label — use `<Toggle>`.
 - `[2026-04-19]` Alt font stacks (`Space Grotesk`, `Inter`, `Avenir Next`, etc.) — the app uses `--font-sans` (Host Grotesk) only.
 - `[2026-04-19]` Radial cyan / gradient hero backgrounds, drop shadows with heavy alpha, blur glass cards — replaced by flat warm surfaces with subtle borders.
@@ -79,15 +79,15 @@ These are the canonical primitives. Anything new that looks like one of these MU
 
 - [x] `packages/design` exports tokens + 10 primitives, with per-component CSS colocated
 - [x] `apps/desktop/src/renderer/styles.css` imports `@tinker/design/styles/tokens.css` and references tokens only (no `--tinker-*` shadow palette)
-- [x] Every pane (`Chat`, `Settings`, `Today`, `FirstRun`, `VaultBrowser`, `Dojo`, `SchedulerPane`) uses `<Button>`, `<Badge>`, `<TextInput>`, `<Textarea>`, `<Toggle>`, `<SegmentedControl>` where applicable
-- [x] Multi-line editor surfaces (`Chat` composer, `SchedulerPane` prompt, `Dojo` skill body, `MarkdownEditor`) use `<Textarea>` rather than raw `<textarea>`
+- [x] Every pane (`Chat`, `Settings`, `Today`, `FirstRun`, `VaultBrowser`, `Playbook`, `SchedulerPane`) uses `<Button>`, `<Badge>`, `<TextInput>`, `<Textarea>`, `<Toggle>`, `<SegmentedControl>` where applicable
+- [x] Multi-line editor surfaces (`Chat` composer, `SchedulerPane` prompt, `Playbook` skill body, `MarkdownEditor`) use `<Textarea>` rather than raw `<textarea>`
 - [x] Renderers (`MarkdownRenderer`, `MarkdownEditor`, `CsvRenderer`, `CodeRenderer`) use `<Badge>` for status pills and `<Button>` for actions
 - [x] `Workspace.tsx` header uses `<Button>` + `<Badge>` — no raw `tinker-button*` / `tinker-pill` spans in new code
-- [x] `Dojo` tab strip uses `<SegmentedControl>`; skill active switch uses `<Toggle>`
+- [x] `Playbook` tab strip uses `<SegmentedControl>`; skill active switch uses `<Toggle>`
 - [x] Typecheck green across workspace: `pnpm --filter @tinker/desktop typecheck`
 - [x] Design playground (`?route=design-system`) still renders every primitive against the live token set
 
 ## Connections
 - [[07-workspace-persistence]] — dockview theme overrides live inside design tokens, not in isolation
-- [[02-dojo-skill-marketplace]] — Dojo pane was the biggest consumer of hand-rolled tabs + inputs, now on design primitives
+- [[02-playbook-skill-marketplace]] — Playbook pane was the biggest consumer of hand-rolled tabs + inputs, now on design primitives
 - [[vision]] — "complexity invisible, not absent" — design system lets every feature ship polish without reinventing the surface

@@ -32,7 +32,7 @@ Anthropic's in-house agent harness that ships with Claude Desktop. Brings Claude
 ## What Cowork Does NOT Have (vs Glass)
 
 - `[2026-04-15]` **No org-level skill marketplace** — skills are personal, not shared-company-wide with Git backing
-- `[2026-04-15]` **No Sensei-style discovery** — you write or browse skills yourself; no role-based recommendations
+- `[2026-04-15]` **No skill-discovery layer** — you write or browse skills yourself; no role-based recommendations (Glass has Sensei; Tinker has [[05-coach-skill-discovery]])
 - `[2026-04-15]` **No self-building memory pipeline** — projects remember what you feed them, no 24hr automated synthesis from Slack/Notion/Calendar
 - `[2026-04-15]` **No SSO-as-auto-wiring** — connectors are configured individually, not "one sign-in = 30 tools light up"
 - `[2026-04-15]` **No Slack-native presence** — Cowork is a separate app, not a bot living in a channel

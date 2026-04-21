@@ -34,7 +34,7 @@ User opens Tinker. Their workspace is exactly how they left it — panes in the 
 
 ### v2 / later
 - Workspace profiles (different layouts for different work modes — "research mode" vs "email drafting mode")
-- Saved layout presets (users publish to Dojo-adjacent repo)
+- Saved layout presets (users publish to a Playbook-adjacent repo)
 - Multi-window support (not v1 per Tauri simplicity)
 
 ## Architecture
@@ -63,7 +63,7 @@ User opens Tinker. Their workspace is exactly how they left it — panes in the 
 | `code` | Lazy syntax-highlighted code renderer (`highlight.js`) | Agent creates/edits code file |
 | `image` | Image viewer | Agent outputs image, user opens image file |
 | `text` | Plain text fallback | Any other file type |
-| `skill` | Skill markdown editor (special mode) | User edits a skill via Dojo |
+| `skill` | Skill markdown editor (special mode) | User edits a skill via the Playbook |
 
 ### Auto-open behavior
 
@@ -137,4 +137,4 @@ User opens Tinker. Their workspace is exactly how they left it — panes in the 
 ## Connections
 - [[ramp-glass]] — workspace reference
 - [[vision]] — "not a chat window" principle
-- [[02-dojo-skill-marketplace]] — uses this pane system for skill browser
+- [[02-playbook-skill-marketplace]] — uses this pane system for skill browser

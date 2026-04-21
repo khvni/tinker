@@ -74,7 +74,7 @@ apps/desktop/src/renderer/workspace/file-open.ts             # same
 apps/desktop/src/renderer/workspace/file-open.test.ts        # same
 apps/desktop/src/renderer/workspace/layout.default.ts        # emit WorkspaceState<TabData> default
 apps/desktop/src/renderer/panes/Chat.tsx                     # signature (no IDockviewPanelProps), ask_user overlay
-apps/desktop/src/renderer/panes/Dojo.tsx                     # signature
+apps/desktop/src/renderer/panes/Playbook.tsx                     # signature
 apps/desktop/src/renderer/panes/SchedulerPane.tsx            # signature
 apps/desktop/src/renderer/panes/Settings.tsx                 # signature + consumes theme helper
 apps/desktop/src/renderer/panes/Today.tsx                    # signature
@@ -461,7 +461,7 @@ export type TabKind =
   | 'today'
   | 'scheduler'
   | 'settings'
-  | 'dojo'
+  | 'playbook'
   | 'markdown-editor'
   | 'file'
   | 'markdown'
@@ -547,8 +547,8 @@ export type SettingsTabData = {
   readonly kind: 'settings';
 };
 
-export type DojoTabData = {
-  readonly kind: 'dojo';
+export type PlaybookTabData = {
+  readonly kind: 'playbook';
 };
 
 export type FileTabData = {
@@ -572,7 +572,7 @@ export type TabData =
   | TodayTabData
   | SchedulerTabData
   | SettingsTabData
-  | DojoTabData
+  | PlaybookTabData
   | FileTabData
   | MemoryTabData
   | AgentTabData;
@@ -897,7 +897,7 @@ git commit -m "refactor(desktop): port openWorkspaceFile to @tinker/panes store"
 
 **Files:**
 - Modify: `apps/desktop/src/renderer/panes/Chat.tsx`
-- Modify: `apps/desktop/src/renderer/panes/Dojo.tsx`
+- Modify: `apps/desktop/src/renderer/panes/Playbook.tsx`
 - Modify: `apps/desktop/src/renderer/panes/SchedulerPane.tsx`
 - Modify: `apps/desktop/src/renderer/panes/Settings.tsx`
 - Modify: `apps/desktop/src/renderer/panes/Today.tsx`
@@ -1146,7 +1146,7 @@ export type LeftRailId =
   | 'connections'
   | 'memory'
   | 'new-tab'
-  | 'dojo'
+  | 'playbook'
   | 'analytics'
   | 'settings'
   | 'avatar';
@@ -1167,7 +1167,7 @@ const TOP: ReadonlyArray<{ id: LeftRailId; label: string; icon: ReactNode }> = [
 ];
 
 const BOTTOM: ReadonlyArray<{ id: LeftRailId; label: string; icon: ReactNode }> = [
-  { id: 'dojo', label: 'Dojo', icon: <RailIcon glyph="dojo" /> },
+  { id: 'playbook', label: 'Playbook', icon: <RailIcon glyph="playbook" /> },
   { id: 'analytics', label: 'Analytics', icon: <RailIcon glyph="chart" /> },
   { id: 'settings', label: 'Settings', icon: <RailIcon glyph="gear" /> },
   { id: 'avatar', label: 'Avatar', icon: <RailIcon glyph="avatar" /> },
@@ -1234,7 +1234,7 @@ const RailIcon = ({ glyph }: { readonly glyph: string }): JSX.Element => {
       return <svg viewBox="0 0 16 16" width="16" height="16"><path d="M4 4c0-1 1-2 2-2s2 1 2 2v8c0 1-1 2-2 2s-2-1-2-2m4-8c0-1 1-2 2-2s2 1 2 2v8c0 1-1 2-2 2s-2-1-2-2" fill="none" stroke="currentColor" strokeWidth="1.3"/></svg>;
     case 'plus':
       return <svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
-    case 'dojo':
+    case 'playbook':
       return <svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 13L8 3l5 10z" fill="currentColor"/></svg>;
     case 'chart':
       return <svg viewBox="0 0 16 16" width="16" height="16"><rect x="3" y="9" width="2" height="4" fill="currentColor"/><rect x="7" y="6" width="2" height="7" fill="currentColor"/><rect x="11" y="3" width="2" height="10" fill="currentColor"/></svg>;
@@ -2102,7 +2102,7 @@ export type TabKind =
   | 'today'
   | 'scheduler'
   | 'settings'
-  | 'dojo'
+  | 'playbook'
   | 'markdown-editor'
   | 'file'
   | 'markdown'
@@ -2577,7 +2577,7 @@ export type TabKind =
   | 'today'
   | 'scheduler'
   | 'settings'
-  | 'dojo'
+  | 'playbook'
   | 'markdown-editor'
   | 'file'
   | 'markdown'

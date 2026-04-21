@@ -1,31 +1,34 @@
 ---
 type: concept
-tags: [tinker, feature, sensei, skills, discovery, recommendation]
+tags: [tinker, feature, coach, skills, discovery, recommendation]
 status: not-started
 priority: p2
+aliases: [sensei-skill-discovery]
 ---
 
-# Feature 05 — Sensei Skill Discovery
+# Feature 05 — Coach Skill Discovery
 
 Recommend the 5 skills that matter most to this user right now. Don't make them browse 350.
 
-**Depends on [[02-dojo-skill-marketplace]] being built first.**
+> Renamed `[2026-04-20]` from "Sensei" to "Coach". Same feature — the martial-arts loan was swapped for a sports-idiom frame (Coach recommends plays from the Playbook — see [[02-playbook-skill-marketplace]]). Ramp Glass's equivalent is still called "Sensei"; Tinker's is "Coach".
+
+**Depends on [[02-playbook-skill-marketplace]] being built first.**
 
 ## Goal
 
-A new user opens Tinker. Instead of a blank canvas, Sensei surfaces 3–5 skills pre-filtered by role, connected tools, and recent activity. User installs one, gets a result, learns what's possible.
+A new user opens Tinker. Instead of a blank canvas, Coach surfaces 3–5 skills pre-filtered by role, connected tools, and recent activity. User installs one, gets a result, learns what's possible.
 
 ## Reference Implementation ([[ramp-glass]])
 
 - `[2026-04-10]` Looks at which tools you've connected, your role, and what you've been working on
 - `[2026-04-10]` Recommends the skills most likely to be useful right now
-- `[2026-04-10]` A new account manager doesn't browse 350 skills — Sensei surfaces the 5 that matter on day one
+- `[2026-04-10]` A new account manager doesn't browse 350 skills — Ramp's Sensei surfaces the 5 that matter on day one
 - `[2026-04-10]` "Rather than expecting people to know what's available, Glass meets them where they are"
 
 ## Tinker Scope
 
-### v1 Scope — "Sensei-lite"
-- `[2026-04-14]` **Scoring function** over the Dojo skill index, sorted by relevance
+### v1 Scope — "Coach-lite"
+- `[2026-04-14]` **Scoring function** over the Playbook skill index, sorted by relevance
 - `[2026-04-14]` **Surfaces**:
   - FirstRun suggested skills strip
   - Today pane "Recommended for you" section
@@ -50,7 +53,7 @@ score(U, S) =
     1.0 * tool_match(U, S)           // skill's required tools are all connected
   + 0.5 * role_match(U, S)           // skill's role tag matches user role
   + 0.3 * recency_match(U, S)        // skill relates to entities user touched in last 7 days
-  + 0.2 * popularity_score(S)        // install count normalized across Dojo
+  + 0.2 * popularity_score(S)        // install count normalized across team Playbook
   - 1.0 * already_installed(U, S)    // suppress already-installed skills in "discover" view
 ```
 
@@ -65,7 +68,7 @@ score(U, S) =
 ```yaml
 ---
 name: kebab-case-skill
-description: One-liner for Sensei to score against
+description: One-liner for Coach to score against
 tools: [gmail, calendar]            # required MCP integrations
 roles: [sales, cx, finance]         # optional role tags
 categories: [reporting, drafting]   # topic tags
@@ -85,8 +88,8 @@ type UserProfile = {
 ## Implementation Outline
 
 ### Package boundary
-- `[2026-04-14]` **`packages/sensei`** — new package: scoring function, recommendation query API
-- `[2026-04-14]` **`packages/memory`** — extends with `user_profile` table + skill-index tables (shared with [[02-dojo-skill-marketplace]])
+- `[2026-04-14]` **`packages/coach`** — new package: scoring function, recommendation query API
+- `[2026-04-14]` **`packages/memory`** — extends with `user_profile` table + skill-index tables (shared with [[02-playbook-skill-marketplace]])
 
 ### API
 
@@ -118,24 +121,24 @@ export async function recommendSkills(
 ## Open Questions
 
 - **Role declaration**: mandatory vs. optional at first-run? Leaning optional — don't gate value on a setup step.
-- **Popularity signal**: if skills live in a user's private Git repo (no shared Dojo), popularity is zero. Fall back to tool_match + recency dominant.
+- **Popularity signal**: if skills live in a user's private Git repo (no shared team Playbook), popularity is zero. Fall back to tool_match + recency dominant.
 - **Reasons surfaced to user**: tooltip vs. inline row ("Recommended because: you use Gmail + Calendar"). Leaning tooltip.
 
 ## Open-Source References
 
-- `ramp-glass` Sensei (closed source, conceptual reference only)
+- `ramp-glass` Sensei (closed source, conceptual reference only — Tinker's equivalent is Coach)
 - Simple recommendation patterns: weighted linear scoring is intentionally minimal; don't over-engineer v1
 
 ## Acceptance Criteria
 
-- [ ] Sensei recommends 3–5 skills on FirstRun based on connected tools + declared role
+- [ ] Coach recommends 3–5 skills on FirstRun based on connected tools + declared role
 - [ ] Today pane shows a "Skills for you" widget with fresh recommendations
-- [ ] Skill browser default sort uses Sensei score
+- [ ] Skill browser default sort uses Coach score
 - [ ] Hard filter on tool_match prevents recommending skills the user can't run
 - [ ] Recommendations exclude already-installed skills
 - [ ] `reasons` field populated for UI tooltips
 
 ## Connections
-- [[02-dojo-skill-marketplace]] — hard dependency
-- [[ramp-glass]] — Sensei reference
+- [[02-playbook-skill-marketplace]] — hard dependency
+- [[ramp-glass]] — Sensei (Ramp's equivalent, the naming heritage we dropped)
 - [[03-memory-pipeline]] — recency signal source

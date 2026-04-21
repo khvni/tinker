@@ -30,7 +30,7 @@ Every 24 hours (and on demand), mine connected MCP integrations (Gmail, Calendar
 ### v2 / later
 - Cross-tool relationship inference (e.g., "this person on Calendar is the same as this Linear assignee")
 - Temporal decay / stale-fact pruning
-- Proactive suggestions based on memory state (Sensei-adjacent)
+- Proactive suggestions based on memory state (Coach-adjacent — see [[05-coach-skill-discovery]])
 
 ## Architecture
 
@@ -48,7 +48,7 @@ Every 24 hours (and on demand), mine connected MCP integrations (Gmail, Calendar
       slack/
       ...
     logs/
-    dojo/
+    skills/                         # Playbook lives here (renamed 2026-04-20 per D24)
 ```
 
 **Invariant:** top-level vault is user-owned; `.tinker/mirrors/<service>/` is app-owned and wipeable.

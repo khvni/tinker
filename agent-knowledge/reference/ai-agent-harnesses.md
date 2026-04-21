@@ -77,7 +77,7 @@ An **agent harness** is the runtime layer around an LLM that gives it persistent
 
 ## Related Tools and Add-ons
 
-- **ClawHub** — OpenClaw community skill marketplace (44K+ skills) → Tinker analog is [[02-dojo-skill-marketplace]]
+- **ClawHub** — OpenClaw community skill marketplace (44K+ skills) → Tinker analog is [[02-playbook-skill-marketplace]]
 - **clawchief** (Ryan Carson) — OpenClaw-based EA stack with priority-map.md, auto-resolver.md, tasks.md, HEARTBEAT.md, cron jobs
 - **awesome-design-md** (VoltAgent) — 31 DESIGN.md files from Stripe, Vercel, Notion, Linear, Apple
 - **agentmemory** (rohitg00) — open-source Karpathy LLM wiki pattern

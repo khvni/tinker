@@ -496,7 +496,7 @@ const ChatTab = (): JSX.Element => {
           Memory loaded · 3 recent entities · vault indexed 4m ago
         </span>
         <Badge variant="skill" size="small">
-          sensei
+          coach
         </Badge>
       </div>
 

@@ -15,7 +15,7 @@ import {
 import { DEFAULT_USER_ID, type OpencodeConnection } from '../../bindings.js';
 import { IntegrationsStrip, type MCPStatus } from '../components/IntegrationsStrip.js';
 import { Chat } from '../panes/Chat.js';
-import { Dojo } from '../panes/Dojo.js';
+import { Playbook } from '../panes/Playbook.js';
 import { SchedulerPane } from '../panes/SchedulerPane.js';
 import { Settings } from '../panes/Settings.js';
 import { Today } from '../panes/Today.js';
@@ -334,7 +334,7 @@ export const Workspace = ({
             onWorkspacePreferencesChange={handleWorkspacePreferencesChange}
           />
         ),
-        dojo: (props) => <Dojo {...props} />,
+        playbook: (props) => <Playbook {...props} />,
         file: (props) => <CodeRenderer {...props} />,
         markdown: (props) => <MarkdownRenderer {...props} vaultRevision={vaultRevision} />,
         html: (props) => <HtmlRenderer {...props} />,
@@ -427,7 +427,7 @@ export const Workspace = ({
         });
 
       event.api.panels
-        .filter((panel) => panel.id === 'dojo')
+        .filter((panel) => panel.id === 'playbook')
         .forEach((panel) => {
           panel.api.updateParameters({
             skillStore,
@@ -459,7 +459,7 @@ export const Workspace = ({
       });
 
     api.panels
-      .filter((panel) => panel.id === 'dojo')
+      .filter((panel) => panel.id === 'playbook')
       .forEach((panel) => {
         panel.api.updateParameters({ skillStore, vaultPath, onActiveSkillsChanged });
       });

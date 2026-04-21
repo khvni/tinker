@@ -14,7 +14,7 @@ export const buildSkillContext = (skills: Skill[]): string | null => {
   }
 
   const header =
-    'The following Dojo skills are active for this session. Follow the instructions when their "When to Use This" triggers fire.';
+    'The following Playbook skills are active for this session. Follow the instructions when their "When to Use This" triggers fire.';
 
   return [header, '', ...active.map(skillSection)].join('\n\n');
 };
