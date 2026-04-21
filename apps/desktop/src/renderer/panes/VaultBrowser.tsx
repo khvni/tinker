@@ -3,7 +3,7 @@ import { Badge } from '@tinker/design';
 import type { MemoryStore } from '@tinker/shared-types';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { relativeVaultPath, resolveVaultPath, walkVaultFiles } from '@tinker/memory';
-import { getPaneKindForPath, getPanelIdForPath, getPanelTitleForPath } from '../renderers/file-utils.js';
+import { getTabKindForPath, getPanelIdForPath, getPanelTitleForPath } from '../renderers/file-utils.js';
 import { useDockviewApi } from '../workspace/DockviewContext.js';
 
 type VaultBrowserParams = {
@@ -104,7 +104,7 @@ export const VaultBrowser = ({ params, vaultRevision }: VaultBrowserProps): JSX.
       return;
     }
 
-    const component = getPaneKindForPath(absolutePath);
+    const component = getTabKindForPath(absolutePath);
     const panelId = getPanelIdForPath(component, absolutePath);
     const existingPanel = dockviewApi.panels.find((panel) => panel.id === panelId);
 

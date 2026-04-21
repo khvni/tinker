@@ -51,7 +51,7 @@ export const getPanelIdForPath = (component: TabKind, path: string): string => {
   return `${component}:${path}`;
 };
 
-export const getPaneKindForPath = (path: string): TabKind => {
+export const getTabKindForPath = (path: string): TabKind => {
   const extension = getFileExtension(path);
 
   if (extension === '.md') {

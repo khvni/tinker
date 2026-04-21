@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getPaneKindForPath, getPanelIdForPath } from '../renderers/file-utils.js';
+import { getTabKindForPath, getPanelIdForPath } from '../renderers/file-utils.js';
 import { openWorkspaceFile } from './file-open.js';
 
 const createPanelApi = () => {
@@ -14,7 +14,7 @@ describe('openWorkspaceFile', () => {
     const panelApi = createPanelApi();
     const api = {
       activePanel: { id: 'something-else' },
-      panels: [{ id: getPanelIdForPath(getPaneKindForPath('/vault/note.ts'), '/vault/note.ts'), api: panelApi }],
+      panels: [{ id: getPanelIdForPath(getTabKindForPath('/vault/note.ts'), '/vault/note.ts'), api: panelApi }],
       addPanel: vi.fn(),
     };
 

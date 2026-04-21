@@ -1,5 +1,5 @@
 import type { TabKind } from '@tinker/shared-types';
-import { getPaneKindForPath, getPanelIdForPath, getPanelTitleForPath } from '../renderers/file-utils.js';
+import { getTabKindForPath, getPanelIdForPath, getPanelTitleForPath } from '../renderers/file-utils.js';
 
 type WorkspacePanel = {
   id: string;
@@ -29,7 +29,7 @@ const getReferencePanelId = (api: WorkspaceDockviewApi): string | null => {
 };
 
 export const openWorkspaceFile = (api: WorkspaceDockviewApi, absolutePath: string): void => {
-  const component = getPaneKindForPath(absolutePath);
+  const component = getTabKindForPath(absolutePath);
   const panelId = getPanelIdForPath(component, absolutePath);
   const existingPanel = api.panels.find((panel) => panel.id === panelId);
 
