@@ -85,7 +85,8 @@
   border-color: transparent;
 }
 .tk-iconbutton--danger:hover:not(.tk-iconbutton--disabled) {
-  background: rgba(239, 68, 68, 0.28);
+  background: var(--color-error-soft);
+  filter: brightness(1.08);
 }
 
 .tk-iconbutton--disabled {
