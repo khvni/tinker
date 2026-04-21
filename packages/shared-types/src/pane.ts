@@ -1,0 +1,35 @@
+// Pane types for the Tinker MVP workspace.
+//
+// `TinkerPaneKind` is the discriminator shipped in `@tinker/panes` registrations
+// (`PaneRegistry<TinkerPaneKind>`, see spec [[20-mvp-panes-workspace]]).
+// `TinkerPaneData` is the discriminated payload stored on each `Pane<TData>`
+// instance and persisted inside `WorkspaceState<TinkerPaneData>`.
+//
+// Adding a fifth kind is an intentional scope change: extend the union, register
+// the renderer, and update any exhaustive switches in the same PR.
+
+/**
+ * Union of pane kinds shipped in the MVP workspace.
+ *
+ * Narrower than the legacy `TabKind` in `layout.ts` (which covered deferred
+ * panes like `today`, `scheduler`, `playbook`, `vault-browser`). `TabKind` is
+ * retired during M1.8–1.9 once the Dockview registry is gone.
+ */
+export type TinkerPaneKind = 'chat' | 'file' | 'settings' | 'memory';
+
+/**
+ * Discriminated union of pane payloads, keyed by `kind`.
+ *
+ * Narrow via the `kind` tag:
+ *
+ *   if (data.kind === 'file') { data.path; data.mime; }
+ *
+ * `chat`, `settings`, and `memory` carry no payload fields in the MVP but keep
+ * the `kind` discriminator so the union stays narrowable and so future payload
+ * additions don't require touching call sites that already destructure `kind`.
+ */
+export type TinkerPaneData =
+  | { readonly kind: 'chat' }
+  | { readonly kind: 'file'; readonly path: string; readonly mime: string }
+  | { readonly kind: 'settings' }
+  | { readonly kind: 'memory' };
