@@ -1,7 +1,10 @@
 ---
 type: concept
 tags: [chat, sessions, performance]
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** Perf feature; revisit once sessions exceed ~1000 messages. Do not start work until MVP ships.
 
 # Feature 14 — Session history windowing
 

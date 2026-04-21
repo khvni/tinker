@@ -3,7 +3,10 @@ type: concept
 tags: [tinker, feature, scheduler, automation, cron]
 status: review
 priority: p1
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** `@tinker/scheduler` package stays in-tree but is not wired to the MVP UI. Do not start work until MVP ships.
 
 # Feature 04 — Native Scheduler
 

@@ -3,7 +3,10 @@ type: concept
 tags: [tinker, feature, mcp, proxy, performance]
 status: not started
 priority: p1
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP spawns its three preloaded MCPs directly via OpenCode (see [[27-mvp-builtin-mcp]]). Proxy layer becomes relevant only at scale (~10+ MCPs or cross-session reuse) — neither is MVP scope.
 
 # Feature 08 — MCP Proxy Layer
 

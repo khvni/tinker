@@ -7,6 +7,8 @@ tags: [tinker, vision, product]
 
 > Open-source Glass for the nontechnical masses. Raise the floor so every team member can move at AI speed without needing to know what an MCP server is.
 
+> **[2026-04-21] MVP lens per [[decisions]] D25.** Vision intact. Scope narrowed for v0.1 to seven pillars that demonstrate the core loop: open a folder → chat with OpenCode → markdown-rendered replies → open any file referenced → search memory via built-in MCPs. Identity, skills, scheduler, attention, sidebar, host-service, and sub-agents are post-MVP. See `tinker-prd.md` §2 + `context/tasks.md` M1–M7.
+
 ## The Wrapper Pattern
 
 - `[2026-04-14]` Claude Cowork wraps the **Claude Agent SDK** and serves a GUI over it
@@ -44,7 +46,7 @@ tags: [tinker, vision, product]
 ## Tech Foundation (see `tinker-prd.md` for full spec)
 
 - `[2026-04-14]` **Tauri v2** desktop shell (Rust core, webview UI)
-- `[2026-04-14]` **React 19 + Dockview** workspace (split panes, persistent layout)
+- `[2026-04-14]` **React 19 + `@tinker/panes`** workspace (recursive split tree + movable tabs, persistent layout; supersedes Dockview per [[decisions]] D16)
 - `[2026-04-14]` **OpenCode sidecar** (localhost HTTP + SSE; `@opencode-ai/sdk`)
 - `[2026-04-14]` **SQLite** for memory/layout/skill index
 - `[2026-04-14]` **Obsidian-compatible markdown vault** for human-readable knowledge

@@ -3,7 +3,10 @@ type: concept
 tags: [tinker, feature, memory, vault, pipeline]
 status: review
 priority: p2
+deferred: post-mvp
 ---
+
+> **[2026-04-21] MVP subset shipped under [[26-mvp-memory-filesystem]] (M6) per [[decisions]] D25.** MVP memory = flat markdown folder + top-N recency injection. Entity extraction / relationships / FTS deferred. Do not start full pipeline work until MVP ships.
 
 # Feature 03 — Self-Building Memory Pipeline
 

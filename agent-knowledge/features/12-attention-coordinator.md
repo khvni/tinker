@@ -1,7 +1,10 @@
 ---
 type: concept
 tags: [attention, notifications, ux]
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** `@tinker/attention` scaffold stays in-tree (tests passing) but not wired to MVP UI — MVP has one pane. Do not start wiring until MVP ships.
 
 # Feature 12 — Workspace attention coordinator
 

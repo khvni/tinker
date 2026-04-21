@@ -231,6 +231,21 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
   - Don't reintroduce "Dojo" or "Sensei" for Tinker-context surfaces (UI, features, code, decisions). Old session summaries stay as-is (historical record).
 - **Persistence note**: persisted Dockview layouts predating the rename carry `component: 'dojo'` IDs that will fail to render against the new `'playbook'` registry key. We accept this pre-v1 breakage because the full Dockview schema is being retired under [[D16]] — users re-open the pane (via Chat "Save as skill" or future LeftRail nav) and the new snapshot saves with the correct key. Do not add a backwards-compat alias to the component registry (TypeScript forbids unknown `TabKind` keys anyway).
 
+### `[2026-04-21]` D25 — MVP refocus: ship one chat interface perfectly, defer everything else
+
+- **Decision**: Tinker v0.1 ships exactly seven pillars — panes+tabs workspace, folder-scoped sessions, in-line doc renderer, markdown-rendered chat + model picker, context-usage badge, desktop-native memory filesystem, and three preloaded auth-free MCP servers (qmd, smart-connections, exa). Every other feature in the existing backlog (SSO / Better Auth, Playbook, Coach, Scheduler, Attention, Workspace Sidebar, Host-service split, Connection gate, Sub-agents, Session history windowing) is **deferred to post-MVP** and marked as such in the feature files.
+- **Why**:
+  1. **Breadth was drowning depth.** 15 features in-flight, each 30-70% done, zero perfect. A foundation nobody is shipping on top of is not a foundation — it's overhead.
+  2. **MVP must demonstrate one loop perfectly.** Open a folder → chat with OpenCode in it → see markdown-rendered replies → open any file referenced → search memory via built-in MCP. If that loop is tight, every deferred feature slots in cleanly. If it isn't, deferred features inherit brokenness.
+  3. **Atomic tasks enable async agent parallelism.** Thin slices (≤1 PR each, explicit acceptance criteria) let delegated agents open PRs without coordinating, which is the unlock the user is targeting.
+- **How to apply**:
+  - Backlog enumerated in `agent-knowledge/context/tasks.md` under **M0 — MVP** section. Post-MVP table stays below as historical scope.
+  - New MVP feature specs live in `agent-knowledge/features/20–27-mvp-*.md`. Old feature files (01–15) keep their content but gain `deferred: post-mvp` in frontmatter + a header note pointing to D25.
+  - Any PR outside the M0 table without an explicit "unblocks MVP task X" rationale gets rejected — even if code is good.
+  - Re-entry bar for a deferred feature: MVP must ship + user must ask for it. No pre-emptive "while we're here" adds.
+  - Deletion vs deferral: feature *files* stay (reasoning > LOC). Runtime *code* for deferred features (scheduler, playbook, attention, auth-sidecar) may stay in-tree but MUST NOT be wired into `Workspace.tsx` / `App.tsx` routing. Dead code is acceptable short-term; dead code on the critical-path UI is not.
+- **Non-goals reaffirmed** (from existing PRD §6, relisted so MVP agents don't drift): multi-provider model support, cloud sync, mobile dispatch, enterprise SSO, legacy desktop-shell compatibility, prompt marketplace. Plus D25 adds: no Better Auth in MVP (identity layer deferred — MVP sessions are anonymous, folder-scoped), no entity extraction / FTS indexing (memory = flat markdown files read top-N-recent), no vault-wide indexing (folder scope = session scope), no sub-agent orchestration, no scheduled jobs.
+
 ## Open Questions (not yet decided)
 
 - **Scheduler implementation**: in-process TypeScript cron vs. OS-level (launchd/Task Scheduler/systemd). Leaning in-process for cross-platform simplicity; revisit when app sleep/wake behavior is tested.

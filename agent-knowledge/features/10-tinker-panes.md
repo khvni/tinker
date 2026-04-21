@@ -1,7 +1,10 @@
 ---
 type: concept
 tags: [panes, layout, design-system]
+mvp_linked: true
 ---
+
+> **[2026-04-21] Architectural reference retained; MVP execution continues under [[20-mvp-panes-workspace]] (M1) per [[decisions]] D25.** This file stays canonical for `@tinker/panes` architecture + API shape. Atomic MVP tasks live in `context/tasks.md` §M1.
 
 # Feature 10 — `@tinker/panes` workspace layout
 

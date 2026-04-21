@@ -4,7 +4,10 @@ tags: [tinker, feature, skills, playbook, marketplace]
 status: review
 priority: p1
 aliases: [dojo-skill-marketplace]
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP has no skills system; markdown + MCP covers the same surface at lower complexity. Do not start work until MVP ships.
 
 # Feature 02 — Playbook Skill Marketplace
 

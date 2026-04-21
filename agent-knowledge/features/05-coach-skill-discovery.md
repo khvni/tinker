@@ -4,7 +4,10 @@ tags: [tinker, feature, coach, skills, discovery, recommendation]
 status: not-started
 priority: p2
 aliases: [sensei-skill-discovery]
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** Depends on Playbook ([[02-playbook-skill-marketplace]]) which is also deferred. Do not start work until MVP ships.
 
 # Feature 05 — Coach Skill Discovery
 

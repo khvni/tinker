@@ -1,7 +1,10 @@
 ---
 type: concept
 tags: [bootstrapping, host-service, ux]
+deferred: post-mvp
 ---
+
+> **[2026-04-21] Full feature deferred — post-MVP per [[decisions]] D25.** MVP ships a minimal variant inside M7.8 (see [[27-mvp-builtin-mcp]]) that waits for the three preloaded MCPs before enabling the composer. Full health/retry UX deferred.
 
 # Feature 15 — Connection gate
 

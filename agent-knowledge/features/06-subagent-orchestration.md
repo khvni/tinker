@@ -3,7 +3,10 @@ type: concept
 tags: [tinker, feature, subagents, orchestration, opencode]
 status: not-started
 priority: p2
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP runs one agent per session. Do not start work until MVP ships.
 
 # Feature 06 — Sub-Agent Orchestration
 

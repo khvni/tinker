@@ -3,7 +3,10 @@ type: concept
 tags: [tinker, feature, sso, oauth, mcp, integrations, auth]
 status: in progress
 priority: p1
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP sessions are anonymous and folder-scoped (no sign-in). Scope preserved; do not start work until MVP (M1–M7 in `context/tasks.md`) ships.
 
 # Feature 01 — SSO Connector Layer
 

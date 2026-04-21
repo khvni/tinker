@@ -1,7 +1,10 @@
 ---
 type: concept
 tags: [workspace, sidebar, nav]
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP has no multi-workspace UX; sidebar is premature. Do not start work until MVP ships.
 
 # Feature 13 — Workspace sidebar (vertical)
 

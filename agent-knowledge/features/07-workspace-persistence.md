@@ -3,7 +3,10 @@ type: concept
 tags: [tinker, feature, workspace, dockview, ui, persistence]
 status: review
 priority: p1
+deferred: post-mvp-partial
 ---
+
+> **[2026-04-21] MVP scope folded into [[20-mvp-panes-workspace]] (M1) per [[decisions]] D25.** MVP ships a single-Chat-pane default; multi-pane split defaults + tab-group persistence nuance deferred. Persistence still via `WorkspaceState<TData>`.
 
 # Feature 07 — Workspace Persistence + Split-Pane UI
 

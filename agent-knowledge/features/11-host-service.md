@@ -1,7 +1,10 @@
 ---
 type: concept
 tags: [host-service, device, architecture]
+deferred: post-mvp
 ---
+
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** Premature abstraction for single-user MVP. Revisit when headless mode or a mobile companion becomes real scope. Do not start work until MVP ships.
 
 # Feature 11 — Device ↔ Host-service split
 
