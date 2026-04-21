@@ -124,7 +124,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | Task | Linear | Priority | Status | PR | Notes |
 |------|--------|----------|--------|----|-------|
-| M2.3 Tauri command `open_folder_picker` | TIN-17 | p1 | review | (pending) | `apps/desktop/src-tauri/src/commands/dialog.rs`, typed wrapper in `apps/desktop/src/bindings.ts` |
+| M2.3 Tauri command `open_folder_picker` | TIN-17 | p1 | review | #19 | `apps/desktop/src-tauri/src/commands/dialog.rs`, typed wrapper in `apps/desktop/src/bindings.ts` |
 
 ## How to Update This File
 
