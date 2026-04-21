@@ -89,6 +89,12 @@ Open work + status + priorities. Agents update this file when starting, progress
 | `ask_user` overlay component | p2 | not started | Chat migration | Per [[D20]]. Keyboard-navigable. |
 | Chat pane wires `ask_user` events through overlay | p2 | not started | overlay component | Host-service emits `ask_user` events over SSE; Chat pane renders overlay. |
 
+### M3 — In-line document renderer (MVP pillar per D25)
+
+| Task | Priority | Status | Depends on | Notes |
+|------|----------|--------|------------|-------|
+| TIN-27 — Research: pick inline renderer libraries | p1 | review | — | PR #TBD. Deliverable: [[inline-renderers]]. Blocks M3.3–M3.6. |
+
 ## Cross-cutting / Infrastructure
 
 | Task | Priority | Status | Notes |
