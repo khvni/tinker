@@ -93,7 +93,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 | Task | Priority | Status | Depends on | Notes |
 |------|----------|--------|------------|-------|
-| TIN-27 — Research: pick inline renderer libraries | p1 | review | — | PR #TBD. Deliverable: [[inline-renderers]]. Blocks M3.3–M3.6. |
+| TIN-27 — Research: pick inline renderer libraries | p1 | review | — | PR #18. Deliverable: [[inline-renderers]]. Blocks M3.3–M3.6. |
 
 ## Cross-cutting / Infrastructure
 
