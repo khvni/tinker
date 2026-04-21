@@ -3,10 +3,10 @@ type: concept
 tags: [tinker, feature, sso, oauth, mcp, integrations, auth]
 status: in progress
 priority: p1
-deferred: post-mvp
+deferred: post-mvp-partial
 ---
 
-> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP sessions are anonymous and folder-scoped (no sign-in). Scope preserved; do not start work until MVP (M1–M7 in `context/tasks.md`) ships.
+> **[2026-04-21] Consumer OAuth subset moved into MVP under [[28-mvp-identity]] (M8) per [[decisions]] D25 amendment.** Google + GitHub + Microsoft consumer providers via Better Auth ship in MVP. Enterprise SSO (SAML / SCIM / dedicated-tenant federation, cross-tenant integration hints) stays enterprise-fork only per D1 / D8 and remains deferred. Only the enterprise portions of this spec are deferred; consumer portions execute under M8 tasks in `context/tasks.md`.
 
 # Feature 01 — SSO Connector Layer
 

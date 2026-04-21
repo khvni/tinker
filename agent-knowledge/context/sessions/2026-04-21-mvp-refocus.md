@@ -63,3 +63,25 @@ These gate downstream impl tasks. An async agent should pick these up first.
 - **Linear vs tasks.md authority**: recommended Linear for tracking + tasks.md as text mirror. User to decide.
 - **Where to put deferred pane .tsx files**: delete vs `apps/desktop/_deferred/`. M3.11 defers this to the implementing agent; both options are fine as long as they're removed from build.
 - **Exact OpenCode SDK field names** for usage + picker parity: gated on M4.1 + M5.1 research tasks.
+
+## Amendment — same-day scope correction (2026-04-21)
+
+User corrected the deferral call on identity: **Better Auth IS MVP**. Chat histories are per-user and need to persist to the session folder so the app knows what was said where.
+
+Changes applied on top of the original commit:
+
+- **D25 amended** — removed "no Better Auth in MVP" non-goal; added explicit in-scope bullet for Google/GitHub/Microsoft consumer OAuth + per-user chat-history persistence; enterprise SSO (SAML/SCIM) stays deferred per D1/D8.
+- **Eighth pillar added**: M8 Identity + per-user chat-history persistence.
+- **PRD** §2.8 added; §1 summary + §3 architecture diagrams + §3 runtime flows all updated to include sign-in, per-user subdirs, JSONL history, silent sign-in. §5 quality bar + §7 acceptance checklist + §6 non-goals reframed.
+- **tasks.md** — new M8 section with 15 atomic tasks (1 L, 7 M, 7 S). M2 gains 2.11 (JSONL writer) + 2.12 (hydration) + updated rows for user_id FK + current-user filtering. M6 rewritten to use `<memory_root>/<user-id>/` per-user subdir. M7 7.7 extended to trigger on user switch too. Acceptance checklist now covers sign-in, silent re-auth, user-switch scoping, JSONL persistence, keychain discipline.
+- **Features** — `01-sso-connector-layer.md` banner updated from "DEFERRED" to "post-mvp-partial": consumer subset moves to M8, enterprise stays deferred. New `28-mvp-identity.md` spec created.
+- **Post-MVP table in tasks.md** — row 01 updated to reflect partial deferral (enterprise only).
+
+What stayed deferred from the original refocus: Playbook (02), Coach (05), memory-pipeline-full (03), scheduler (04), sub-agents (06), MCP-proxy-layer (08), host-service (11), attention-wiring (12), sidebar (13), session-history-windowing (14), full connection-gate (15). Plus: additional MCP integrations beyond the three preloaded, automations, custom agents.
+
+Research tasks now four:
+- M3.1 → `reference/inline-renderers.md`
+- M4.1 → `reference/opencode-desktop-model-picker.md`
+- M5.1 → `reference/opencode-sdk-usage.md`
+- **M8.1 → `reference/better-auth-config.md`** (new — blocks provider wiring)
+- **M8.14 → `reference/chat-history-format.md`** (new — schema for 2.11 + 2.12)

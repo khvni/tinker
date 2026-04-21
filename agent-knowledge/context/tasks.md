@@ -40,7 +40,7 @@ Open work + status + priorities. Agents update this file when starting, progress
 
 ## M0 — MVP (v0.1 ship target)
 
-Seven pillars. Atomic tasks per pillar. Pillars are the TOP-LEVEL goals from [[decisions]] D25.
+Eight pillars (seven product surfaces + Better Auth identity for per-user chat-history persistence). Atomic tasks per pillar. Pillars are the TOP-LEVEL goals from [[decisions]] D25.
 
 ### M1 — Panes+tabs workspace (cohesive layout)
 Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
@@ -58,21 +58,23 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 | 1.9 | Remove `dockview-react` from `apps/desktop/package.json`. Run `pnpm install`. Verify `pnpm typecheck` passes. | S | 1.8 | not started | Kills the dep. |
 | 1.10 | Layout snapshot migration: detect old Dockview-shaped JSON in SQLite `layouts` table → delete + re-seed default. Log once. | S | 1.9 | not started | One-shot. Acceptable data loss on upgrade (pre-v1). |
 
-### M2 — Folder-scoped session (every chat starts in a local directory)
-Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Independent of Better Auth (deferred).
+### M2 — Folder-scoped session (every chat starts in a local directory, per-user)
+Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to current user from M8.
 
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
-| 2.1 | Add `Session` type in `@tinker/shared-types`: `{ id, folderPath, createdAt, lastActiveAt, modelId?: string }`. | S | — | not started | Shared types only. |
-| 2.2 | SQLite `sessions` table + migrations in `@tinker/memory/database.ts`. CRUD helpers in new `packages/memory/src/session-store.ts`. | M | 2.1 | not started | Mirrors existing `scheduler-store` shape. |
+| 2.1 | Add `Session` type in `@tinker/shared-types`: `{ id, userId, folderPath, createdAt, lastActiveAt, modelId?: string }`. Also export `User` type placeholder (expanded in M8.1). | S | — | not started | Shared types only. |
+| 2.2 | SQLite `sessions` table + migrations in `@tinker/memory/database.ts` (columns: `id, user_id, folder_path, created_at, last_active_at, model_id`; FK `user_id → users(id)` once M8.3 lands — add the FK in the same PR if possible, else gate behind a follow-up). CRUD helpers in new `packages/memory/src/session-store.ts`. | M | 2.1, 8.3 | not started | Mirrors existing `scheduler-store` shape. |
 | 2.3 | Rust Tauri command `open_folder_picker() -> Result<String, Error>` using `tauri-plugin-dialog`. | S | — | not started | Shell to OS picker. |
-| 2.4 | Rust Tauri command `start_opencode(folder_path: String) -> Result<OpencodeHandle, Error>` that spawns `opencode serve --cwd <folder_path>`. Health-poll until ready. Returns `{ baseUrl, pid }`. | M | — | not started | Extends existing sidecar lifecycle. No mutate-then-call per D22. |
+| 2.4 | Rust Tauri command `start_opencode(folder_path, user_id, memory_subdir) -> Result<OpencodeHandle, Error>` that spawns `opencode serve --cwd <folder>` with `SMART_VAULT_PATH=<memory_subdir>`. Health-poll until ready. Returns `{ baseUrl, pid }`. | M | — | not started | Extends sidecar lifecycle. Per-call config per D22. |
 | 2.5 | Rust Tauri command `stop_opencode(pid: u32)` for session close. | S | 2.4 | not started | Clean shutdown. |
-| 2.6 | First-run screen: full-window "Pick a folder to start" → `<Button>Choose folder…</Button>` → folder picker → creates session → navigates into workspace. | M | 2.2, 2.3, 2.4 | not started | Replaces existing FirstRun.tsx. Lives in `routes/first-run.tsx`. |
-| 2.7 | Session restore: on app launch, list sessions from SQLite ordered by `lastActiveAt`. If ≥1, show session switcher; if 0, show first-run. | M | 2.2 | not started | Simple list UI using `@tinker/design`. |
+| 2.6 | First-run screen (post-sign-in): full-window "Pick a folder to start" → `<Button>Choose folder…</Button>` → folder picker → creates session bound to current user → navigates into workspace. | M | 2.2, 2.3, 2.4, 8.5 | not started | Replaces existing FirstRun.tsx. Lives in `routes/first-run.tsx`. |
+| 2.7 | Session restore: on app launch (post-auth), list sessions from SQLite **filtered by `user_id = currentUser.id`** ordered by `lastActiveAt`. If ≥1, show session switcher; if 0, show folder picker. | M | 2.2, 8.5 | not started | Simple list UI using `@tinker/design`. |
 | 2.8 | "New session" button in session switcher → folder picker → spawn OpenCode → open new Chat pane tab. | S | 2.6 | not started | Same code path as first-run. |
-| 2.9 | Active session indicator in workspace titlebar: shows folder basename + monospace short path. | S | 2.7 | not started | Purely cosmetic surface. |
+| 2.9 | Active session indicator in workspace titlebar: shows folder basename + monospace short path + current user's avatar (avatar from M8.10). | S | 2.7, 8.10 | not started | Purely cosmetic surface. |
 | 2.10 | On app quit, stop all running OpenCode instances (best-effort; survive kill -9 via manifest). | S | 2.5 | not started | Per D22 coordinator pattern. |
+| 2.11 | Chat history JSONL writer: every OpenCode SSE event from the active session appends one line to `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Buffered + flushed per event. Create dirs on first write. | M | 2.2, 4.2 | not started | Stream-persistence bridge. Lives in `packages/bridge/src/chat-history.ts`. |
+| 2.12 | Chat history hydration: on session open, read JSONL (if exists) and seed Chat pane with prior messages before the SSE subscription resumes. | M | 2.11 | not started | Hydrate-before-stream. Render from JSONL via same markdown path as live events. |
 
 ### M3 — In-line document renderer
 Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
@@ -122,34 +124,55 @@ Spec: [[25-mvp-context-badge]] · Depends on: M4.2
 | 5.3 | Wire badge into Chat pane header. Subscribes to same SSE stream as chat; recomputes on each message. | S | 5.2, 4.4 | not started | One call site. |
 | 5.4 | Playground entry in `routes/design-system.tsx` with three states (low/mid/high). Per D14 canonical rule. | S | 5.2 | not started | Design-system hygiene. |
 
-### M6 — Memory as desktop-native filesystem
-Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5
+### M6 — Memory as desktop-native filesystem (per-user subdir)
+Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5, M8.3 (current user resolved)
 
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | 6.1 | Add `app_settings` SQLite table (key/value JSON) in `@tinker/memory/database.ts`. CRUD helpers in new `packages/memory/src/settings-store.ts`. | S | — | not started | Shared config surface. |
-| 6.2 | Default memory path resolver (TS): macOS `~/Library/Application Support/Tinker/memory`, Linux `~/.local/share/tinker/memory`, Windows `%APPDATA%\Tinker\memory`. Create dir if missing via Tauri fs plugin. | S | — | not started | Platform paths. |
-| 6.3 | On first run: seed `app_settings.memory_path` with resolved default. Subsequent reads go through setting. | S | 6.1, 6.2 | not started | Init hook. |
-| 6.4 | Memory pane (register in M1.5): list `.md` files in memory folder. Click → opens as FilePane tab w/ Markdown renderer (3.9). | M | 6.3, 3.9 | not started | Reuses renderer. |
-| 6.5 | Settings pane: "Memory folder" row with current path + `<Button>Change location…</Button>`. Opens Tauri folder picker → validates writable → updates setting. | M | 6.3 | not started | Single setting surface for MVP. |
-| 6.6 | On memory-path change: move folder contents to new location via Tauri fs plugin. Show `<Progress>` modal. On completion, reload memory pane + emit path-changed event. | M | 6.5 | not started | Filesystem move. |
-| 6.7 | Simple memory injection (MVP): before `session.prompt()`, read up to N most recent `.md` files (default N=5) from memory folder, prepend as `noReply` system context. Existing `bridge/memory-injector.ts` scaffold extended. | M | 6.3, 4.2 | not started | MVP = recency-only. No semantic ranking. |
-| 6.8 | Simple memory append (MVP, toggleable): after assistant response finishes streaming, write `memory/sessions/YYYY-MM-DD-HHMM-<session-id>.md` with the user prompt + final assistant message. Setting `app_settings.memory_auto_append` default `true`. | M | 6.3, 4.4 | not started | Append-only. No summarization yet. |
-| 6.9 | Path-change-propagation: 6.6 triggers 6.7/6.8 to re-resolve path + triggers M7.7 (MCP env var refresh). | S | 6.6, 6.7, 6.8, 7.7 | not started | Cross-pillar hook. |
+| 6.2 | Default memory root resolver (TS): macOS `~/Library/Application Support/Tinker/memory`, Linux `~/.local/share/tinker/memory`, Windows `%APPDATA%\Tinker\memory`. Create dir if missing via Tauri fs plugin. | S | — | not started | Platform root paths. |
+| 6.3 | On first run: seed `app_settings.memory_root` with resolved default. Per-user active path resolves to `<memory_root>/<current-user-id>/` — created if missing on sign-in. | S | 6.1, 6.2, 8.3 | not started | Init hook. |
+| 6.4 | Memory pane (register in M1.5): list `.md` files in the current user's subdir. Click → opens as FilePane tab w/ Markdown renderer (3.9). | M | 6.3, 3.9 | not started | Reuses renderer. |
+| 6.5 | Settings pane: "Memory folder" row with current root path + `<Button>Change location…</Button>`. Opens Tauri folder picker → validates writable → updates setting. | M | 6.3 | not started | Single setting surface for MVP. |
+| 6.6 | On memory-root change: move folder contents (including all `<user-id>/` subdirs) to new location via Tauri fs plugin. Show `<Progress>` modal. On completion, reload memory pane + emit path-changed event. | M | 6.5 | not started | Filesystem move. |
+| 6.7 | Simple memory injection (MVP): before `session.prompt()`, read up to N most recent `.md` files (default N=5) from `<memory_root>/<current-user-id>/`, prepend as `noReply` system context. Existing `bridge/memory-injector.ts` scaffold extended. | M | 6.3, 4.2 | not started | Recency-only. No semantic ranking. |
+| 6.8 | Simple memory append (MVP, toggleable): after assistant response finishes streaming, write `<memory_root>/<user-id>/sessions/YYYY-MM-DD-HHMM-<session-id>.md` with the user prompt + final assistant message. Setting `app_settings.memory_auto_append` default `true`. | M | 6.3, 4.4 | not started | Append-only. No summarization yet. |
+| 6.9 | Path-change / user-switch propagation: 6.6 AND M8.8 both trigger 6.7/6.8 to re-resolve path + trigger M7.7 (MCP env var refresh). | S | 6.6, 6.7, 6.8, 7.7, 8.8 | not started | Cross-pillar hook. |
 
 ### M7 — Built-in MCP servers (qmd, smart-connections, exa)
 Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
 
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
-| 7.1 | Strip `opencode.json` → only `qmd`, `smart-connections`, `exa`. Remove `github`, `linear`, `better-auth` (auth-gated / deferred). | S | — | not started | File edit. |
+| 7.1 | Strip `opencode.json` → only `qmd`, `smart-connections`, `exa`. Remove `github`, `linear` (additional MCP integrations deferred). Keep `better-auth` entry ONLY if the Better Auth sidecar needs it — otherwise remove (Better Auth in MVP is a local sidecar, not an MCP). | S | — | not started | File edit. |
 | 7.2 | Ensure `exa` works zero-config: it's remote, no env needed. Add boot-time check that calls exa's health MCP. | S | 7.1 | not started | Verify. |
-| 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` (qmd reuses it) = memory path from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | not started | Env var injection at spawn. |
-| 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = memory path from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | not started | Mirror of 7.3. |
+| 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` = `<memory_root>/<current-user-id>/` from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | not started | Env var injection at spawn. |
+| 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = same per-user subdir from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | not started | Mirror of 7.3. |
 | 7.5 | Settings pane: "Integrations" section lists 3 MCPs with status (connected/error). Calls OpenCode SDK `mcp.list()` on mount. | M | 7.1, 6.5 | not started | Status only, no config. |
 | 7.6 | Per-MCP retry button in Settings: calls `mcp.reconnect(name)` SDK method (or restarts sidecar if SDK doesn't expose). | S | 7.5 | not started | Recovery. |
-| 7.7 | Memory-path change triggers MCP refresh: stop OpenCode → respawn with new env → MCPs reconnect. Triggered by 6.9. | M | 7.3, 7.4, 6.6 | not started | Invalidation path. |
+| 7.7 | Memory-root change OR user-switch triggers MCP refresh: stop OpenCode → respawn with new env → MCPs reconnect. Triggered by 6.9 (path change) and 8.8 (sign-out/in). | M | 7.3, 7.4, 6.6, 8.8 | not started | Invalidation path. |
 | 7.8 | First-run verification: on new session launch, wait for all 3 MCPs to report `connected` before enabling the composer. Show `<ConnectionGate>` minimal variant during wait (3-5s typical). | M | 7.5 | not started | Quality bar. |
+
+### M8 — Identity (Better Auth) + per-user chat-history persistence
+Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffold (present) · D2 / D4 / D5
+
+| ID | Task | Size | Depends on | Status | Notes |
+|----|------|------|------------|--------|-------|
+| 8.1 | **Research**: confirm Better Auth v1 config shape for Google + GitHub + Microsoft providers on a Tauri desktop app — loopback redirect URI format, PKCE flow, session/refresh-token handoff. Deliverable: `agent-knowledge/reference/better-auth-config.md` with exact config snippets + redirect URI registrations per provider. | M | — | not started | Research-as-task. Blocks 8.2–8.4. |
+| 8.2 | Add `User` type in `@tinker/shared-types`: `{ id, provider, providerUserId, displayName, avatarUrl?: string, email?: string, createdAt, lastSeenAt }`. | S | — | not started | Shared type. |
+| 8.3 | SQLite `users` table in `@tinker/memory/database.ts` (columns mirror `User` type, unique composite index on `(provider, provider_user_id)`). CRUD helpers in new `packages/memory/src/user-store.ts`. | M | 8.2 | not started | Seeds on every successful sign-in (upsert). |
+| 8.4 | `@tinker/auth-sidecar` wire Google provider per 8.1: provider config, loopback URI, PKCE flow, callback handler. Sidecar exposes HTTP endpoints `POST /auth/start`, `GET /auth/callback`, `POST /auth/logout`, `GET /auth/session`. | M | 8.1 | not started | Extend existing `packages/auth-sidecar/src/main.ts`. |
+| 8.5 | `@tinker/auth-sidecar` wire GitHub provider per 8.1. | S | 8.4 | not started | Config-only once 8.4 lands. |
+| 8.6 | `@tinker/auth-sidecar` wire Microsoft (consumer) provider per 8.1. | S | 8.4 | not started | Consumer/personal only. No tenant federation. |
+| 8.7 | Rust Tauri command `start_auth_sidecar() -> Result<AuthHandle, Error>` spawns the auth sidecar + returns base URL. Rust binds OS-level loopback redirect URIs needed by the sidecar (Google, GitHub, Microsoft). | M | 8.4 | not started | Mirrors OpenCode sidecar lifecycle (coordinator pattern D22). |
+| 8.8 | Rust keychain bridge: Tauri commands `save_refresh_token(provider, user_id, token)`, `load_refresh_token(provider, user_id) -> Option<String>`, `clear_refresh_token(provider, user_id)` via `tauri-plugin-keyring`. | M | — | not started | D5: only keychain stores bearer creds. |
+| 8.9 | Sign-in UX: first-run screen shows three buttons (Google / GitHub / Microsoft). Click → renderer calls `auth/start` → opens system browser to provider → redirect comes back to loopback → renderer polls `auth/session` until `authenticated: true` → upserts `users` row → navigates to folder picker. | L | 8.4, 8.5, 8.6, 8.7, 8.3 | not started | Subdivide if >500 LOC: split into (a) provider-picker screen, (b) in-flight "waiting for browser…" screen, (c) session-poll hook. |
+| 8.10 | Current-user context: renderer `useCurrentUser()` hook reads session + hydrates from `users` table. App boot blocks on this until resolved or unauthenticated. | M | 8.9 | not started | Single source of truth for `user_id` everywhere. |
+| 8.11 | Settings pane: "Account" section shows current user's name + avatar + provider + `<Button>Sign out</Button>`. Sign-out clears keychain + returns to sign-in screen. | M | 8.10 | not started | Routes through `clear_refresh_token` + resets `useCurrentUser` state. |
+| 8.12 | Auto-sign-in on cold launch: Rust checks keychain for any refresh token → if found, Better Auth sidecar validates → `useCurrentUser` resolves without showing sign-in screen. If invalid, fall through to sign-in. | M | 8.8, 8.10 | not started | Silent sign-in. |
+| 8.13 | Per-user memory subdir creation: on successful sign-in, ensure `<memory_root>/<user-id>/` exists. On user-switch, re-resolve. Triggers M6.9. | S | 8.3, 6.3 | not started | One-liner wired to 8.10's sign-in callback. |
+| 8.14 | Chat-history JSONL file format doc: one line per OpenCode SSE event, `{ ts, event, data }`. Deliverable: short `agent-knowledge/reference/chat-history-format.md`. | S | — | not started | Schema reference for M2.11 + M2.12. |
+| 8.15 | Integration test: sign in as User A → pick folder F → send message → sign out → sign in as User B → folder F session NOT visible in switcher → User B picks folder F → new JSONL created under `.tinker/chats/<user-b-id>/`. Doc result in `docs/mvp-verification.md`. | S | 8.11, 2.7, 2.11 | not started | End-to-end identity-scoping proof. |
 
 ### Cross-cutting (small stuff that any task can inherit)
 
@@ -161,16 +184,19 @@ Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
 
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
 
-- [ ] All M1-M7 rows status = `done`.
+- [ ] All M1-M8 rows status = `done`.
 - [ ] `pnpm -r typecheck` green.
 - [ ] `pnpm -r test` green (including `@tinker/panes` 69+ tests).
-- [ ] `pnpm tauri dev` opens first-run → folder picker → workspace → sends message → receives markdown-rendered reply.
+- [ ] `pnpm tauri dev` opens sign-in → pick provider → OAuth → folder picker → workspace → sends message → receives markdown-rendered reply.
+- [ ] Silent sign-in works on relaunch (no re-auth if refresh token valid in keychain).
+- [ ] Sign-out + sign-in as different provider shows a different set of sessions and memory subdir.
 - [ ] Context badge updates during streaming.
 - [ ] Opening a `.pdf`, `.xlsx`, `.md`, `.html`, `.docx` via chat link works.
-- [ ] Memory folder default created + changeable via Settings.
+- [ ] Memory root default created + changeable via Settings; per-user subdir visible.
 - [ ] All 3 MCP servers report connected on cold start.
+- [ ] Chat history JSONL exists under `<folder>/.tinker/chats/<user-id>/` after first message; reopening the session hydrates prior messages from the file.
+- [ ] Refresh tokens found only in OS keychain (not in SQLite, not in files).
 - [ ] No `dockview-react` import anywhere in repo.
-- [ ] No Better Auth runtime code in `App.tsx` boot path.
 
 ---
 
@@ -180,7 +206,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 
 | # | Feature | Spec | Deferred reason |
 |---|---------|------|------------------|
-| 01 | SSO connector layer (Google/GitHub/Microsoft via Better Auth) | [[01-sso-connector-layer]] | MVP = anonymous folder sessions. Identity layer adds auth ceremony before product value is demonstrated. |
+| 01 | SSO connector layer — enterprise SSO only (SAML / SCIM / tenant federation) | [[01-sso-connector-layer]] | Consumer OAuth (Google / GitHub / Microsoft) IS in MVP per [[28-mvp-identity]]. Enterprise SSO stays enterprise-fork only per D1 / D8. |
 | 02 | Playbook skill marketplace | [[02-playbook-skill-marketplace]] | No skills system in MVP. Markdown + MCP covers the same use cases at lower complexity. |
 | 03 | Self-building memory pipeline (entity extraction) | [[03-memory-pipeline]] | MVP memory = flat markdown files. Entity graph is premature without validated retrieval need. |
 | 04 | Native scheduler | [[04-native-scheduler]] | No scheduled execution in MVP. |
