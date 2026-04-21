@@ -1,0 +1,7 @@
+[[permission]]
+identifier = "allow-folder-picker"
+description = "Allows the renderer to open the native folder picker."
+
+[permission.commands]
+allow = ["open_folder_picker"]
+deny = []

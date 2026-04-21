@@ -22,6 +22,7 @@
     "sql:allow-execute",
     "keyring:default",
     "notification:default",
+    "allow-folder-picker",
     "allow-get-opencode-connection",
     "allow-oauth-flow",
     "allow-restart-opencode",

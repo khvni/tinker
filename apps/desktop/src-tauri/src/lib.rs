@@ -324,7 +324,8 @@ pub fn run() {
       restart_opencode,
       commands::auth::auth_sign_in,
       commands::auth::auth_sign_out,
-      commands::auth::auth_status
+      commands::auth::auth_status,
+      commands::dialog::open_folder_picker
     ])
     .setup(|app| {
       tauri::async_runtime::block_on(async {

@@ -232,6 +232,16 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | Multi-provider model support | Handled by OpenCode, not Tinker. |
 | Slack-native presence | Slack as MCP only. |
 
+## MVP (D25) — atomic tasks tracked here until D25 docs merge to main
+
+> Canonical MVP matrix lives on the `claude/bold-panini` branch (commits `817581a` + `a648742`). Feature branches are landing against main ahead of that merge; track status here until the D25 refocus lands.
+
+### M2 — Folder-scoped session
+
+| Task | Linear | Priority | Status | PR | Notes |
+|------|--------|----------|--------|----|-------|
+| M2.3 Tauri command `open_folder_picker` | TIN-17 | p1 | review | #19 | `apps/desktop/src-tauri/src/commands/dialog.rs`, typed wrapper in `apps/desktop/src/bindings.ts` |
+
 ## How to Update This File
 
 - **Claiming MVP task** → set status `claimed`, add `[<agent-id> · ETA YYYY-MM-DD]` in Notes. Commit.

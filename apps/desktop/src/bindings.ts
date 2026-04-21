@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import type { SSOProvider, SSOStatus } from '@tinker/shared-types';
 
 export const GOOGLE_SCOPES = [
@@ -20,3 +21,7 @@ export type OpencodeConnection = {
   username: string;
   password: string;
 };
+
+export function openFolderPicker(): Promise<string> {
+  return invoke<string>('open_folder_picker');
+}
