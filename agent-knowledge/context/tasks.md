@@ -81,7 +81,7 @@ Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
 
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
-| 3.1 | **Research**: pick libraries for pdf / xlsx / docx / pptx / html / code / markdown. Deliverable: `agent-knowledge/reference/inline-renderers.md` with lib name + license + bundle size + rationale per format. Criterion: no paid libs, no copyleft licenses (MIT/Apache/ISC/BSD only). | M | — | not started | Research-as-task. Blocks 3.3–3.9. |
+| 3.1 | **Research**: pick libraries for pdf / xlsx / docx / pptx / html / code / markdown. Deliverable: `agent-knowledge/reference/inline-renderers.md` with lib name + license + bundle size + rationale per format. Criterion: no paid libs, no copyleft licenses (MIT/Apache/ISC/BSD only). | M | — | review | TIN-27 · PR #18 · deliverable at [[inline-renderers]]. Blocks 3.3–3.9. |
 | 3.2 | Unified `FilePane` component: accepts `{ path, mime }`, looks up renderer in `mimeToRenderer` map, renders. Fallback = "unsupported, open externally" with Tauri `shell.open`. | S | 1.4, 3.1 | not started | Dispatcher. |
 | 3.3 | PDF renderer integration per 3.1 choice. Accepts file path → embedded viewer. Keyboard navigation (PgUp/PgDn). | M | 3.1, 3.2 | not started | Probably `react-pdf`. |
 | 3.4 | XLSX renderer per 3.1. First-sheet-by-default + `<SegmentedControl>` sheet switcher. Read-only table. | M | 3.1, 3.2 | not started | Probably SheetJS. |
