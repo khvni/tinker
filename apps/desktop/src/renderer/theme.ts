@@ -17,7 +17,7 @@ export const writeTheme = (theme: Theme): void => {
   try {
     localStorage.setItem(STORAGE_KEY, theme);
   } catch {
-    // privacy mode / quota / disabled storage — expected, swallow
+    /* intentionally empty */
   }
 };
 
