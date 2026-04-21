@@ -1,4 +1,4 @@
-export type PaneKind =
+export type TabKind =
   | 'vault-browser'
   | 'chat'
   | 'today'

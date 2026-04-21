@@ -1,4 +1,4 @@
-import type { PaneKind } from '@tinker/shared-types';
+import type { TabKind } from '@tinker/shared-types';
 import { getPaneKindForPath, getPanelIdForPath, getPanelTitleForPath } from '../renderers/file-utils.js';
 
 type WorkspacePanel = {
@@ -14,7 +14,7 @@ type WorkspaceDockviewApi = {
   panels: WorkspacePanel[];
   addPanel(panel: {
     id: string;
-    component: PaneKind;
+    component: TabKind;
     title: string;
     params: { path: string };
     position?: {

@@ -1,4 +1,4 @@
-import type { PaneKind } from '@tinker/shared-types';
+import type { TabKind } from '@tinker/shared-types';
 
 export type FilePaneParams = {
   path: string;
@@ -47,11 +47,11 @@ export const getPanelTitleForPath = (path: string): string => {
   return segments.at(-1) ?? path;
 };
 
-export const getPanelIdForPath = (component: PaneKind, path: string): string => {
+export const getPanelIdForPath = (component: TabKind, path: string): string => {
   return `${component}:${path}`;
 };
 
-export const getPaneKindForPath = (path: string): PaneKind => {
+export const getPaneKindForPath = (path: string): TabKind => {
   const extension = getFileExtension(path);
 
   if (extension === '.md') {
