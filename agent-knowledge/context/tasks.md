@@ -98,7 +98,7 @@ Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
 
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
-| 4.1 | **Research**: clone/browse OpenCode Desktop (sst/opencode) model-picker UI. Document open/close behavior, keyboard nav, filter semantics, grouping (provider/model/context-window display). Deliverable: `agent-knowledge/reference/opencode-desktop-model-picker.md`. | M | — | not started | Research-as-task. Blocks 4.7–4.10. |
+| 4.1 | **Research**: clone/browse OpenCode Desktop (sst/opencode) model-picker UI. Document open/close behavior, keyboard nav, filter semantics, grouping (provider/model/context-window display). Deliverable: `agent-knowledge/reference/opencode-desktop-model-picker.md`. | M | — | review | TIN-38 · branch `feat/M4/tin-38-opencode-desktop-model-picker` · deliverable written · source commit pinned `d2181e9273` · blocks 4.7–4.10. |
 | 4.2 | Chat message list renders markdown via `react-markdown` + `remark-gfm` + `rehype-shiki` (match existing code-highlighter choice). Covers: headings, bold/italic, lists, tables, blockquotes, inline code, fenced code, links. | M | 1.3 | not started | Core chat requirement. |
 | 4.3 | Code block renderer: uses existing `code-highlighter.ts`. Copy button per block. Language label. | S | 4.2 | not started | Reuses code. |
 | 4.4 | Streaming render: SSE chunks → incremental markdown parse. Debounce re-render to 60fps max (requestAnimationFrame). No full re-parse per chunk. | M | 4.2 | not started | Perf-sensitive. |
