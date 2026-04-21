@@ -174,12 +174,15 @@ How this shows up in practice:
 
 ## 11. Knowledge Base Discipline
 
-- **Before building**: check `agent-knowledge/features/NN-*.md` for the matching spec + out-of-scope boundaries.
+All agent-readable context lives under `agent-knowledge/`. Do not split it across `docs/` — `docs/` is the human-developer-facing Markdown site (overview, architecture explainers, enterprise-fork guide) and must not duplicate execution context.
+
+- **Before building**: check `agent-knowledge/features/NN-*.md` for the matching product spec + out-of-scope boundaries, then `agent-knowledge/specs/YYYY-MM-DD-*.md` for the matching execution design (phases, agent teams, verification gates).
 - **Before deciding**: check `agent-knowledge/product/decisions.md` — respect existing decisions unless intentionally reopening (then update the log).
 - **While working**: if you learn something non-obvious a future contributor will need, update the relevant `agent-knowledge/*.md` file in the same PR.
 - **Ending a session**: append a summary to `agent-knowledge/context/sessions/YYYY-MM-DD-HHMM.md`.
 - **Updating tasks**: move entries in `agent-knowledge/context/tasks.md` as you start, block, or complete work.
 - **New reference material**: process external articles / research into `agent-knowledge/reference/*.md`.
+- **Writing a new execution spec**: save to `agent-knowledge/specs/YYYY-MM-DD-<topic>-design.md`. Override the superpowers default of `docs/superpowers/specs/` — tinker keeps agent-readable material under `agent-knowledge/` only.
 
 ---
 

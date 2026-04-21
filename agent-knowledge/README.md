@@ -16,13 +16,14 @@ Without a shared knowledge base, every contributor's agent starts cold, asks the
 
 ## How Agents Use It
 
-1. **Before building any feature** → read `features/NN-*.md` for the matching feature spec, reasoning, and out-of-scope boundaries
+1. **Before building any feature** → read `features/NN-*.md` for the matching product spec, then `specs/YYYY-MM-DD-*.md` for the matching execution design (phases, agent teams, verification gates)
 2. **For product-level questions** ("why are we doing this?") → `product/vision.md` + `product/positioning.md`
 3. **For reference implementations** ("how does Ramp Glass do this?") → `reference/ramp-glass.md`
 4. **Before making architectural decisions** → `product/decisions.md` (what's explicitly out of scope)
 5. **Starting a session** → read `context/tasks.md` (open work) and the 2–3 most recent `context/sessions/*.md` files for continuity
 6. **Ending a session** → append a session summary to `context/sessions/YYYY-MM-DD-HHMM.md` so the next agent picks up cleanly
-7. **Discovering something new** → update the relevant note or add a new one; the knowledge base is meant to grow
+7. **Writing an execution spec** → save to `specs/YYYY-MM-DD-<topic>-design.md`. Override the superpowers `docs/superpowers/specs/` default — tinker keeps agent-readable material under `agent-knowledge/` only.
+8. **Discovering something new** → update the relevant note or add a new one; the knowledge base is meant to grow
 
 ## How Human Contributors Use It
 
@@ -50,7 +51,9 @@ agent-knowledge/
 │   ├── feature-gap-table.md      # Claude Code vs Cowork vs Glass vs Tinker
 │   ├── ramp-ai-adoption.md       # Why Glass exists (org adoption playbook)
 │   └── ai-agent-harnesses.md     # OpenClaw / Hermes / Cowork landscape
-└── features/                     # Feature specs with reasoning (01–15)
+├── features/                     # Product feature specs with reasoning (01–15)
+└── specs/                        # Execution design docs (phases, agent teams, gates)
+    └── YYYY-MM-DD-<topic>-design.md
 ```
 
 ## UI Discipline (non-negotiable)
