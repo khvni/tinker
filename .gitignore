@@ -1,6 +1,7 @@
 # Tooling / agent scratch
 .claude/*
 !.claude/settings.json
+!.claude/agents/
 .remember/
 .DS_Store
 .vscode/
