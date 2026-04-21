@@ -2,10 +2,10 @@
   --toggle-width: 34px;
   --toggle-height: 20px;
   --toggle-knob: 14px;
-  --toggle-on-bg: var(--color-info);
-  --toggle-off-bg: var(--color-bg-input);
-  --toggle-off-border: var(--color-border-default);
-  --toggle-knob-bg: #ffffff;
+  --toggle-knob-bg: var(--color-toggle-knob);
+  --toggle-on-bg: var(--color-accent-soft);
+  --toggle-off-bg: var(--color-toggle-track-off);
+  --toggle-off-border: var(--color-toggle-track-border);
 
   position: relative;
   width: var(--toggle-width);
@@ -26,15 +26,7 @@
 
 .tk-toggle--disabled {
   cursor: not-allowed;
-}
-.tk-toggle--disabled.tk-toggle--on {
-  --toggle-on-bg: rgba(96, 165, 250, 0.3);
-  --toggle-knob-bg: rgba(255, 255, 255, 0.6);
-}
-.tk-toggle--disabled.tk-toggle--off {
-  --toggle-off-bg: rgba(255, 255, 255, 0.04);
-  --toggle-off-border: rgba(255, 255, 255, 0.06);
-  --toggle-knob-bg: rgba(255, 255, 255, 0.45);
+  opacity: 0.45;
 }
 
 .tk-toggle__knob {
@@ -48,7 +40,7 @@
   transform: translateY(-50%);
   transition: left var(--duration-base) var(--ease-standard),
     background var(--duration-base) var(--ease-standard);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-toggle-knob);
 }
 
 .tk-toggle--on .tk-toggle__knob {
