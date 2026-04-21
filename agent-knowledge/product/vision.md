@@ -48,7 +48,7 @@ tags: [tinker, vision, product]
 - `[2026-04-14]` **OpenCode sidecar** (localhost HTTP + SSE; `@opencode-ai/sdk`)
 - `[2026-04-14]` **SQLite** for memory/layout/skill index
 - `[2026-04-14]` **Obsidian-compatible markdown vault** for human-readable knowledge
-- `[2026-04-14]` **GPT-5.4 via Codex OAuth** as default model (user brings ChatGPT subscription)
+- `[2026-04-14]` **Model choice delegated to OpenCode** — Tinker wraps OpenCode's SDK with a GUI model picker; OpenCode owns provider auth (local + cloud)
 - `[2026-04-14]` **MCP servers** for all integrations (not custom API clients)
 
 ## Connections

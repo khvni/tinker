@@ -72,8 +72,8 @@ How this shows up in practice:
 | Workspace layout | **`@tinker/panes`** (recursive split tree + tabs, zustand-backed; Dockview deprecated per [[D16]]) |
 | Agent backend | **OpenCode** sidecar |
 | Bridge SDK | **`@opencode-ai/sdk`** |
-| LLM | **GPT-5.4** via Codex OAuth |
-| SSO | **Google OAuth** loopback flow |
+| Model runtime | **OpenCode** (provider + model auth owned by OpenCode; Tinker ships a GUI model picker over its SDK) |
+| Identity | **Better Auth** (v1 providers: Google + GitHub + Microsoft) per [[D2]] / [[D4]] |
 | Secrets | **System keychain** via `tauri-plugin-keyring` |
 | Persistence | **SQLite** via `@tauri-apps/plugin-sql` |
 | Vault I/O | **`@tauri-apps/plugin-fs`** |
@@ -188,10 +188,11 @@ All agent-readable context lives under `agent-knowledge/`. Do not split it acros
 
 ## 12. Things That Will Tempt You
 
-- "Let me call the OpenAI API directly." No — use OpenCode.
+- "Let me call the OpenAI/Anthropic API directly." No — use OpenCode. OpenCode owns provider auth, model routing, and SDK contracts; Tinker is a GUI on top of its SDK.
 - "Let me put business logic in Rust." No — Rust is system plumbing only.
 - "Let me build a custom integration client." No — use MCP servers.
-- "Let me add non-GPT providers." No — GPT-5.4 via Codex OAuth is the path.
+- "Let me hardcode a single default model." No — model choice is delegated to OpenCode. Tinker ships a model picker UI that surfaces OpenCode's configured providers (local + cloud).
+- "Let me write our own OAuth / session layer." No — identity is handled by Better Auth (per [[D2]]). Adding a provider = extending Better Auth config, not rolling a new auth path.
 - "Let me store tokens in a file." No — use the system keychain.
 - "Let me add `dockview-react` back for this one pane." No — register a `kind` in `PaneRegistry` per [[D16]].
 - "Let me stash config on the coordinator and call start later." No — pass config per call per [[D22]].

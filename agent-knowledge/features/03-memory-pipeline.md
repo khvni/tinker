@@ -156,7 +156,7 @@ Never touch top-level user-authored markdown, regardless of what source original
 
 ## Open Questions
 
-- **Extraction model**: run extraction with same GPT-5.4 as chat, or cheaper model? Leaning: same model, but with a tight system prompt that forces structured output.
+- **Extraction model**: run extraction with the same model the user has selected in the chat model picker, or call a cheaper secondary model via OpenCode? Leaning: same model + tight structured-output prompt in v1, revisit once extraction quality is measurable.
 - **Batch size for daily sweep**: process all new Gmail threads in one big prompt vs. one at a time? Big-batch is token-efficient but worse for parallel errors.
 - **Human-in-the-loop review**: should extracted facts be confirmed by the user before landing in the vault? Leaning: no for v1 (trust + correct); add opt-in review for sensitive entity types later.
 

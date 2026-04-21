@@ -12,8 +12,8 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
 ### `[2026-04-14]` — No Latent Briefing
 
 - **Decision**: Do NOT implement [[Latent Briefing]] KV cache compaction in v1 (or v2). Optimize with simpler approaches (prompt caching, selective context passing) instead.
-- **Why**: Latent Briefing requires direct KV cache access to the worker model, which means self-hosting a model (Ramp's setup: Claude orchestrator + Qwen3-14B on A100). Tinker's target user (nontechnical masses) does not have A100s, will not run Ollama, and should not be asked to pick a model tier. GPT-5.4 via Codex OAuth is the default path (per `tinker-prd.md`) — no KV cache exposure there.
-- **Complexity cost**: implementing Latent Briefing means shipping a local GPU runtime + model-weight management → violates "complexity invisible, not absent" principle.
+- **Why**: Latent Briefing requires direct KV-cache access to the worker model, which means owning the inference runtime (Ramp's setup: Claude orchestrator + Qwen3-14B on A100). Tinker does not own the runtime — OpenCode is the agent backend and it owns all model auth + provider selection (local or cloud). We build a GUI on top of its SDK. KV-cache access is not exposed through that surface, and reaching for it would mean bypassing OpenCode and shipping our own inference stack.
+- **Complexity cost**: implementing Latent Briefing means shipping a local GPU runtime + model-weight management + a parallel agent stack alongside OpenCode → violates "complexity invisible, not absent" principle.
 - **Exception**: if a hybrid stack emerges later (e.g., Tinker Enterprise edition) where self-hosting is tolerated, revisit. Not before.
 
 ### `[2026-04-14]` — Slack-native presence deferred
@@ -22,17 +22,18 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
 - **Why**: Glass's Slack presence is huge at Ramp because Ramp lives in Slack. Most nontechnical teams Tinker targets use Teams, Google Chat, or mixed stacks. Building Slack-native first would be premature specialization.
 - **Alternative**: Native scheduler ([[04-native-scheduler]]) posts outputs to vault + optional notification channels via MCP; Slack is one option, not the primary surface.
 
-### `[2026-04-14]` — No local-model pull via Ollama in first-run path
+### `[2026-04-14]` — No local-model pull in first-run path
 
-- **Decision**: Tinker ships with GPT-5.4 via Codex OAuth as the default model. Do NOT auto-install Ollama / pull local models / assume GPU availability.
-- **Why**: Nontechnical target users do not have strong laptop compute. Model downloads (7–30GB) destroy the "open the app and start working" flow. Fans spinning up = bad first impression.
-- **Alternative**: Power users can configure a different model in `opencode.json` (OpenCode SDK supports this). First-run path uses hosted GPT.
+- **Decision**: Tinker does not own model choice. OpenCode does. First-run path must not auto-install Ollama, pull local model weights, or assume GPU availability. The default model at first launch is whatever OpenCode is configured to use out of the box (a hosted cloud model), chosen so the app is usable immediately on a stock laptop with no GPU.
+- **Why**: Nontechnical users do not have strong laptop compute. Model downloads (7–30GB) destroy the "open app → start working" flow. Fans spinning up on first launch = bad first impression. Tinker's role is a GUI on top of the OpenCode SDK, not a model distribution channel.
+- **Alternative**: Users (and power users) change provider or model through the in-app model picker, which is a thin UI over OpenCode's existing provider/model configuration (local via Ollama/LM Studio, cloud via Anthropic/OpenAI/etc.). OpenCode already handles the auth + SDK plumbing for every supported provider — we do not replicate that.
 
-### `[2026-04-14]` — SSO limited to Google + GitHub for v1
+### `[2026-04-14]` — v1 identity = Better Auth, Google + GitHub + Microsoft (consumer OSS)
 
-- **Decision**: v1 SSO supports Google OAuth (already in PRD) and GitHub OAuth. No Okta, no Azure AD, no SAML.
-- **Why**: Enterprise SSO is in PRD §6 non-goals. Google covers Gmail/Calendar/Drive (the most common nontechnical-user tools) + most of Workspace-first companies. GitHub covers the developer sub-segment. These two unlock 80% of target integrations with minimal auth complexity.
-- **Revisit**: If enterprise adopters ask for Okta/SAML, build then. Not speculatively.
+- **Decision**: Tinker does NOT build a custom auth layer. Identity is handled by **Better Auth** (see D2). Upstream Tinker is a consumer-grade OSS app — the Better Auth config enables **Google, GitHub, and Microsoft as sign-in providers**. Enterprise-only SSO paths (dedicated Okta / Entra tenant federation, SAML, SCIM, etc.) are explicitly **NOT** part of upstream and will not be built here.
+- **Why**: Writing OAuth loopback + PKCE + session management from scratch is a solved problem — Better Auth already ships that, including a built-in Microsoft provider that accepts personal Microsoft accounts (Outlook, OneDrive, personal Microsoft 365). The three providers cover the three consumer surfaces we care about: Google = Workspace-first users, Microsoft = Outlook/Office personal users, GitHub = developers. That unlocks the majority of consumer users with zero bespoke auth code. Shipping enterprise federation upstream would invite compliance + tenant-admin scope we don't want to own (see D1: consumer-first OSS, enterprise via fork).
+- **Note**: This decision is strictly about *identity* (who is signed into the Tinker app). Service-level OAuth for Gmail / Calendar / Drive / Outlook / Linear / etc. is a separate concern handled via MCP servers in `opencode.json` — OpenCode owns that token lifecycle. Identity ≠ integration credentials (see D6).
+- **Forks**: Enterprise adopters that need tenant-locked Entra ID, Okta, SAML, or SCIM build that by swapping / extending Better Auth providers in their fork's `packages/auth-sidecar`. That is the canonical fork path per [[D1]] / [[D8]] — upstream contributors should not land enterprise-federation code here.
 
 ### `[2026-04-14]` — No mobile dispatch in v1
 

@@ -73,7 +73,7 @@ An **agent harness** is the runtime layer around an LLM that gives it persistent
 - `[2026-04-04]` Triggered the alternatives guide: GLM 5.1 (Z.ai), Minimax 2.7, OpenAI Codex (GPT-5.4), local models (Gemma 4, Qwen 3.5, Kimi 2.5)
 - `[2026-04-08]` **Gemma 4 + OpenClaw + Ollama** = popular local stack — 24/7 free agents on M4 Mac Mini
 
-**Relevance to Tinker**: OpenCode SDK + Codex OAuth (GPT-5.4) avoids the Anthropic ecosystem entirely. This is a strategic advantage — Tinker users aren't exposed to Anthropic policy changes.
+**Relevance to Tinker**: Tinker delegates all model + provider auth to OpenCode — we ship a GUI model picker on top of OpenCode's SDK, not our own provider layer. This means Tinker users inherit OpenCode's entire supported-provider matrix (local via Ollama/LM Studio, plus cloud providers) and are insulated from any single vendor's policy changes (including Anthropic's OAuth ban). Users pick the model that fits their cost/compute profile.
 
 ## Related Tools and Add-ons
 

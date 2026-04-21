@@ -22,8 +22,8 @@ The app is not a cloud dashboard. It is a local workspace that happens to talk t
 
 Core traits:
 
-- OpenCode is the agent runtime
-- GPT-5.4 is the default model path
+- OpenCode is the agent runtime; model + provider auth are owned by OpenCode, not Tinker
+- Tinker ships a GUI model picker over OpenCode's SDK — the default model at first launch is whichever hosted (no-GPU) provider OpenCode is configured with, so the app is usable on a stock laptop out of the box
 - a local markdown vault is the knowledge base
 - SQLite stores app state, memory indexes, and layout state
 - the workspace is pane-based, not chat-only
@@ -35,7 +35,7 @@ Core traits:
 ### 2.1 Desktop runtime
 
 - Tauri v2 manages the native window, sidecar lifecycle, system keychain access, and OS dialogs.
-- Rust stays thin. It starts the OpenCode sidecar, runs the Google loopback OAuth command, exposes the OpenCode base URL, and shuts the sidecar down cleanly.
+- Rust stays thin. It starts the OpenCode sidecar and the Better Auth identity sidecar, binds the OS-level loopback redirect URIs those sidecars need, exposes the OpenCode base URL, and shuts everything down cleanly.
 - The webview talks directly to OpenCode over HTTP + SSE through `@opencode-ai/sdk`.
 
 ### 2.2 OpenCode backend
@@ -47,10 +47,11 @@ Core traits:
 
 ### 2.3 Sign-in and integrations
 
-- v1 sign-in is **Google only**.
-- Gmail, Calendar, Drive, and Linear are integration targets configured through MCP servers in `opencode.json`.
+- v1 identity is handled by **Better Auth** running as a local sidecar (`packages/auth-sidecar`) per [[decisions]] D2. Enabled sign-in providers in upstream OSS are **Google, GitHub, and Microsoft** (consumer Microsoft accounts — Outlook / personal Microsoft 365 — via Better Auth's built-in Microsoft provider). Tinker does not ship its own OAuth/session code.
+- Enterprise SSO (Okta, Azure Entra ID, SAML, SCIM) is explicitly out of scope for upstream — that lives in enterprise forks per [[decisions]] D1 / D8.
+- Gmail, Calendar, Drive, Linear, and every other integration are configured through MCP servers in `opencode.json` — OpenCode owns the service-level OAuth / token lifecycle. Identity ≠ integration credentials (per [[decisions]] D6).
 - No custom API clients belong in the app.
-- OAuth tokens are stored in the system keychain.
+- Bearer-equivalent credentials (Better Auth refresh tokens, integration OAuth tokens) live only in the system keychain per [[decisions]] D5.
 
 ### 2.4 Memory and vault
 
@@ -84,7 +85,7 @@ Device — Tauri Window
 
 Device — Tauri Rust core
   |- spawns + adopts the host service (coordinator pattern, per D17 + D22)
-  |- runs Google loopback OAuth
+  |- binds OS-level loopback redirect URIs for Better Auth sign-in providers (Google, GitHub, Microsoft)
   |- manages keychain-backed token storage plugin
   |- OS-level primitives only
 
@@ -98,7 +99,7 @@ Host service (packages/host-service)
   |- exposes PSK-authenticated HTTP/WS surface
 
 OpenCode sidecar
-  |- GPT-5.4 via Codex OAuth
+  |- model + provider auth (OpenCode-owned; Tinker does not replicate)
   |- session management
   |- tools and MCP servers
 ```
@@ -107,9 +108,9 @@ OpenCode sidecar
 
 **First launch**
 
-1. Tauri starts the OpenCode sidecar.
-2. The renderer asks for the sidecar URL.
-3. The user can sign in with Google or skip it.
+1. Tauri starts the OpenCode sidecar and the Better Auth identity sidecar.
+2. The renderer asks for the sidecar URLs.
+3. The user can sign in via Better Auth (Google, GitHub, or Microsoft) or skip it.
 4. The user chooses an existing vault or creates a new one.
 5. The renderer indexes the vault into SQLite.
 6. The workspace opens with Chat and Today.

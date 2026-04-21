@@ -72,7 +72,7 @@ export const Chat = ({
   const [draft, setDraft] = useState('');
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect GPT-5.4 in Settings to start chatting.');
+  const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
   const mountedRef = useRef(true);
   const sessionIDRef = useRef<string | null>(null);
   const memoryCommitRef = useRef<Promise<void>>(Promise.resolve());
@@ -91,7 +91,7 @@ export const Chat = ({
   }, [client]);
 
   useEffect(() => {
-    setStatus(modelConnected ? 'OpenCode is ready.' : 'Connect GPT-5.4 in Settings to start chatting.');
+    setStatus(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
   }, [modelConnected]);
 
   useEffect(() => {
@@ -295,7 +295,7 @@ export const Chat = ({
           <div className="tinker-message tinker-message--system">
             {modelConnected
               ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
-              : 'Connect GPT-5.4 in Settings before sending a message.'}
+              : 'Connect an AI model in Settings before sending a message.'}
           </div>
         ) : null}
 

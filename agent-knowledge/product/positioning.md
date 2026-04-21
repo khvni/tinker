@@ -18,13 +18,13 @@ Tinker is **not** open-source Claude Cowork. Tinker **is** open-source Ramp Glas
 
 | Feature | Claude Code | Claude Cowork | Ramp Glass | Tinker |
 |---|---|---|---|---|
-| SSO → pre-wired integrations | ❌ (manual MCP) | ⚠️ (connectors, but per-user setup) | ✅ (Okta → 30+ tools) | ✅ (Google + GitHub OAuth) |
+| SSO → pre-wired integrations | ❌ (manual MCP) | ⚠️ (connectors, but per-user setup) | ✅ (Okta → 30+ tools) | ✅ (Better Auth: Google + GitHub + Microsoft) |
 | Org skill marketplace (Dojo) | ❌ | ⚠️ (personal skills only) | ✅ (350+ skills, Git-backed) | ✅ (local + optional Git sync) |
 | Skill discovery (Sensei) | ❌ | ❌ | ✅ | ✅ |
 | Self-building memory pipeline | ❌ | ⚠️ (projects remember what you feed them) | ✅ (24hr synthesis) | ✅ (scheduled entity extraction) |
 | Native scheduler | ❌ | ✅ (recurring tasks) | ✅ (cron → Slack) | ✅ (cron → vault/notify) |
 | Sub-agent orchestration | ⚠️ (manual) | ✅ | ✅ | ✅ (OpenCode primitives) |
-| Workspace persistence (split-pane) | ❌ (terminal) | ⚠️ (chat UI) | ✅ (code-editor layout) | ✅ (Dockview) |
+| Workspace persistence (split-pane) | ❌ (terminal) | ⚠️ (chat UI) | ✅ (code-editor layout) | ✅ (`@tinker/panes`, per D16) |
 | Mobile dispatch | ❌ | ✅ | ✅ (headless mode) | ❌ (not v1) |
 | Slack-native presence | ❌ | ❌ | ✅ | ❌ (deferred — see [[decisions]]) |
 | Latent Briefing (KV cache compaction) | ❌ | ❌ | ⚠️ (research — not shipped) | ❌ (out of scope — see [[decisions]]) |
@@ -45,8 +45,8 @@ Tinker is **not** open-source Claude Cowork. Tinker **is** open-source Ramp Glas
 ## What Tinker is NOT
 
 - `[2026-04-14]` **NOT a cloud SaaS** — local-first, user-owned; no hosted backend, nothing to subscribe to
-- `[2026-04-14]` **NOT multi-provider from day 1** — GPT-5.4 via Codex OAuth is the v1 path (per PRD)
-- `[2026-04-14]` **NOT a chat window** — workspace is pane-based (Dockview), not chat-only
+- `[2026-04-14]` **NOT replicating OpenCode's model/provider surface** — Tinker wraps OpenCode's SDK with a GUI model picker. Whatever providers OpenCode supports (local via Ollama/LM Studio, cloud via Anthropic/OpenAI/etc.), Tinker exposes. We do not own model auth or routing.
+- `[2026-04-14]` **NOT a chat window** — workspace is pane-based (`@tinker/panes`, per [[decisions]] D16), not chat-only
 - `[2026-04-14]` **NOT a replacement for OpenCode** — it wraps OpenCode; power users can always drop to the CLI
 
 ## Connections

@@ -509,7 +509,7 @@ export const Workspace = ({
         </div>
         <div className="tinker-header-meta">
           <Badge variant={modelConnected ? 'success' : 'default'} size="small">
-            {modelConnected ? 'GPT-5.4 connected' : 'GPT-5.4 disconnected'}
+            {modelConnected ? 'Model connected' : 'Model disconnected'}
           </Badge>
           <Badge variant="default" size="small">
             {sessions.google?.email ?? sessions.github?.email ?? 'Offline mode'}

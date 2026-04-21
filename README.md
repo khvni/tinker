@@ -4,7 +4,7 @@ Tinker is a local-first AI workspace. The desktop shell is Tauri v2, the UI is R
 
 ## Why it exists
 
-Tinker keeps the agent close to the user and their files. Memory, layout state, and vault notes stay local. LLM access goes through OpenCode and Codex OAuth, so the user can bring a ChatGPT subscription instead of wiring direct API billing into the app.
+Tinker keeps the agent close to the user and their files. Memory, layout state, and vault notes stay local. The agent runtime is OpenCode — Tinker wraps OpenCode's SDK with a GUI, so model choice (local or cloud) and provider auth are handled by OpenCode, not by the app. Identity sign-in (Google, GitHub, Microsoft) runs through Better Auth as a local sidecar.
 
 ## Quick start
 
@@ -31,13 +31,17 @@ Tinker Desktop (Tauri v2 + React + @tinker/panes)
   |- direct HTTP + SSE calls to OpenCode on localhost
 
 OpenCode Sidecar
-  |- GPT-5.4 via Codex OAuth
+  |- model + provider auth (OpenCode-owned; Tinker does not replicate)
   |- MCP integrations from opencode.json
+
+Better Auth Sidecar (packages/auth-sidecar)
+  |- identity sign-in (Google, GitHub, Microsoft)
+  |- session management
 ```
 
 ## Status
 
-Early, but bootable. v1 focuses on Google sign-in, Linear via MCP, local vault indexing, and a persistent split-pane workspace.
+Early, but bootable. v1 focuses on Better Auth sign-in (Google / GitHub / Microsoft), Linear via MCP, local vault indexing, and a persistent split-pane workspace.
 
 ## Read next
 

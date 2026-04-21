@@ -50,13 +50,13 @@ Every memory entity has `sources: Array<{service, ref, lastSeen}>`. Enables clea
 ## Historical Decisions
 
 ### `[2026-04-14]` No Latent Briefing (KV cache compaction)
-Requires self-hosting a worker model with direct KV cache access. Tinker's target users don't have A100s. GPT-5.4 via Codex OAuth is the default path — no KV cache exposure there.
+Requires direct KV-cache access to the worker model, which means owning the inference runtime. Tinker does not own that runtime — OpenCode is the agent backend and owns model + provider auth. We build a GUI on top of its SDK. Shipping Latent Briefing would mean running our own inference stack alongside OpenCode.
 
 ### `[2026-04-14]` No Slack-native presence
 Slack is one MCP integration among many. Most nontechnical teams use Teams, Google Chat, or mixed stacks. Slack-first would be premature specialization.
 
-### `[2026-04-14]` No local-model pull via Ollama in first-run
-Model downloads (7–30GB) destroy "open the app and start working" flow. GPT-5.4 via Codex OAuth is default. Power users can configure alternate models in `opencode.json`.
+### `[2026-04-14]` No local-model pull in first-run
+Tinker does not own model choice — OpenCode does. First launch must not auto-install Ollama, pull weights, or assume a GPU. The default at first launch is whichever hosted (no-GPU) provider OpenCode is configured with, so the app is usable immediately on a stock laptop. Users change provider or model through an in-app model picker that wraps OpenCode's SDK.
 
 ### `[2026-04-14]` No mobile dispatch in v1
 Out of scope per PRD. Desktop-first, local-first. Mobile is a convenience, not a capability gap.

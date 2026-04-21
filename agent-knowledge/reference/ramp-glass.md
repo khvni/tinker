@@ -43,7 +43,7 @@ Ramp's internal AI productivity suite. Built to make every employee an AI power 
 - `[2026-04-10]` "When a sales rep asks Glass to pull context from a Gong call, enrich it with Salesforce data, and draft a follow-up — it just works, because everything is already connected"
 - `[2026-04-10]` "This is the unsexy foundation that makes everything else possible"
 
-**See `features/01-sso-connector-layer.md`** for how Tinker replicates this with Google + GitHub OAuth.
+**See `features/01-sso-connector-layer.md`** for how Tinker replicates this with Better Auth (Google + GitHub + Microsoft).
 
 ## Dojo — The Skills Marketplace
 

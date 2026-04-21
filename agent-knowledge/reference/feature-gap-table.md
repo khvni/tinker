@@ -18,7 +18,7 @@ Detailed comparison of what each product provides. Use this when deciding scope 
 | Capability | Claude Code | Claude Cowork | Ramp Glass | Tinker (target) |
 |---|---|---|---|---|
 | **Auth / Connectors** | | | | |
-| SSO sign-in | ❌ (API key only) | ⚠️ (Anthropic account) | ✅ (Okta) | ✅ (Google + GitHub OAuth) |
+| SSO sign-in | ❌ (API key only) | ⚠️ (Anthropic account) | ✅ (Okta) | ✅ (Better Auth: Google + GitHub + Microsoft) |
 | Pre-wired integrations on sign-in | ❌ | ⚠️ (per-connector setup) | ✅ (30+ tools auto) | ✅ (MCP servers in `opencode.json`) |
 | Custom connector config | ✅ (MCP JSON) | ⚠️ (UI-limited) | ✅ (internal MCP) | ✅ (`opencode.json`) |
 | **Skills** | | | | |
@@ -41,7 +41,7 @@ Detailed comparison of what each product provides. Use this when deciding scope 
 | **UI / Workspace** | | | | |
 | CLI / terminal | ✅ | ❌ | ❌ | ❌ (though OpenCode CLI still available) |
 | Chat GUI | ❌ | ✅ | ✅ | ✅ |
-| Split-pane workspace | ❌ | ⚠️ (basic) | ✅ (code-editor style) | ✅ (Dockview) |
+| Split-pane workspace | ❌ | ⚠️ (basic) | ✅ (code-editor style) | ✅ (`@tinker/panes`, per D16) |
 | Layout persistence | ❌ | ⚠️ | ✅ | ✅ (SQLite) |
 | Inline rendering (md/CSV/code) | ❌ (terminal) | ✅ | ✅ | ✅ (React components) |
 | **Platform / Deployment** | | | | |
@@ -53,7 +53,7 @@ Detailed comparison of what each product provides. Use this when deciding scope 
 ## Tinker's Scope Filter
 
 **Build** (moat features):
-- SSO with Google + GitHub → pre-wired MCP integrations
+- SSO via Better Auth (Google + GitHub + Microsoft) → pre-wired MCP integrations
 - Dojo skill marketplace
 - Sensei skill discovery
 - Self-building memory pipeline
@@ -66,10 +66,10 @@ Detailed comparison of what each product provides. Use this when deciding scope 
 - Mobile dispatch
 
 **Reject** (out of scope):
-- Latent Briefing (requires self-hosted model)
-- Multi-provider model support (v1 = GPT-5.4 via Codex)
+- Latent Briefing (requires owning the inference runtime; we delegate to OpenCode)
+- Our own provider / model-auth layer (OpenCode owns this; Tinker ships a GUI model picker over OpenCode's SDK)
 - Cloud sync (local-first principle)
-- Enterprise SSO / SAML (revisit if asked)
+- Enterprise SSO / SAML / SCIM (consumer OSS scope; lives in enterprise forks per D1 / D8)
 
 ## Connections
 - [[positioning]]

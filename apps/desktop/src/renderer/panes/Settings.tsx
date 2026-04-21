@@ -61,21 +61,21 @@ export const Settings = ({
 
       <div className="tinker-list">
         <article className="tinker-list-item">
-          <h3>GPT-5.4</h3>
+          <h3>AI model</h3>
           <p className="tinker-muted">
             {modelConnected
               ? 'Connected through OpenCode.'
-              : 'Not connected yet. Tinker asks OpenCode to run provider auth instead of owning separate OpenAI token plumbing.'}
+              : 'Not connected yet. OpenCode owns provider/model auth — Tinker hands off to it instead of owning its own token plumbing.'}
           </p>
           {modelAuthMessage ? <p className="tinker-muted">{modelAuthMessage}</p> : null}
           <div className="tinker-inline-actions">
             {modelConnected ? (
               <Button variant="secondary" onClick={() => void onDisconnectModel()} disabled={modelAuthBusy}>
-                Disconnect GPT-5.4
+                Disconnect model
               </Button>
             ) : (
               <Button variant="primary" onClick={() => void onConnectModel()} disabled={modelAuthBusy}>
-                {modelAuthBusy ? 'Connecting…' : 'Connect GPT-5.4'}
+                {modelAuthBusy ? 'Connecting…' : 'Connect model'}
               </Button>
             )}
           </div>
