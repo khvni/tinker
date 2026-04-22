@@ -8,8 +8,86 @@ export type MCPStatus = {
     | 'error'
     | 'failed'
     | 'needs_auth'
-    | 'needs_client_registration';
+    | 'needs_client_registration'
+    | 'reconnecting';
   error?: string;
+};
+
+export const BUILTIN_MCP_NAMES = ['qmd', 'smart-connections', 'exa'] as const;
+export type BuiltinMcpName = (typeof BUILTIN_MCP_NAMES)[number];
+
+const QMD_MISSING_MEMORY_PATH_HINT =
+  'SMART_VAULT_PATH is not set. Pick a memory folder in Settings so qmd can index your notes.';
+const SMART_CONNECTIONS_MISSING_MEMORY_PATH_HINT =
+  'SMART_VAULT_PATH is not set. Pick a memory folder in Settings so smart-connections can embed your notes.';
+const EXA_NETWORK_HINT = 'Network error reaching exa. Check your connection and try again.';
+
+const GENERIC_CONNECTING_FALLBACK = 'Waiting for OpenCode to report MCP status…';
+
+type NormalizeMcpStatusArgs = {
+  name: string;
+  raw: MCPStatusLike | undefined;
+  memoryPath: string | null;
+};
+
+export const normalizeMcpRowStatus = ({ name, raw, memoryPath }: NormalizeMcpStatusArgs): MCPStatus => {
+  if (raw === undefined) {
+    return { status: 'checking' };
+  }
+
+  const statusValue = raw.status?.trim();
+  if (statusValue === 'connected') {
+    return { status: 'connected' };
+  }
+
+  const rawError = raw.error?.trim();
+
+  if (statusValue === 'failed' || statusValue === 'error') {
+    return {
+      status: 'failed',
+      error: rawError && rawError.length > 0 ? rawError : deriveDefaultError(name, memoryPath),
+    };
+  }
+
+  if (statusValue === 'needs_auth') {
+    return rawError && rawError.length > 0
+      ? { status: 'needs_auth', error: rawError }
+      : { status: 'needs_auth' };
+  }
+
+  if (statusValue === 'needs_client_registration') {
+    return {
+      status: 'needs_client_registration',
+      error: rawError && rawError.length > 0 ? rawError : 'MCP server needs client registration.',
+    };
+  }
+
+  if (statusValue === 'disabled') {
+    return { status: 'disabled' };
+  }
+
+  if (statusValue === 'checking' || statusValue === 'reconnecting') {
+    return { status: statusValue };
+  }
+
+  if (rawError && rawError.length > 0) {
+    return { status: 'failed', error: rawError };
+  }
+
+  return { status: 'checking', error: GENERIC_CONNECTING_FALLBACK };
+};
+
+const deriveDefaultError = (name: string, memoryPath: string | null): string => {
+  if (name === 'qmd' && !memoryPath) {
+    return QMD_MISSING_MEMORY_PATH_HINT;
+  }
+  if (name === 'smart-connections' && !memoryPath) {
+    return SMART_CONNECTIONS_MISSING_MEMORY_PATH_HINT;
+  }
+  if (name === 'exa') {
+    return EXA_NETWORK_HINT;
+  }
+  return 'MCP server failed to connect.';
 };
 
 type MCPStatusLike = {

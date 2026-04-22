@@ -24,7 +24,7 @@ import {
 } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../bindings.js';
 import { resolveWorkspaceFilePath } from '../file-links.js';
-import type { MCPStatus } from '../integrations.js';
+import { BUILTIN_MCP_NAMES, type BuiltinMcpName, type MCPStatus } from '../integrations.js';
 import { FilePaneRuntimeContext } from '../panes/FilePane/file-pane-runtime.js';
 import { isAbsolutePath, getPanelTitleForPath } from '../renderers/file-utils.js';
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
@@ -85,6 +85,7 @@ type WorkspaceProps = {
   onSchedulerChanged(): void;
   onRunMemorySweep(): Promise<void>;
   onMemoryCommitted(): void;
+  onRequestMcpRespawn(): Promise<void>;
 };
 
 const createWorkspaceTabId = (): string => {
@@ -133,6 +134,8 @@ export const Workspace = ({
   onDisconnectGithub,
   onDisconnectMicrosoft,
   onMemoryCommitted,
+  mcpStatus,
+  onRequestMcpRespawn,
 }: WorkspaceProps): JSX.Element => {
   const workspaceStoreRef = useRef<WorkspaceStore<TinkerPaneData> | null>(null);
   const attentionStoreRef = useRef(createAttentionStore());
@@ -402,6 +405,14 @@ export const Workspace = ({
       microsoft: onDisconnectMicrosoft,
     };
 
+    const mcpSeedStatuses: Partial<Record<BuiltinMcpName, MCPStatus>> = {};
+    for (const name of BUILTIN_MCP_NAMES) {
+      const seeded = mcpStatus[name];
+      if (seeded) {
+        mcpSeedStatuses[name] = seeded;
+      }
+    }
+
     return {
       sessions,
       activeSession,
@@ -410,6 +421,10 @@ export const Workspace = ({
       onSignOut: async (session: SSOSession) => {
         await disconnectByProvider[session.provider]();
       },
+      opencode,
+      vaultPath,
+      mcpSeedStatuses,
+      onRequestRespawn: onRequestMcpRespawn,
     };
   }, [
     sessions,
@@ -422,6 +437,10 @@ export const Workspace = ({
     onDisconnectGoogle,
     onDisconnectGithub,
     onDisconnectMicrosoft,
+    opencode,
+    vaultPath,
+    mcpStatus,
+    onRequestMcpRespawn,
   ]);
 
   return (

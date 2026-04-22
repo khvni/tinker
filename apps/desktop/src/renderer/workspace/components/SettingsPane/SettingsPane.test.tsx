@@ -15,6 +15,13 @@ const renderWithRuntime = (runtime: SettingsPaneRuntime): string => {
 };
 
 describe('SettingsPane', () => {
+  const baseRuntime = {
+    opencode: null,
+    vaultPath: null,
+    mcpSeedStatuses: {},
+    onRequestRespawn: vi.fn().mockResolvedValue(undefined),
+  } as const;
+
   it('renders the Account section rail entry', () => {
     const runtime: SettingsPaneRuntime = {
       sessions: emptySessions,
@@ -22,6 +29,7 @@ describe('SettingsPane', () => {
       signOutBusy: false,
       signOutMessage: null,
       onSignOut: vi.fn(),
+      ...baseRuntime,
     };
 
     const markup = renderWithRuntime(runtime);
@@ -46,6 +54,7 @@ describe('SettingsPane', () => {
       signOutBusy: false,
       signOutMessage: null,
       onSignOut: vi.fn(),
+      ...baseRuntime,
     };
 
     const markup = renderWithRuntime(runtime);

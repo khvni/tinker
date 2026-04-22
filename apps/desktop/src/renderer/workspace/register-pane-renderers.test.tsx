@@ -18,6 +18,10 @@ const settingsRuntime: SettingsPaneRuntime = {
   signOutBusy: false,
   signOutMessage: null,
   onSignOut: vi.fn(),
+  opencode: null,
+  vaultPath: null,
+  mcpSeedStatuses: {},
+  onRequestRespawn: vi.fn().mockResolvedValue(undefined),
 };
 
 describe('registerWorkspacePaneRenderers', () => {

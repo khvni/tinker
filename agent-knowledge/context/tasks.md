@@ -151,8 +151,9 @@ Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
 | 7.2 | Ensure `exa` works zero-config: it's remote, no env needed. Add boot-time check that calls exa's health MCP. | S | 7.1 | review | TIN-67 · PR #42 opened 2026-04-21. |
 | 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` = `<memory_root>/<current-user-id>/` from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | review | TIN-68 + TIN-69 · PR #91. Restart path now takes explicit `user_id` + `memory_subdir` and boot/auth flows use it. |
 | 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = same per-user subdir from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | review | TIN-68 + TIN-69 · PR #91. Shared restart flow reuses the same per-user memory subdir for both MCPs. |
-| 7.5 | Settings pane: "Integrations" section lists 3 MCPs with status (connected/error). Calls OpenCode SDK `mcp.list()` on mount. | M | 7.1, 6.5 | not started | Status only, no config. |
-| 7.6 | Per-MCP retry button in Settings: calls `mcp.reconnect(name)` SDK method (or restarts sidecar if SDK doesn't expose). | S | 7.5 | not started | Recovery. |
+| 7.5 | Settings pane: "Connections" section lists 3 MCPs with status dots + human errors. Calls OpenCode SDK `mcp.status()` on mount + polls 1.5s. | M | 7.1, 6.5 | review | TIN-70 · PR #105. Polling hook `useMcpStatusPolling` renders into `ConnectionsSection`. |
+| 7.6 | Per-MCP retry button in Settings: calls `client.mcp.connect(name)` SDK method (falls back to `restart_opencode` via `onRequestRespawn` when SDK missing/throws). | S | 7.5 | review | TIN-71 · PR #105. Fallback wired as a prop from App.tsx → Settings → ConnectionsSection. |
+| 7.9 | "+ Add tool" CTA + picker shell in Settings Connections. Modal lists 6 disabled post-MVP MCPs (GitHub, Linear, Gmail, Calendar, Drive, Slack) with Linear-ticket links. Config-driven via `available-mcps.ts`. | S | 7.5 | review | TIN-175 · PR #105. Flip `available: true` + add handlers post-MVP. |
 | 7.7 | Memory-root change OR user-switch triggers MCP refresh: stop OpenCode → respawn with new env → MCPs reconnect. Triggered by 6.9 (path change) and 8.8 (sign-out/in). | M | 7.3, 7.4, 6.6, 8.8 | not started | Invalidation path. |
 | 7.8 | First-run verification: on new session launch, wait for all 3 MCPs to report `connected` before enabling the composer. Show `<ConnectionGate>` minimal variant during wait (3-5s typical). | M | 7.5 | review | TIN-73 · PR #94. Gated brand-new chat sessions on qmd + smart-connections + exa readiness with retry, skip, and 10s timeout warning. |
 
@@ -242,6 +243,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | TIN-158 + TIN-159 | integrations | GitHub + Linear MCP server wiring | review | PR #102. Swapped stale package refs to current official remote MCP endpoints, expanded GitHub scopes for repo access, and added boot-time GitHub/Linear MCP status handling. |
 | TIN-182 | UI.7 | Workspace shell redesign per Paper — Titlebar + tauri Overlay + delete bespoke header + IntegrationsStrip compact | review | Branch `khvni/ui7-shell`. Session [[2026-04-22-0315-ui7-shell]]. Folder-per-component `<Titlebar>` (D21), tokens-only (D14/D23), macOS traffic-lights honored via `titleBarStyle:"Overlay"` + 68px reservation. 9 new tests. |
 | TIN-146 + TIN-147 | 12 | Pane-frame attention ring + pane-tab unread dot in `@tinker/panes`; desktop chat raises unread attention for unfocused assistant output; panes demo can trigger both states | review | PR #89. Branch `khvni/tin146-147-workspace-ui`. Paper MCP unavailable in-session, so parity used existing tokens + local workspace patterns. |
+| follow-up | cleanup | Delete legacy `IntegrationsStrip` once FirstRun + Workspace stop importing it — the Settings Connections surface now lives in `ConnectionsSection` (TIN-70) inside the `SettingsPane` rail. | not started | Kicked out of TIN-70/71/175 scope. |
 
 ## Rejected (not coming back)
 

@@ -20,6 +20,7 @@ import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus
 import { DEFAULT_USER_ID, openFolderPicker, type AuthProvider, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
+  BUILTIN_MCP_NAMES,
   checkTrackedMcpBootHealth,
   EXA_CHECKING_STATUS,
   EXA_MCP_NAME,
@@ -328,7 +329,7 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        let opencode = await invoke<OpencodeConnection>('get_opencode_connection');
+        const opencode = await invoke<OpencodeConnection>('get_opencode_connection');
         const storedVaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         let vaultRevision = 0;
@@ -627,10 +628,15 @@ export const App = (): JSX.Element => {
     }
 
     const connection = state.opencode;
-    const directory = getOpencodeDirectory(state.vaultPath);
+    const vaultPath = state.vaultPath;
+    const directory = getOpencodeDirectory(vaultPath);
     const githubSession = currentUserState.sessions.github;
     let active = true;
 
+    // Seed every tracked + preloaded MCP as `checking` so the Settings
+    // Connections section and status dock render without flicker before the
+    // boot health check resolves. The per-pane polling hook swings qmd +
+    // smart-connections to their real states once it runs.
     setState((current) =>
       current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl
         ? current
@@ -641,6 +647,7 @@ export const App = (): JSX.Element => {
               [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
               [GITHUB_MCP_NAME]: EXA_CHECKING_STATUS,
               [LINEAR_MCP_NAME]: EXA_CHECKING_STATUS,
+              ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
             },
           },
     );
@@ -739,6 +746,7 @@ export const App = (): JSX.Element => {
             mcpStatus: {
               ...current.mcpStatus,
               [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
+              ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
             },
           },
     );
@@ -982,6 +990,7 @@ export const App = (): JSX.Element => {
         onActiveSkillsChanged={handleActiveSkillsChanged}
         onRunMemorySweep={handleRunMemorySweep}
         onMemoryCommitted={handleMemoryCommitted}
+        onRequestMcpRespawn={() => refreshWorkspaceConnection(currentSessions)}
       />
     </div>
   );

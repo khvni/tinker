@@ -1,12 +1,18 @@
 import { createContext, useContext } from 'react';
 import type { SSOSession, SSOStatus } from '@tinker/shared-types';
+import type { OpencodeConnection } from '../../bindings.js';
+import type { BuiltinMcpName, MCPStatus } from '../integrations.js';
 
 export type SettingsPaneRuntime = {
   readonly sessions: SSOStatus;
   readonly activeSession: SSOSession | null;
   readonly signOutBusy: boolean;
   readonly signOutMessage: string | null;
+  readonly opencode: OpencodeConnection | null;
+  readonly vaultPath: string | null;
+  readonly mcpSeedStatuses: Partial<Record<BuiltinMcpName, MCPStatus>>;
   onSignOut(session: SSOSession): Promise<void>;
+  onRequestRespawn(): Promise<void>;
 };
 
 export const SettingsPaneRuntimeContext = createContext<SettingsPaneRuntime | null>(null);
