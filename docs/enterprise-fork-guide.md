@@ -101,6 +101,8 @@ In the app registration → **Authentication** tab:
   - This enables PKCE flow without requiring a client_secret (critical — never ship client_secret in a desktop binary)
 - **Supported account types** should match what you set in Step 2
 
+> **Tenant lock — endpoint.** Upstream Tinker points Microsoft OAuth at `https://login.microsoftonline.com/common/…` so personal + work + school accounts all work. An enterprise fork MUST swap `common` for the tenant UUID from Step 2 on every Microsoft endpoint (authorize, token, OBO, JWKS, discovery). Leaving `common` in place lets users from any Microsoft directory — including consumer `@outlook.com` accounts — complete sign-in against your app registration and then get a Graph token scoped to whatever directory they belong to. The tenant-scoped endpoint instructs Entra to refuse authentication from foreign directories before a token is ever minted. Grep your fork for `login.microsoftonline.com/common` and `/common/v2.0` after wiring — these are bugs in an enterprise build.
+
 ### Step 4 — Configure API Permissions + Admin Consent
 
 In the app registration → **API permissions** tab:
@@ -149,6 +151,11 @@ In your fork's `opencode.json`, update the `auth` section:
 
 ### Step 6 — Implement the Federation Adapter
 
+The adapter enforces two tenant-lock invariants before the OBO exchange runs:
+
+1. **Endpoint tenant lock** — the OAuth token URL embeds `config.tenant`, not `common`. Entra refuses to mint tokens for users from other directories.
+2. **Assertion `tid` claim equality** — the incoming user ID token MUST carry `tid === config.tenant`. The endpoint lock is sufficient when both hops run against the same Entra deployment, but `assertTenantLocked()` below defends against misconfiguration (another fork pointing at upstream's `common`, a dev proxy, or a rotated config). Treat it as a required belt-and-suspenders check, not optional. The same routine verifies `iss` and audience so a replayed token issued for a different app registration or tenant cannot be exchanged.
+
 Create `packages/auth-sidecar/src/adapters/entra-obo.ts`:
 
 ```ts
@@ -164,6 +171,63 @@ const FEDERATED_SERVICES = new Set([
   // Add internal services your org has published to Entra
 ])
 
+type EntraIdTokenClaims = {
+  tid: string
+  iss: string
+  aud: string
+  exp: number
+}
+
+function decodeJwtClaims(token: string): EntraIdTokenClaims {
+  const parts = token.split('.')
+  if (parts.length !== 3) {
+    throw new Error('Malformed assertion: expected a signed JWT')
+  }
+  const payload = parts[1]!.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4)
+  const json = Buffer.from(padded, 'base64').toString('utf8')
+  const claims = JSON.parse(json) as Partial<EntraIdTokenClaims>
+  if (
+    typeof claims.tid !== 'string' ||
+    typeof claims.iss !== 'string' ||
+    typeof claims.aud !== 'string' ||
+    typeof claims.exp !== 'number'
+  ) {
+    throw new Error('Assertion missing required claims (tid/iss/aud/exp)')
+  }
+  return claims as EntraIdTokenClaims
+}
+
+function assertTenantLocked(
+  claims: EntraIdTokenClaims,
+  config: { tenant: string; clientId: string }
+): void {
+  // Reject any incoming assertion whose `tid` does not match the
+  // fork's configured tenant. Without this check, a token issued
+  // by a different Entra directory (including consumer `9188040d-…`)
+  // could reach the OBO endpoint and be exchanged for a Graph token
+  // in that foreign directory.
+  if (claims.tid !== config.tenant) {
+    throw new Error(
+      `Tenant mismatch: assertion tid=${claims.tid}, expected ${config.tenant}`
+    )
+  }
+  const expectedIssuer = `https://login.microsoftonline.com/${config.tenant}/v2.0`
+  if (claims.iss !== expectedIssuer) {
+    throw new Error(
+      `Issuer mismatch: assertion iss=${claims.iss}, expected ${expectedIssuer}`
+    )
+  }
+  if (claims.aud !== config.clientId && claims.aud !== `api://${config.clientId}`) {
+    throw new Error(
+      `Audience mismatch: assertion aud=${claims.aud}, expected ${config.clientId}`
+    )
+  }
+  if (claims.exp * 1000 <= Date.now()) {
+    throw new Error('Assertion expired')
+  }
+}
+
 export function createEntraOBOAdapter(config: {
   tenant: string
   clientId: string
@@ -177,6 +241,9 @@ export function createEntraOBOAdapter(config: {
       userIdpToken: string,
       service: string
     ): Promise<ServiceCredential> {
+      const claims = decodeJwtClaims(userIdpToken)
+      assertTenantLocked(claims, config)
+
       const tokenUrl = `https://login.microsoftonline.com/${config.tenant}/oauth2/v2.0/token`
 
       const body = new URLSearchParams({
@@ -231,6 +298,8 @@ Checklist:
 - [ ] MCP server list in the UI shows all federated services as "connected" within 3 seconds of login
 - [ ] Sign-in audit entry appears in Entra admin console
 - [ ] Services NOT in `FEDERATED_SERVICES` (e.g., GitHub, personal Notion) still go through per-service OAuth
+- [ ] Tenant lock — endpoint: `grep -r "login.microsoftonline.com/common" packages/ apps/` returns zero matches in your fork
+- [ ] Tenant lock — assertion: a foreign-tenant ID token fed into `createEntraOBOAdapter({ tenant: '<yours>', clientId: '<yours>' }).exchangeForService(...)` throws `Tenant mismatch: …` before any network call (unit test recommended)
 
 ### Step 8 — Distribute the Fork
 
