@@ -28,6 +28,7 @@ import {
 } from './integrations.js';
 import { FirstRun } from './panes/FirstRun.js';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
+import { SignIn } from './routes/SignIn/index.js';
 import { isTauriRuntime, WEB_PREVIEW_NOTICE } from './runtime.js';
 import { Workspace } from './workspace/Workspace.js';
 
@@ -920,7 +921,24 @@ export const App = (): JSX.Element => {
     await engine.runNow(jobId);
   };
 
-  const workspaceAvailable = nativeRuntime && state.onboarded;
+  const hasSignedIn =
+    state.sessions.google !== null ||
+    state.sessions.github !== null ||
+    state.sessions.microsoft !== null;
+  const signInGateVisible = nativeRuntime && !hasSignedIn;
+  const workspaceAvailable = nativeRuntime && state.onboarded && hasSignedIn;
+
+  if (signInGateVisible) {
+    return (
+      <div className="tinker-app">
+        <SignIn
+          nativeRuntimeAvailable={nativeRuntime}
+          providerMessages={providerMessages}
+          onSignIn={handleProviderConnect}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="tinker-app">

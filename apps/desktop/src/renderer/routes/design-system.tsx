@@ -31,6 +31,7 @@ import {
   SettingsShell,
   type SettingsShellSection,
 } from '../workspace/components/SettingsShell/index.js';
+import { SignIn } from './SignIn/index.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -43,7 +44,8 @@ type PlaygroundTab =
   | 'toast'
   | 'empty'
   | 'chat'
-  | 'settings-shell';
+  | 'settings-shell'
+  | 'sign-in';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
@@ -56,6 +58,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
   { value: 'settings-shell', label: 'Settings Shell' },
+  { value: 'sign-in', label: 'Sign In' },
 ];
 
 const BADGE_VARIANTS: ReadonlyArray<{ variant: BadgeVariant; label: string }> = [
@@ -1292,6 +1295,30 @@ const SettingsShellTab = (): JSX.Element => (
   </div>
 );
 
+const SignInTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Idle (provider picker)">
+      <div className="ds-settings-frame">
+        <SignIn
+          nativeRuntimeAvailable
+          providerMessages={{}}
+          onSignIn={() => new Promise<void>(() => {})}
+        />
+      </div>
+    </Section>
+
+    <Section label="Native runtime unavailable (web preview)">
+      <div className="ds-settings-frame">
+        <SignIn
+          nativeRuntimeAvailable={false}
+          providerMessages={{}}
+          onSignIn={async () => {}}
+        />
+      </div>
+    </Section>
+  </div>
+);
+
 /* ----------------------- Router ------------------------- */
 
 const renderTab = (tab: PlaygroundTab): JSX.Element => {
@@ -1316,6 +1343,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ChatTab />;
     case 'settings-shell':
       return <SettingsShellTab />;
+    case 'sign-in':
+      return <SignInTab />;
   }
 };
 
