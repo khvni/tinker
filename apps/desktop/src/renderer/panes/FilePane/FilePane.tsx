@@ -1,6 +1,4 @@
-import { Suspense, lazy, useState, type JSX } from 'react';
-import { open as openExternal } from '@tauri-apps/plugin-shell';
-import { Button } from '@tinker/design';
+import { Suspense, lazy, type JSX } from 'react';
 import type { TinkerPaneData } from '@tinker/shared-types';
 import { CodeRenderer } from '../../renderers/CodeRenderer.js';
 import { CsvRenderer } from '../../renderers/CsvRenderer.js';
@@ -8,7 +6,8 @@ import { HtmlRenderer } from '../../renderers/HtmlRenderer.js';
 import { ImageRenderer } from '../../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../../renderers/MarkdownEditor.js';
 import { MarkdownRenderer } from '../../renderers/MarkdownRenderer.js';
-import { getPanelTitleForPath, type FilePaneParams } from '../../renderers/file-utils.js';
+import type { FilePaneParams } from '../../renderers/file-utils.js';
+import { ExternalPreviewPane } from './components/ExternalPreviewPane/index.js';
 
 type FilePaneData = Extract<TinkerPaneData, { readonly kind: 'file' }>;
 
@@ -64,6 +63,17 @@ const MarkdownEditorFileRenderer: FileRenderer = ({ path, vaultRevision }) => {
   return <MarkdownEditor path={path} vaultRevision={vaultRevision} />;
 };
 
+const PptxFileRenderer: FileRenderer = ({ path, mime }) => {
+  return (
+    <ExternalPreviewPane
+      eyebrow="PPTX preview"
+      message="Inline PowerPoint preview is unavailable. Open externally for full-fidelity slides."
+      mime={mime}
+      path={path}
+    />
+  );
+};
+
 const createMimeMap = (
   mimeTypes: readonly string[],
   renderer: FileRenderer,
@@ -99,6 +109,11 @@ const IMAGE_MIME_TYPES = [
   'image/webp',
 ] as const;
 
+const PPTX_MIME_TYPES = [
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+] as const;
+
 // Legacy Markdown editor is still pane-based, so it needs a temporary
 // MIME-shaped selector until M3 replaces the edit flow.
 export const MARKDOWN_EDITOR_MIME = 'text/markdown; mode=edit';
@@ -107,6 +122,7 @@ export const mimeToRenderer: Readonly<Record<string, FileRenderer>> = Object.fre
   ...createMimeMap(CODE_MIME_TYPES, CodeFileRenderer),
   ...createMimeMap(IMAGE_MIME_TYPES, ImageFileRenderer),
   'application/pdf': PdfFileRenderer,
+  ...createMimeMap(PPTX_MIME_TYPES, PptxFileRenderer),
   'application/xhtml+xml': HtmlFileRenderer,
   'text/csv': CsvFileRenderer,
   'text/html': HtmlFileRenderer,
@@ -118,15 +134,6 @@ export const mimeToRenderer: Readonly<Record<string, FileRenderer>> = Object.fre
 type FilePaneLoadingStateProps = {
   label: string;
   path: string;
-};
-
-type UnsupportedFilePaneProps = {
-  path: string;
-  mime: string;
-};
-
-export const openFileExternally = async (path: string): Promise<void> => {
-  await openExternal(path);
 };
 
 const FilePaneLoadingState = ({ label, path }: FilePaneLoadingStateProps): JSX.Element => {
@@ -144,54 +151,20 @@ const FilePaneLoadingState = ({ label, path }: FilePaneLoadingStateProps): JSX.E
   );
 };
 
-const UnsupportedFilePane = ({ path, mime }: UnsupportedFilePaneProps): JSX.Element => {
-  const [error, setError] = useState<string | null>(null);
-  const [opening, setOpening] = useState(false);
-
-  const handleOpenExternal = async (): Promise<void> => {
-    setOpening(true);
-    setError(null);
-
-    try {
-      await openFileExternally(path);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
-    } finally {
-      setOpening(false);
-    }
-  };
-
-  return (
-    <section className="tinker-pane tinker-renderer-pane">
-      <header className="tinker-pane-header">
-        <div>
-          <p className="tinker-eyebrow">Unsupported file</p>
-          <h2>{getPanelTitleForPath(path)}</h2>
-        </div>
-      </header>
-
-      <p className="tinker-muted">Unsupported, open externally.</p>
-      <p className="tinker-muted">MIME: {mime}</p>
-      {error ? <p className="tinker-muted">{error}</p> : null}
-      <div className="tinker-inline-actions">
-        <Button
-          variant="secondary"
-          size="s"
-          onClick={() => void handleOpenExternal()}
-          disabled={opening}
-        >
-          {opening ? 'Opening…' : 'Open externally'}
-        </Button>
-      </div>
-    </section>
-  );
-};
+export { openFileExternally } from './components/ExternalPreviewPane/index.js';
 
 export const FilePane = ({ data, vaultRevision = 0 }: FilePaneProps): JSX.Element => {
   const Renderer = mimeToRenderer[data.mime];
 
   if (!Renderer) {
-    return <UnsupportedFilePane path={data.path} mime={data.mime} />;
+    return (
+      <ExternalPreviewPane
+        eyebrow="Unsupported file"
+        message="Unsupported, open externally."
+        mime={data.mime}
+        path={data.path}
+      />
+    );
   }
 
   return <Renderer path={data.path} mime={data.mime} vaultRevision={vaultRevision} />;
