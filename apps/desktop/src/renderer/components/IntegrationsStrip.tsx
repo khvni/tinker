@@ -1,10 +1,6 @@
 import type { JSX } from 'react';
 import type { SSOStatus } from '@tinker/shared-types';
-
-export type MCPStatus = {
-  status: 'connected' | 'disabled' | 'failed' | 'needs_auth' | 'needs_client_registration';
-  error?: string;
-};
+import type { MCPStatus } from '../integrations.js';
 
 type IntegrationsStripProps = {
   compact?: boolean;
@@ -32,10 +28,13 @@ const statusLabel = (status: MCPStatus | undefined, providerConnected: boolean):
   }
 
   switch (status.status) {
+    case 'checking':
+      return 'Checking';
     case 'connected':
       return 'Connected';
     case 'needs_auth':
       return 'Needs reconnect';
+    case 'error':
     case 'failed':
       return 'Failed';
     case 'needs_client_registration':
@@ -55,7 +54,7 @@ const toneClass = (status: MCPStatus | undefined, providerConnected: boolean): s
     return 'tinker-integration-chip--warning';
   }
 
-  if (status?.status === 'failed') {
+  if (status?.status === 'error' || status?.status === 'failed') {
     return 'tinker-integration-chip--error';
   }
 

@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import { Button, Toggle } from '@tinker/design';
 import type { SSOStatus } from '@tinker/shared-types';
-import type { MCPStatus } from '../components/IntegrationsStrip.js';
+import type { MCPStatus } from '../integrations.js';
 import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
 import type { WorkspacePreferences } from '@tinker/shared-types';
 
