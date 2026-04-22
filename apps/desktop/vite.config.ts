@@ -6,6 +6,13 @@ export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
   clearScreen: false,
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    css: false,
+    include: ['**/*.test.{ts,tsx}'],
+    setupFiles: ['test-setup.ts'],
+  },
   build: {
     outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true,
