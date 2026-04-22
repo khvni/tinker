@@ -7,6 +7,7 @@ export * from './memory-store.js';
 export * from './role-profile.js';
 export * from './memory-utils.js';
 export * from './scheduler-store.js';
+export * from './session-store.js';
 export * from './settings-store.js';
 export * from './skill-git.js';
 export * from './skill-parser.js';
