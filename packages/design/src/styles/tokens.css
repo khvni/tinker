@@ -76,9 +76,10 @@
   --radius-lg: 12px;
   --radius-pill: 9999px;
 
-  /* typography */
+  /* typography — generic scale (load-bearing for primitives that don't map 1:1 to a Paper role) */
   --font-sans: "Host Grotesk Variable", "Host Grotesk", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+  --font-size-xxs: 10px;
   --font-size-xs: 11px;
   --font-size-sm: 12px;
   --font-size-base: 13px;
@@ -94,6 +95,28 @@
   --line-height-normal: 1.45;
   --line-height-relaxed: 1.6;
   --letter-spacing-label: 0.08em;
+
+  /* typography roles (Paper 9J-0 spec) — semantic layer on top of the generic scale */
+  --font-size-display: 28px;
+  --font-size-h2: 20px;
+  --font-size-h3: 16px;
+  --font-size-body: 14px;
+  --font-size-secondary: 13px;
+  --font-size-label: 11px;
+  --font-size-mono: 12px;
+
+  --font-weight-display: var(--font-weight-bold);     /* 700 — light default per 9J-0 */
+  --font-weight-h2: var(--font-weight-semibold);      /* 600 */
+  --font-weight-h3: var(--font-weight-medium);        /* 500 */
+  --font-weight-body: var(--font-weight-regular);     /* 400 */
+
+  --line-height-display: 1.2;
+  --line-height-h2: 1.3;
+  --line-height-h3: 1.4;
+  --line-height-body: 1.45;
+  --line-height-secondary: 1.4;
+  --line-height-label: 1.3;
+  --line-height-mono: 1.4;
 
   /* motion */
   --duration-fast: 120ms;
@@ -117,6 +140,9 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
+
+  /* typography — dark renders the display line lighter per Paper 6M-0 */
+  --font-weight-display: var(--font-weight-semibold);  /* 600 in dark */
 
   /* bg (warm near-black) */
   --color-bg-primary: #1a1612;
