@@ -76,6 +76,12 @@ describe('FilePane', () => {
     expect(mimeToRenderer[MARKDOWN_EDITOR_MIME]).toBeDefined();
   });
 
+  it('dispatches DOCX files through the DOCX renderer', () => {
+    expect(
+      mimeToRenderer['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ).toBeDefined();
+  });
+
   it('routes pptx files through the explicit external-preview fallback', () => {
     const markup = renderToStaticMarkup(
       <FilePane

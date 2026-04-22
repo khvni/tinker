@@ -518,6 +518,49 @@ textarea {
   color: var(--color-accent);
 }
 
+.tinker-docx-body p,
+.tinker-docx-body ul,
+.tinker-docx-body ol,
+.tinker-docx-body table {
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+
+.tinker-docx-body ul,
+.tinker-docx-body ol {
+  padding-left: var(--space-5);
+}
+
+.tinker-docx-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+.tinker-docx-body table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+}
+
+.tinker-docx-body th,
+.tinker-docx-body td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tinker-docx-body thead th {
+  background: var(--color-bg-panel);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
 .tinker-markdown-body pre,
 .tinker-code-block {
   padding: var(--space-4);

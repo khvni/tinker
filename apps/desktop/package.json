@@ -30,6 +30,7 @@
     "@tinker/shared-types": "workspace:*",
     "dompurify": "^3.4.0",
     "highlight.js": "^11.11.1",
+    "mammoth": "^1.12.0",
     "marked": "^18.0.0",
     "papaparse": "^5.5.3",
     "react": "^19.0.0",

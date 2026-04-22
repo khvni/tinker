@@ -59,7 +59,7 @@ Every pick below has its license link inlined and has been cross-checked against
 
 ### DOCX — `mammoth`
 
-- **Version pin**: `mammoth@^1.8.0`.
+- **Version pin**: `mammoth@^1.12.0`.
 - **Install**: `pnpm -F @tinker/desktop add mammoth`.
 - **Integration notes**:
   - Call `mammoth.convertToHtml({ arrayBuffer })`; feed output through existing `DOMPurify` sanitization before injection.

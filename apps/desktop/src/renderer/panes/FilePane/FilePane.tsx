@@ -2,6 +2,7 @@ import { type JSX } from 'react';
 import type { TinkerPaneData } from '@tinker/shared-types';
 import { CodeRenderer } from '../../renderers/CodeRenderer.js';
 import { CsvRenderer } from '../../renderers/CsvRenderer.js';
+import { DocxRenderer } from '../../renderers/DocxRenderer/index.js';
 import { HtmlRenderer } from '../../renderers/HtmlRenderer.js';
 import { ImageRenderer } from '../../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../../renderers/MarkdownEditor.js';
@@ -36,6 +37,10 @@ const CsvFileRenderer: FileRenderer = ({ path }) => {
 
 const HtmlFileRenderer: FileRenderer = ({ path, mime }) => {
   return <HtmlRenderer params={toParams(path, mime)} />;
+};
+
+const DocxFileRenderer: FileRenderer = ({ path }) => {
+  return <DocxRenderer path={path} />;
 };
 
 const ImageFileRenderer: FileRenderer = ({ path }) => {
@@ -108,6 +113,7 @@ export const MARKDOWN_EDITOR_MIME = 'text/markdown; mode=edit';
 export const mimeToRenderer: Readonly<Record<string, FileRenderer>> = Object.freeze({
   ...createMimeMap(CODE_MIME_TYPES, CodeFileRenderer),
   ...createMimeMap(IMAGE_MIME_TYPES, ImageFileRenderer),
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DocxFileRenderer,
   ...createMimeMap(PPTX_MIME_TYPES, PptxFileRenderer),
   'application/xhtml+xml': HtmlFileRenderer,
   'text/csv': CsvFileRenderer,
