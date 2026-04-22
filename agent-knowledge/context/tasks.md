@@ -130,7 +130,7 @@ Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5, M8.3 (current user resol
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | 6.1 | Add `app_settings` SQLite table (key/value JSON) in `@tinker/memory/database.ts`. CRUD helpers in new `packages/memory/src/settings-store.ts`. | S | — | review | TIN-57 · PR #24 · branch `khvni/tin-57-app-settings`. |
-| 6.2 | Default memory root resolver (TS): macOS `~/Library/Application Support/Tinker/memory`, Linux `~/.local/share/tinker/memory`, Windows `%APPDATA%\Tinker\memory`. Create dir if missing via Tauri fs plugin. | S | — | not started | Platform root paths. |
+| 6.2 | Default memory root resolver (TS): macOS `~/Library/Application Support/Tinker/memory`, Linux `~/.local/share/tinker/memory`, Windows `%APPDATA%\Tinker\memory`. Create dir if missing via Tauri fs plugin. | S | — | review | TIN-58 · PR #30 opened 2026-04-21. |
 | 6.3 | On first run: seed `app_settings.memory_root` with resolved default. Per-user active path resolves to `<memory_root>/<current-user-id>/` — created if missing on sign-in. | S | 6.1, 6.2, 8.3 | not started | Init hook. |
 | 6.4 | Memory pane (register in M1.5): list `.md` files in the current user's subdir. Click → opens as FilePane tab w/ Markdown renderer (3.9). | M | 6.3, 3.9 | not started | Reuses renderer. |
 | 6.5 | Settings pane: "Memory folder" row with current root path + `<Button>Change location…</Button>`. Opens Tauri folder picker → validates writable → updates setting. | M | 6.3 | not started | Single setting surface for MVP. |
