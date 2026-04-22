@@ -16,6 +16,10 @@ use tokio::time::{sleep, timeout, Duration as TokioDuration, Instant};
 
 use crate::commands::auth::{AuthProvider, BetterAuthState, SSOSession, KEYRING_SERVICE};
 
+const TINKER_GITHUB_AUTHORIZATION_ENV: &str = "TINKER_GITHUB_AUTHORIZATION";
+const TINKER_LINEAR_AUTHORIZATION_ENV: &str = "TINKER_LINEAR_AUTHORIZATION";
+const LINEAR_API_TOKEN_ENV_NAMES: [&str; 2] = ["TINKER_LINEAR_API_TOKEN", "LINEAR_API_TOKEN"];
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct OpencodeConnection {
@@ -66,6 +70,37 @@ fn read_keychain_session(
             Ok(None)
         }
     }
+}
+
+fn first_non_empty_scope<'a>(scopes: &'a [String], candidates: &[&'a str]) -> Option<&'a str> {
+    scopes.iter().find_map(|scope| {
+        let normalized = scope.trim();
+        if normalized.is_empty() {
+            return None;
+        }
+
+        candidates.iter().copied().find(|candidate| normalized == *candidate)
+    })
+}
+
+fn github_session_supports_mcp(session: &SSOSession) -> bool {
+    first_non_empty_scope(session.scopes(), &["repo", "public_repo"]).is_some()
+}
+
+fn bearer_authorization(token: &str) -> Option<String> {
+    let trimmed = token.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    Some(format!("Bearer {trimmed}"))
+}
+
+fn env_token_authorization(var_names: &[&str]) -> Option<String> {
+    var_names
+        .iter()
+        .find_map(|name| std::env::var(name).ok())
+        .and_then(|token| bearer_authorization(&token))
 }
 
 #[tauri::command]
@@ -278,9 +313,10 @@ async fn bootstrap_opencode(
     };
     let username = format!("tinker-{}", random_url_safe(8));
     let password = random_url_safe(24);
-    let github_token = read_keychain_session(app, AuthProvider::Github)?
-        .map(|session| session.access_token().to_string())
-        .unwrap_or_default();
+    let github_authorization = read_keychain_session(app, AuthProvider::Github)?
+        .filter(github_session_supports_mcp)
+        .and_then(|session| bearer_authorization(session.access_token()));
+    let linear_authorization = env_token_authorization(&LINEAR_API_TOKEN_ENV_NAMES);
 
     let mut sidecar_args = vec!["serve", "--hostname", "127.0.0.1", "--port", "0"];
     if let Some(folder) = folder_arg {
@@ -300,8 +336,12 @@ async fn bootstrap_opencode(
         ))
         .current_dir(working_dir);
 
-    if !github_token.is_empty() {
-        sidecar = sidecar.env("TINKER_GITHUB_TOKEN", github_token);
+    if let Some(github_authorization) = github_authorization {
+        sidecar = sidecar.env(TINKER_GITHUB_AUTHORIZATION_ENV, github_authorization);
+    }
+
+    if let Some(linear_authorization) = linear_authorization {
+        sidecar = sidecar.env(TINKER_LINEAR_AUTHORIZATION_ENV, linear_authorization);
     }
 
     let (mut receiver, child) = sidecar.spawn().map_err(|error| error.to_string())?;
@@ -439,6 +479,30 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn github_session(scopes: &[&str]) -> SSOSession {
+        SSOSession::for_test(AuthProvider::Github, scopes)
+    }
+
+    #[test]
+    fn github_session_supports_repo_scopes() {
+        assert!(github_session_supports_mcp(&github_session(&["read:user", "repo"])));
+        assert!(github_session_supports_mcp(&github_session(&["public_repo"])));
+    }
+
+    #[test]
+    fn github_session_rejects_identity_only_scopes() {
+        assert!(!github_session_supports_mcp(&github_session(&["read:user", "user:email"])));
+    }
+
+    #[test]
+    fn bearer_authorization_requires_non_empty_token() {
+        assert_eq!(
+            bearer_authorization("  ghp_123  "),
+            Some("Bearer ghp_123".to_string())
+        );
+        assert_eq!(bearer_authorization("   "), None);
+    }
 
     #[test]
     fn bootstrap_opencode_env_includes_smart_vault_path_when_present() {

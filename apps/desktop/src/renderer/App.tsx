@@ -20,9 +20,11 @@ import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus
 import { DEFAULT_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
-  checkExaBootHealth,
+  checkTrackedMcpBootHealth,
   EXA_CHECKING_STATUS,
   EXA_MCP_NAME,
+  GITHUB_MCP_NAME,
+  LINEAR_MCP_NAME,
   type MCPStatus,
 } from './integrations.js';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
@@ -647,15 +649,17 @@ export const App = (): JSX.Element => {
             mcpStatus: {
               ...current.mcpStatus,
               [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
+              [GITHUB_MCP_NAME]: EXA_CHECKING_STATUS,
+              [LINEAR_MCP_NAME]: EXA_CHECKING_STATUS,
             },
           },
     );
 
     void (async () => {
-      const status = await checkExaBootHealth(() => {
+      const statuses = await checkTrackedMcpBootHealth(() => {
         const client = createWorkspaceClient(connection, directory);
         return client.mcp.status();
-      });
+      }, state.sessions.github);
 
       if (!active) {
         return;
@@ -668,7 +672,7 @@ export const App = (): JSX.Element => {
               ...current,
               mcpStatus: {
                 ...current.mcpStatus,
-                [EXA_MCP_NAME]: status,
+                ...statuses,
               },
             },
       );
@@ -683,6 +687,7 @@ export const App = (): JSX.Element => {
     state.status === 'ready' ? state.opencode.baseUrl : null,
     state.status === 'ready' ? state.opencode.username : null,
     state.status === 'ready' ? state.opencode.password : null,
+    state.status === 'ready' ? state.sessions.github?.scopes.join(',') : null,
   ]);
 
   if (state.status === 'loading') {
