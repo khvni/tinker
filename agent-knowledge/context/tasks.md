@@ -219,7 +219,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | 11 | Device ↔ host-service split | [[11-host-service]] | Premature abstraction for single-user MVP. Revisit when headless mode becomes real scope. |
 | 12 | Workspace attention coordinator | [[12-attention-coordinator]] | Multi-pane UX polish. MVP = one pane. |
 | 13 | Vertical workspace sidebar | [[13-workspace-sidebar]] | Depends on multi-workspace UX which MVP doesn't have. Package scaffold landed via TIN-149 — PR #45 review — not wired into `App.tsx`; dead code per D25. |
-| 14 | Session history windowing | [[14-session-history-windowing]] | Perf feature. Revisit at >1000 messages/session. |
+| 14 | Session history windowing | [[14-session-history-windowing]] | review — TIN-152 · PR #51. Perf feature. Revisit at >1000 messages/session. |
 | 15 | Connection gate (full splash + retry) | [[15-connection-gate]] | Minimal variant in M7.8 covers MVP. |
 
 ## Rejected (not coming back)
