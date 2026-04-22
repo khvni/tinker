@@ -147,7 +147,7 @@ jobs:
         run: pnpm exec node ./scripts/write-release-config.mjs
 
       - name: Build desktop bundles and upload release assets
-        uses: tauri-apps/tauri-action@v1
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           CI: "true"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
