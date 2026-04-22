@@ -23,7 +23,7 @@ Public documentation for Tinker — a local-first desktop AI workspace. Authorit
 - **[Architectural decisions](./decisions.md)** — decision log with reasoning
 
 ### For operators
-- Distribution + signing *(coming soon)*
+- **[Distribution + signing](./distribution-signing.md)** — macOS release workflow, required secrets, notarization flow
 - Telemetry + logging *(coming soon)*
 
 ---

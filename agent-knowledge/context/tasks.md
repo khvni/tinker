@@ -227,6 +227,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | Ticket | Feature | Scope | Status | Notes |
 |--------|---------|-------|--------|-------|
 | TIN-112 | 02 | Playbook shared skill schema + markdown frontmatter spec | review | PR #46 |
+| TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
 
 ## Rejected (not coming back)
 
