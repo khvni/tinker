@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./coach": "./src/coach.ts",
     "./layout": "./src/layout.ts",
     "./memory": "./src/memory.ts",
     "./pane": "./src/pane.ts",

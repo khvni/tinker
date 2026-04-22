@@ -1,5 +1,5 @@
 import { copyFile, exists, mkdir, readTextFile, remove, stat, writeTextFile } from '@tauri-apps/plugin-fs';
-import type { Skill, SkillDraft, SkillGitConfig, SkillSearchResult, SkillStore } from '@tinker/shared-types';
+import type { RoleProfile, Skill, SkillDraft, SkillGitConfig, SkillSearchResult, SkillStore } from '@tinker/shared-types';
 import { SKILLS_VAULT_DIRECTORY } from '@tinker/shared-types';
 import { getDatabase } from './database.js';
 import {
@@ -10,6 +10,7 @@ import {
   skillRelativePath,
   slugFromRelativePath,
 } from './skill-parser.js';
+import { inferRoleProfile } from './role-profile.js';
 import { resolveVaultPath, walkMarkdownFiles } from './vault-utils.js';
 
 type SkillRow = {
@@ -218,6 +219,11 @@ export const createSkillStore = (): SkillStore => {
         'SELECT * FROM skills WHERE active = 1 ORDER BY title COLLATE NOCASE ASC',
       );
       return rows.map(hydrateSkill);
+    },
+
+    async getRoleProfile(connectedTools): Promise<RoleProfile> {
+      const skills = await readAllRows();
+      return inferRoleProfile({ connectedTools, skills });
     },
 
     async setActive(slug: string, active: boolean): Promise<void> {

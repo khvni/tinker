@@ -1,3 +1,5 @@
+import type { RoleProfile } from './coach.js';
+
 export const SKILLS_VAULT_DIRECTORY = '.tinker/skills';
 
 export type SkillFrontmatter = {
@@ -55,6 +57,7 @@ export type SkillStore = {
   get(slug: string): Promise<Skill | null>;
   search(query: string, limit?: number): Promise<SkillSearchResult[]>;
   getActive(): Promise<Skill[]>;
+  getRoleProfile(connectedTools: ReadonlyArray<string>): Promise<RoleProfile>;
   setActive(slug: string, active: boolean): Promise<void>;
   installFromFile(sourceAbsolutePath: string): Promise<Skill>;
   installFromDraft(draft: SkillDraft): Promise<Skill>;
