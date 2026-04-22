@@ -1,0 +1,7 @@
+[[permission]]
+identifier = "allow-refresh-token-keychain"
+description = "Allows the renderer to save, load, and clear refresh tokens via the OS keychain."
+
+[permission.commands]
+allow = ["save_refresh_token", "load_refresh_token", "clear_refresh_token"]
+deny = []

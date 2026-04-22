@@ -25,6 +25,7 @@
     "allow-folder-picker",
     "allow-get-opencode-connection",
     "allow-oauth-flow",
+    "allow-refresh-token-keychain",
     "allow-restart-opencode",
     "fs:default",
     "fs:allow-home-read-recursive",

@@ -13,9 +13,11 @@ export const GOOGLE_SCOPES = [
 export const ONBOARDING_KEY = 'tinker:onboarded';
 export const VAULT_PATH_KEY = 'tinker:vault-path';
 export const DEFAULT_USER_ID = 'local-user';
+export const REFRESH_TOKEN_PROVIDERS = ['google', 'github', 'microsoft'] as const;
 
 export type AuthProvider = SSOProvider;
 export type AuthStatus = SSOStatus;
+export type RefreshTokenProvider = (typeof REFRESH_TOKEN_PROVIDERS)[number];
 export type OpencodeConnection = {
   baseUrl: string;
   username: string;
@@ -24,6 +26,18 @@ export type OpencodeConnection = {
 
 export function openFolderPicker(): Promise<string> {
   return invoke<string>('open_folder_picker');
+}
+
+export function saveRefreshToken(provider: RefreshTokenProvider, userId: string, token: string): Promise<void> {
+  return invoke('save_refresh_token', { provider, userId, token });
+}
+
+export function loadRefreshToken(provider: RefreshTokenProvider, userId: string): Promise<string | null> {
+  return invoke<string | null>('load_refresh_token', { provider, userId });
+}
+
+export function clearRefreshToken(provider: RefreshTokenProvider, userId: string): Promise<void> {
+  return invoke('clear_refresh_token', { provider, userId });
 }
 
 export function stopOpencode(pid: number): Promise<void> {

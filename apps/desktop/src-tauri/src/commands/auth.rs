@@ -139,7 +139,7 @@ fn parse_callback_request(request: &str) -> Result<HashMap<String, String>, Stri
   Ok(url.query_pairs().into_owned().collect())
 }
 
-fn keyring_error(error: impl std::fmt::Display) -> String {
+pub(crate) fn keyring_error(error: impl std::fmt::Display) -> String {
   format!("Keychain operation failed: {error}")
 }
 

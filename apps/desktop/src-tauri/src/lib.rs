@@ -326,6 +326,9 @@ pub fn run() {
       commands::auth::auth_sign_out,
       commands::auth::auth_status,
       commands::dialog::open_folder_picker,
+      commands::keychain::save_refresh_token,
+      commands::keychain::load_refresh_token,
+      commands::keychain::clear_refresh_token,
       commands::opencode::start_opencode,
       commands::opencode::stop_opencode
     ])
