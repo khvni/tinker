@@ -190,6 +190,12 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | done | TIN-90 · PR #29 merged 2026-04-22. |
 | X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | review | TIN-91 · PR #88 · documented with repo-root `pnpm dev:desktop` because `pnpm tauri dev` is not wired in this workspace. |
 
+### Testing infra
+
+| ID | Task | Size | Depends on | Status | Notes |
+|----|------|------|------------|--------|-------|
+| TIN-201 | Visual parity CI gate: Playwright + pixelmatch baselines for Workspace / Memory / Settings panes. | M | X.2 | review | PR #115. Code-baseline approach (not Paper-PNG diff). `dev:web` not `dev:desktop`. |
+
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
 
 - [ ] All M1-M8 rows status = `done`.

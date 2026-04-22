@@ -17,6 +17,16 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['**/dist/**', '**/out/**', '**/build/**', '**/node_modules/**', '**/.next/**', '**/.vercel/**'],
+    ignores: [
+      '**/dist/**',
+      '**/out/**',
+      '**/build/**',
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/.vercel/**',
+      '**/test-output/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
+    ],
   },
 );

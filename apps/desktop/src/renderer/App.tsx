@@ -345,6 +345,11 @@ export const App = (): JSX.Element => {
   const initialAuthSyncRef = useRef<boolean>(true);
   const { state: currentUserState, refresh: refreshCurrentUser } = useCurrentUser(nativeRuntime);
 
+  useEffect(() => {
+    const ready = state.status === 'ready' && currentUserState.status === 'ready';
+    document.documentElement.dataset['appReady'] = ready ? 'true' : 'false';
+  }, [state.status, currentUserState.status]);
+
   const requireNativeRuntime = (action: string): void => {
     if (!nativeRuntime) {
       throw new Error(`${action} is unavailable in browser preview. Use pnpm dev:desktop for native app flows.`);
