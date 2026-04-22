@@ -11,8 +11,8 @@ import {
   createSkillStore,
   createVaultService,
   getActiveMemoryPath,
-  getMemoryRoot,
   indexVault,
+  syncActiveMemoryPath,
   upsertUser,
   type MemoryRunState,
 } from '@tinker/memory';
@@ -138,13 +138,15 @@ const readAuthStatus = async (): Promise<SSOStatus> => {
   return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
 };
 
-const ensureConnectedMemoryPaths = async (sessions: SSOStatus): Promise<void> => {
-  await getMemoryRoot();
-
+const syncCurrentUserMemoryPath = async (
+  sessions: SSOStatus,
+  options?: { emit?: boolean },
+): Promise<void> => {
   const connectedSessions = Object.values(sessions).filter((session): session is SSOSession => session !== null);
   await Promise.all(
     connectedSessions.map((session) => getActiveMemoryPath(buildStoredUserId(session.provider, session.userId))),
   );
+  await syncActiveMemoryPath(pickCurrentUserId(sessions), options);
 };
 
 const getDefaultVaultPath = async (): Promise<string> => {
@@ -354,7 +356,7 @@ export const App = (): JSX.Element => {
 
         const [opencode, sessions] = await Promise.all([invoke<OpencodeConnection>('get_opencode_connection'), readAuthStatus()]);
         await upsertUser(createLocalUser());
-        await ensureConnectedMemoryPaths(sessions);
+        await syncCurrentUserMemoryPath(sessions, { emit: false });
         const vaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         let vaultRevision = 0;
@@ -703,6 +705,7 @@ export const App = (): JSX.Element => {
     requireNativeRuntime('Restarting OpenCode');
     const opencode = await invoke<OpencodeConnection>('restart_opencode');
     const nextState = await reloadConnectionState(opencode, state.vaultPath);
+    await syncCurrentUserMemoryPath(nextState.sessions);
 
     setState((current) =>
       current.status !== 'ready'
@@ -841,16 +844,17 @@ export const App = (): JSX.Element => {
     try {
       requireNativeRuntime(`Connecting ${providerDisplayName(provider)}`);
       const session = await invoke<SSOSession>('auth_sign_in', { provider });
-      await upsertUser(toStoredUser(session));
-      await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
       if (providerNeedsRefreshToken(provider) && session.refreshToken.length === 0) {
         throw new Error(`${providerDisplayName(provider)} sign-in did not return refresh token. Try again.`);
       }
+      await upsertUser(toStoredUser(session));
+      await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
 
       if (providerNeedsWorkspaceRefresh(provider)) {
         await refreshWorkspaceConnection();
       } else {
         const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
+        await syncCurrentUserMemoryPath(nextState.sessions);
         setState((current) =>
           current.status !== 'ready'
             ? current
@@ -882,6 +886,7 @@ export const App = (): JSX.Element => {
         await refreshWorkspaceConnection();
       } else {
         const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
+        await syncCurrentUserMemoryPath(nextState.sessions);
         setState((current) =>
           current.status !== 'ready'
             ? current

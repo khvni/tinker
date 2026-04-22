@@ -19,11 +19,21 @@ export type MemoryRootMoveProgress = {
 export type MemoryPathChangedDetail = {
   previousRoot: string;
   nextRoot: string;
+  previousPath: string | null;
+  nextPath: string | null;
+  previousUserId: string | null;
+  nextUserId: string | null;
 };
 
 type RelativeMemoryTree = {
   directories: string[];
   files: string[];
+};
+
+type ActiveMemoryPathState = {
+  root: string;
+  path: string;
+  userId: string;
 };
 
 const normalizeDirectoryForDetection = (directory: string): string => {
@@ -33,6 +43,7 @@ const normalizeDirectoryForDetection = (directory: string): string => {
 const MEMORY_ROOT_SETTING_KEY = 'memory_root';
 const MEMORY_ROOT_PROBE_FILE_PREFIX = '.tinker-memory-root-probe';
 const memoryPathListeners = new Set<(detail: MemoryPathChangedDetail) => void>();
+let activeMemoryPathState: ActiveMemoryPathState | null = null;
 
 const createMemorySettingsStore = (): SettingsStore => {
   return createSettingsStore();
@@ -205,6 +216,51 @@ export const getActiveMemoryPath = async (
   return activeMemoryPath;
 };
 
+export const syncActiveMemoryPath = async (
+  userId: string,
+  options?: {
+    emit?: boolean;
+    runtimePlatform?: string;
+  },
+): Promise<string> => {
+  const normalizedUserId = userId.trim();
+  if (normalizedUserId.length === 0) {
+    throw new Error('Cannot resolve active memory path without a user id.');
+  }
+
+  const memoryRoot = await getMemoryRoot(options?.runtimePlatform);
+  const activeMemoryPath = await join(memoryRoot, normalizedUserId);
+  await mkdir(activeMemoryPath, { recursive: true });
+
+  const previousState = activeMemoryPathState;
+  const changed =
+    previousState === null ||
+    !isSamePath(previousState.root, memoryRoot) ||
+    !isSamePath(previousState.path, activeMemoryPath) ||
+    previousState.userId !== normalizedUserId;
+
+  activeMemoryPathState = {
+    root: memoryRoot,
+    path: activeMemoryPath,
+    userId: normalizedUserId,
+  };
+
+  if (options?.emit === false || !changed) {
+    return activeMemoryPath;
+  }
+
+  emitMemoryPathChanged({
+    previousRoot: previousState?.root ?? memoryRoot,
+    nextRoot: memoryRoot,
+    previousPath: previousState?.path ?? null,
+    nextPath: activeMemoryPath,
+    previousUserId: previousState?.userId ?? null,
+    nextUserId: normalizedUserId,
+  });
+
+  return activeMemoryPath;
+};
+
 export const validateMemoryRootWritable = async (memoryRoot: string): Promise<void> => {
   const normalizedRoot = memoryRoot.trim();
   if (normalizedRoot.length === 0) {
@@ -296,7 +352,24 @@ export const moveMemoryRoot = async (
 
   await remove(currentRoot, { recursive: true }).catch(() => undefined);
 
-  emitMemoryPathChanged({ previousRoot: currentRoot, nextRoot: normalizedNextRoot });
+  const previousState = activeMemoryPathState;
+  if (previousState) {
+    const nextActivePath = await join(normalizedNextRoot, previousState.userId);
+    activeMemoryPathState = {
+      root: normalizedNextRoot,
+      path: nextActivePath,
+      userId: previousState.userId,
+    };
+  }
+
+  emitMemoryPathChanged({
+    previousRoot: currentRoot,
+    nextRoot: normalizedNextRoot,
+    previousPath: previousState?.path ?? null,
+    nextPath: activeMemoryPathState?.path ?? null,
+    previousUserId: previousState?.userId ?? null,
+    nextUserId: activeMemoryPathState?.userId ?? null,
+  });
   return normalizedNextRoot;
 };
 
