@@ -34,6 +34,7 @@ import {
   SettingsShell,
   type SettingsShellSection,
 } from '../workspace/components/SettingsShell/index.js';
+import { AccountPanel } from '../workspace/components/AccountPanel/index.js';
 import { Titlebar } from '../workspace/components/Titlebar/index.js';
 import { AttachmentIcon } from '../panes/Chat/AttachmentIcon.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
@@ -1409,22 +1410,31 @@ const SettingsSectionBody = ({
   </div>
 );
 
+const SAMPLE_ACCOUNT_SESSION = {
+  provider: 'google' as const,
+  userId: 'demo-user',
+  email: 'demo@tinker.local',
+  displayName: 'Demo User',
+  accessToken: '',
+  refreshToken: '',
+  expiresAt: new Date().toISOString(),
+  scopes: [],
+};
+
 const SETTINGS_SECTIONS: ReadonlyArray<SettingsShellSection> = [
   {
     id: 'account',
     label: 'Account',
     icon: <UserIcon />,
     content: (
-      <SettingsSectionBody
-        eyebrow="Identity"
-        title="Account"
-        lede="Identity, providers, and sign-in handled by Better Auth."
-      >
-        <div className="ds-settings-card">
-          <p className="ds-settings-card__label">Signed in as</p>
-          <p className="ds-settings-card__value">khani@berkeley.edu</p>
-        </div>
-      </SettingsSectionBody>
+      <AccountPanel
+        session={SAMPLE_ACCOUNT_SESSION}
+        signOutBusy={false}
+        signOutMessage={null}
+        onSignOut={async () => {
+          console.warn('Sample sign-out');
+        }}
+      />
     ),
   },
   {
@@ -1475,6 +1485,36 @@ const SettingsShellTab = (): JSX.Element => (
     <Section label="Default shell (Account · Memory · Connections · Display)">
       <div className="ds-settings-frame">
         <SettingsShell sections={SETTINGS_SECTIONS} />
+      </div>
+    </Section>
+
+    <Section label="Account panel — signed in (provider: Google)">
+      <div className="ds-settings-frame">
+        <AccountPanel
+          session={SAMPLE_ACCOUNT_SESSION}
+          signOutBusy={false}
+          signOutMessage={null}
+          onSignOut={async () => {
+            console.warn('Sample sign-out');
+          }}
+        />
+      </div>
+    </Section>
+
+    <Section label="Account panel — signing out (busy + notice)">
+      <div className="ds-settings-frame">
+        <AccountPanel
+          session={SAMPLE_ACCOUNT_SESSION}
+          signOutBusy
+          signOutMessage="Clearing keychain…"
+          onSignOut={async () => {}}
+        />
+      </div>
+    </Section>
+
+    <Section label="Account panel — not signed in">
+      <div className="ds-settings-frame">
+        <AccountPanel session={null} signOutBusy={false} signOutMessage={null} onSignOut={async () => {}} />
       </div>
     </Section>
 
