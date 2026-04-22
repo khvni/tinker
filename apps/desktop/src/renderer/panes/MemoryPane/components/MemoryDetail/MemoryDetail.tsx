@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 import DOMPurify from 'dompurify';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { Badge, Button, EmptyState, IconButton } from '@tinker/design';
-import {
-  MEMORY_CATEGORY_LABELS,
-  type MemoryCategoryId,
-  type MemoryEntryBucket,
-  type MemoryMarkdownFile,
-} from '@tinker/memory';
+import { MEMORY_CATEGORY_LABELS, type MemoryCategoryId, type MemoryEntryBucket, type MemoryMarkdownFile } from '@tinker/memory';
 import { renderMarkdown } from '../../../../renderers/MarkdownRenderer.js';
 import './MemoryDetail.css';
 
@@ -70,11 +65,8 @@ const PencilIcon = (): JSX.Element => (
   </svg>
 );
 
-const CategoryBadge = ({ bucket }: { bucket: MemoryEntryBucket }): JSX.Element | null => {
-  if (bucket === 'pending') {
-    return null;
-  }
-  const label = MEMORY_CATEGORY_LABELS[bucket as MemoryCategoryId];
+const CategoryBadge = ({ category }: { category: MemoryCategoryId }): JSX.Element => {
+  const label = MEMORY_CATEGORY_LABELS[category];
   return <Badge variant="default" size="medium">{label}</Badge>;
 };
 
@@ -203,14 +195,15 @@ export const MemoryDetail = ({
 
   const showActions = bucket === 'pending';
   const diffEmpty = !diffLoading && diffText.trim().length === 0;
+  const badgeCategory = file.category ?? (bucket === 'pending' ? null : bucket);
 
   return (
     <div className="tinker-memory-detail">
       <header className="tinker-memory-detail__header">
         <div className="tinker-memory-detail__header-main">
           <div className="tinker-memory-detail__title-row">
-            <h2 className="tinker-memory-detail__title">{file.name}</h2>
-            {bucket !== 'pending' ? <CategoryBadge bucket={bucket} /> : null}
+            <h2 className="tinker-memory-detail__title">{file.title}</h2>
+            {badgeCategory ? <CategoryBadge category={badgeCategory} /> : null}
           </div>
           <StatusLine bucket={bucket} modifiedAt={file.modifiedAt} formatter={relativeFormatter} />
         </div>
@@ -232,7 +225,7 @@ export const MemoryDetail = ({
             <div className="tinker-memory-detail__file-card-header">
               <div className="tinker-memory-detail__file-card-titles">
                 <span className="tinker-memory-detail__file-name">{file.name}</span>
-                <span className="tinker-memory-detail__file-path">{file.absolutePath}</span>
+                <span className="tinker-memory-detail__file-path">{file.displayPath}</span>
               </div>
               <div className="tinker-memory-detail__file-card-actions">
                 <IconButton

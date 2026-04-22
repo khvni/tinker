@@ -56,6 +56,7 @@ import {
   subscribeMemoryPathChanged,
   validateMemoryRootWritable,
 } from './memory-paths.js';
+import { DEMO_MEMORY_NOTES } from './memory-seed.js';
 
 const stubProcessPlatform = (platform: NodeJS.Platform): void => {
   vi.stubGlobal('process', { ...process, platform });
@@ -213,6 +214,29 @@ describe('default memory root resolution', () => {
 
     expect(mockJoin).toHaveBeenCalledWith('/tmp/memory-a', 'user-1');
     expect(mockJoin).toHaveBeenCalledWith('/tmp/memory-b', 'user-1');
+  });
+
+  it('seeds the Paper memory scaffold when the memory root is empty', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/tmp/custom-memory'));
+    mockReadDir.mockResolvedValue([]);
+
+    await expect(getActiveMemoryPath('guest', 'linux')).resolves.toBe('/tmp/custom-memory/guest');
+
+    expect(mockWriteTextFile).toHaveBeenCalledTimes(DEMO_MEMORY_NOTES.length);
+    expect(mockWriteTextFile).toHaveBeenCalledWith(
+      '/tmp/custom-memory/guest/pending/synthesis-auto-20260408-glass-article.md',
+      expect.stringContaining('Writing Articles on AI Agents and Software Strategy'),
+    );
+  });
+
+  it('does not re-seed the demo scaffold when the memory root already has content', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/tmp/custom-memory'));
+    mockReadDir.mockResolvedValue([createDirEntry('guest', 'directory')]);
+
+    await expect(getActiveMemoryPath('user-2', 'linux')).resolves.toBe('/tmp/custom-memory/user-2');
+
+    expect(mockWriteTextFile).not.toHaveBeenCalled();
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2', { recursive: true });
   });
 
   it('validates that a candidate memory root is writable', async () => {

@@ -3,7 +3,11 @@ import { readTextFile } from '@tauri-apps/plugin-fs';
 import { EmptyState, Button } from '@tinker/design';
 import {
   bucketForFrontmatter,
+  DEMO_MEMORY_PREVIEW,
+  DEMO_MEMORY_REFERENCE_TIME_MS,
+  DEMO_MEMORY_SELECTED_RELATIVE_PATH,
   listCategorisedMemoryFiles,
+  MEMORY_CATEGORY_ORDER,
   MEMORY_CATEGORY_DIRECTORIES,
   parseFrontmatter,
   subscribeMemoryPathChanged,
@@ -21,13 +25,6 @@ import {
   readMemoryDiff,
 } from './memory-commands.js';
 import { isTauriRuntime } from '../../runtime.js';
-import {
-  PREVIEW_MEMORY_BUCKETS,
-  PREVIEW_MEMORY_DIFF,
-  PREVIEW_MEMORY_MARKDOWN,
-  PREVIEW_MEMORY_REFERENCE_TIME_MS,
-  PREVIEW_MEMORY_SELECTION,
-} from './memory-preview.js';
 import './MemoryPane.css';
 
 type LoadState =
@@ -56,11 +53,36 @@ type Selection = {
   bucket: MemoryEntryBucket;
 };
 
+const findDefaultSelection = (
+  buckets: Record<MemoryEntryBucket, MemoryMarkdownFile[]>,
+): Selection | null => {
+  const seededSelection = buckets.pending.find(
+    (file) => file.relativePath === DEMO_MEMORY_SELECTED_RELATIVE_PATH,
+  );
+  if (seededSelection) {
+    return { file: seededSelection, bucket: 'pending' };
+  }
+
+  const firstPending = buckets.pending[0];
+  if (firstPending) {
+    return { file: firstPending, bucket: 'pending' };
+  }
+
+  for (const category of MEMORY_CATEGORY_ORDER) {
+    const firstFile = buckets[category][0];
+    if (firstFile) {
+      return { file: firstFile, bucket: category };
+    }
+  }
+
+  return null;
+};
+
 export const MemoryPane = (): JSX.Element => {
   const { currentUserId } = useMemoryPaneRuntime();
   const filePaneRuntime = useFilePaneRuntime();
   const nativeRuntime = isTauriRuntime();
-  const browserPreview = !nativeRuntime && import.meta.env.VITE_E2E === '1';
+  const browserPreview = !nativeRuntime;
 
   const [reloadToken, setReloadToken] = useState(0);
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
@@ -81,11 +103,8 @@ export const MemoryPane = (): JSX.Element => {
     setLoad({ status: 'loading' });
 
     if (browserPreview) {
-      setCategorised({
-        rootPath: '/memory/demo',
-        buckets: PREVIEW_MEMORY_BUCKETS,
-      });
-      setSelection((current) => current ?? PREVIEW_MEMORY_SELECTION);
+      setCategorised(DEMO_MEMORY_PREVIEW.categorised);
+      setSelection((current) => current ?? DEMO_MEMORY_PREVIEW.selection);
       setLoad({ status: 'ready' });
       return () => {
         cancelled = true;
@@ -101,13 +120,15 @@ export const MemoryPane = (): JSX.Element => {
         setLoad({ status: 'ready' });
 
         setSelection((current) => {
-          if (!current) {
-            return null;
+          if (current) {
+            const stillExists = Object.values(result.buckets)
+              .flat()
+              .some((file) => file.absolutePath === current.file.absolutePath);
+            if (stillExists) {
+              return current;
+            }
           }
-          const stillExists = Object.values(result.buckets)
-            .flat()
-            .some((file) => file.absolutePath === current.file.absolutePath);
-          return stillExists ? current : null;
+          return findDefaultSelection(result.buckets);
         });
       })
       .catch((error) => {
@@ -137,7 +158,7 @@ export const MemoryPane = (): JSX.Element => {
     }
 
     if (browserPreview) {
-      setDiffText(PREVIEW_MEMORY_DIFF[selection.file.absolutePath] ?? '');
+      setDiffText(selection.file.changesPreview ?? '');
       setDiffLoading(false);
       return;
     }
@@ -147,13 +168,13 @@ export const MemoryPane = (): JSX.Element => {
     void readMemoryDiff(selection.file.absolutePath)
       .then((text) => {
         if (!cancelled) {
-          setDiffText(text);
+          setDiffText(text.trim().length > 0 ? text : (selection.file.changesPreview ?? ''));
           setDiffLoading(false);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setDiffText('');
+          setDiffText(selection.file.changesPreview ?? '');
           setDiffLoading(false);
         }
       });
@@ -266,7 +287,7 @@ export const MemoryPane = (): JSX.Element => {
         selectedPath={selection?.file.absolutePath ?? null}
         onSelect={handleSelect}
         seenPaths={seenPaths}
-        referenceTimeMs={browserPreview ? PREVIEW_MEMORY_REFERENCE_TIME_MS : undefined}
+        referenceTimeMs={browserPreview ? DEMO_MEMORY_REFERENCE_TIME_MS : undefined}
       />
       <div className="tinker-memory-pane__detail">
         {actionError ? (
@@ -288,7 +309,9 @@ export const MemoryPane = (): JSX.Element => {
           onOpenInTab={handleOpenInTab}
           isBusy={isBusy}
           previewMarkdown={
-            !browserPreview || !selection ? null : (PREVIEW_MEMORY_MARKDOWN[selection.file.absolutePath] ?? null)
+            !browserPreview || !selection
+              ? null
+              : (DEMO_MEMORY_PREVIEW.markdownByAbsolutePath[selection.file.absolutePath] ?? null)
           }
         />
       </div>

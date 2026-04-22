@@ -1,13 +1,27 @@
-import { stat } from '@tauri-apps/plugin-fs';
-import { bucketForRelativePath, type MemoryEntryBucket } from './memory-categories.js';
+import { readTextFile, stat } from '@tauri-apps/plugin-fs';
+import {
+  bucketForFrontmatter,
+  bucketForRelativePath,
+  type MemoryCategoryId,
+  type MemoryEntryBucket,
+} from './memory-categories.js';
 import { getActiveMemoryPath } from './memory-paths.js';
-import { relativeVaultPath, walkMarkdownFiles } from './vault-utils.js';
+import {
+  deriveNoteTitle,
+  parseFrontmatter,
+  relativeVaultPath,
+  walkMarkdownFiles,
+} from './vault-utils.js';
 
 export type MemoryMarkdownFile = {
   absolutePath: string;
   relativePath: string;
   name: string;
+  title: string;
   modifiedAt: string;
+  category: MemoryCategoryId | null;
+  displayPath: string;
+  changesPreview: string | null;
 };
 
 type IndexedMemoryMarkdownFile = MemoryMarkdownFile & {
@@ -19,19 +33,65 @@ export type CategorisedMemoryFiles = {
   buckets: Record<MemoryEntryBucket, MemoryMarkdownFile[]>;
 };
 
+const readFrontmatterString = (
+  frontmatter: Record<string, unknown>,
+  ...keys: readonly string[]
+): string | null => {
+  for (const key of keys) {
+    const value = frontmatter[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return null;
+};
+
+const readFileMetadata = async (
+  absolutePath: string,
+  relativePath: string,
+): Promise<Pick<MemoryMarkdownFile, 'title' | 'category' | 'displayPath' | 'changesPreview'>> => {
+  try {
+    const text = await readTextFile(absolutePath);
+    const { frontmatter, body } = parseFrontmatter(text);
+    const pathBucket = bucketForRelativePath(relativePath);
+    const category =
+      bucketForFrontmatter(frontmatter) ?? (pathBucket && pathBucket !== 'pending' ? pathBucket : null);
+
+    return {
+      title: deriveNoteTitle(relativePath, frontmatter, body),
+      category,
+      displayPath: readFrontmatterString(frontmatter, 'display_path', 'displayPath') ?? absolutePath,
+      changesPreview:
+        readFrontmatterString(frontmatter, 'changes', 'changes_preview', 'changesPreview') ?? null,
+    };
+  } catch {
+    const fallbackTitle = relativePath.replace(/\.md$/iu, '').split('/').at(-1) ?? relativePath;
+    return {
+      title: fallbackTitle,
+      category: null,
+      displayPath: absolutePath,
+      changesPreview: null,
+    };
+  }
+};
+
 const toIndexedFile = async (
   absolutePath: string,
   rootPath: string,
 ): Promise<IndexedMemoryMarkdownFile> => {
   const fileInfo = await stat(absolutePath);
   const relativePath = relativeVaultPath(rootPath, absolutePath);
+  const name = relativePath.split('/').at(-1) ?? relativePath;
   const modifiedAtMs = fileInfo.mtime?.getTime() ?? 0;
+  const metadata = await readFileMetadata(absolutePath, relativePath);
 
   return {
     absolutePath,
     relativePath,
-    name: relativePath.split('/').at(-1) ?? relativePath,
+    name,
     modifiedAt: fileInfo.mtime?.toISOString() ?? new Date(modifiedAtMs).toISOString(),
+    ...metadata,
     modifiedAtMs,
   };
 };

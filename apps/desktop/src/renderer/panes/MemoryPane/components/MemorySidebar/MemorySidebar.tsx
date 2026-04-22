@@ -50,7 +50,11 @@ const matchesQuery = (file: MemoryMarkdownFile, query: string): boolean => {
   if (query.length === 0) {
     return true;
   }
-  return file.name.toLowerCase().includes(query);
+  return (
+    file.title.toLowerCase().includes(query) ||
+    file.name.toLowerCase().includes(query) ||
+    file.relativePath.toLowerCase().includes(query)
+  );
 };
 
 const ClockIcon = (): JSX.Element => (
@@ -140,7 +144,7 @@ const MemoryPendingRow = ({
     onClick={onSelect}
   >
     <span className="tinker-memory-sidebar__row-body">
-      <span className="tinker-memory-sidebar__row-title">{file.name}</span>
+      <span className="tinker-memory-sidebar__row-title">{file.title}</span>
       <span className="tinker-memory-sidebar__row-meta">
         {isNew ? 'New Entry' : 'Update'} &middot; {relativeSuffix}
       </span>
@@ -206,7 +210,7 @@ const CategorySection = ({
                 }}
               >
                 <span className="tinker-memory-sidebar__row-body">
-                  <span className="tinker-memory-sidebar__row-title">{file.name}</span>
+                  <span className="tinker-memory-sidebar__row-title">{file.title}</span>
                 </span>
               </button>
             ))

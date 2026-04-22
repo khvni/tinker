@@ -1,5 +1,6 @@
 import { dataDir, join } from '@tauri-apps/api/path';
 import { copyFile, exists, mkdir, readDir, remove, writeTextFile } from '@tauri-apps/plugin-fs';
+import { DEMO_MEMORY_NOTES } from './memory-seed.js';
 import { createSettingsStore, type SettingsStore } from './settings-store.js';
 import { emitMemoryPathChanged } from './events.js';
 export { subscribeMemoryPathChanged } from './events.js';
@@ -108,6 +109,30 @@ const removeDirectoryContents = async (rootPath: string): Promise<void> => {
   await Promise.all(entries.map(async (entry) => remove(await join(rootPath, entry.name), { recursive: true })));
 };
 
+const seedMemoryScaffoldIfRootEmpty = async (
+  memoryRoot: string,
+  activeMemoryPath: string,
+): Promise<void> => {
+  const rootEntries = await readDir(memoryRoot);
+  if (rootEntries.length > 0) {
+    await mkdir(activeMemoryPath, { recursive: true });
+    return;
+  }
+
+  await mkdir(activeMemoryPath, { recursive: true });
+
+  const createdDirectories = new Set<string>();
+  for (const note of DEMO_MEMORY_NOTES) {
+    const relativeDirectory = note.relativePath.split('/').slice(0, -1).join('/');
+    if (relativeDirectory.length > 0 && !createdDirectories.has(relativeDirectory)) {
+      await mkdir(await join(activeMemoryPath, relativeDirectory), { recursive: true });
+      createdDirectories.add(relativeDirectory);
+    }
+
+    await writeTextFile(await join(activeMemoryPath, note.relativePath), note.text);
+  }
+};
+
 const detectMemoryRootPlatformFromDirectory = (dataDirectory: string): MemoryRootPlatform => {
   const normalizedDirectory = normalizeDirectoryForDetection(dataDirectory);
 
@@ -199,7 +224,7 @@ export const getActiveMemoryPath = async (
 
   const memoryRoot = await getMemoryRoot(runtimePlatform);
   const activeMemoryPath = await join(memoryRoot, normalizedUserId);
-  await mkdir(activeMemoryPath, { recursive: true });
+  await seedMemoryScaffoldIfRootEmpty(memoryRoot, activeMemoryPath);
   return activeMemoryPath;
 };
 
@@ -217,7 +242,7 @@ export const syncActiveMemoryPath = async (
 
   const memoryRoot = await getMemoryRoot(options?.runtimePlatform);
   const activeMemoryPath = await join(memoryRoot, normalizedUserId);
-  await mkdir(activeMemoryPath, { recursive: true });
+  await seedMemoryScaffoldIfRootEmpty(memoryRoot, activeMemoryPath);
 
   const previousState = activeMemoryPathState;
   const changed =
