@@ -5,6 +5,8 @@ export type FilePaneParams = {
   mime?: string;
 };
 
+export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
 const CODE_LANGUAGE_BY_EXTENSION: Record<string, string> = {
   '.c': 'c',

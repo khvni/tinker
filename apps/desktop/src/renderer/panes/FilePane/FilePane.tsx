@@ -9,7 +9,13 @@ import { HtmlRenderer } from '../../renderers/HtmlRenderer.js';
 import { ImageRenderer } from '../../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../../renderers/MarkdownEditor.js';
 import { MarkdownRenderer } from '../../renderers/MarkdownRenderer.js';
-import { getPanelIdForPath, getPanelTitleForPath, type FilePaneParams } from '../../renderers/file-utils.js';
+import { XlsxRenderer } from '../../renderers/XlsxRenderer/index.js';
+import {
+  getPanelIdForPath,
+  getPanelTitleForPath,
+  type FilePaneParams,
+  XLSX_MIME,
+} from '../../renderers/file-utils.js';
 
 type FilePaneData = Extract<TinkerPaneData, { readonly kind: 'file' }>;
 
@@ -46,6 +52,10 @@ const HtmlFileRenderer: FileRenderer = ({ path, mime }) => {
 
 const ImageFileRenderer: FileRenderer = ({ path, mime }) => {
   return <ImageRenderer {...createDockviewProps(path, mime)} />;
+};
+
+const XlsxFileRenderer: FileRenderer = ({ path, mime }) => {
+  return <XlsxRenderer {...createDockviewProps(path, mime)} />;
 };
 
 const MarkdownFileRenderer: FileRenderer = ({ path, mime, vaultRevision }) => {
@@ -102,6 +112,8 @@ const IMAGE_MIME_TYPES = [
   'image/webp',
 ] as const;
 
+const XLSX_MIME_TYPES = [XLSX_MIME] as const;
+
 // Legacy Markdown editor is still pane-based, so it needs a temporary
 // MIME-shaped selector until M3 replaces the edit flow.
 export const MARKDOWN_EDITOR_MIME = 'text/markdown; mode=edit';
@@ -109,6 +121,7 @@ export const MARKDOWN_EDITOR_MIME = 'text/markdown; mode=edit';
 export const mimeToRenderer: Readonly<Record<string, FileRenderer>> = Object.freeze({
   ...createMimeMap(CODE_MIME_TYPES, CodeFileRenderer),
   ...createMimeMap(IMAGE_MIME_TYPES, ImageFileRenderer),
+  ...createMimeMap(XLSX_MIME_TYPES, XlsxFileRenderer),
   'application/xhtml+xml': HtmlFileRenderer,
   'text/csv': CsvFileRenderer,
   'text/html': HtmlFileRenderer,

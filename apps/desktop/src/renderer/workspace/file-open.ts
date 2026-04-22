@@ -6,6 +6,7 @@ import {
   getPanelIdForPath,
   getPanelTitleForPath,
   isAbsolutePath,
+  XLSX_MIME,
 } from '../renderers/file-utils.js';
 
 const createWorkspaceTabId = (): string => {
@@ -37,6 +38,8 @@ const getPaneMimeForPath = (absolutePath: string): string => {
       return 'application/typescript';
     case '.tsx':
       return 'text/typescript';
+    case '.xlsx':
+      return XLSX_MIME;
     default:
       return 'text/plain';
   }
