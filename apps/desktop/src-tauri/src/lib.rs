@@ -16,6 +16,10 @@ use tokio::time::{sleep, timeout, Duration as TokioDuration, Instant};
 
 use crate::commands::auth::{AuthProvider, BetterAuthState, SSOSession, KEYRING_SERVICE};
 
+const TINKER_GITHUB_AUTHORIZATION_ENV: &str = "TINKER_GITHUB_AUTHORIZATION";
+const TINKER_LINEAR_AUTHORIZATION_ENV: &str = "TINKER_LINEAR_AUTHORIZATION";
+const LINEAR_API_TOKEN_ENV_NAMES: [&str; 2] = ["TINKER_LINEAR_API_TOKEN", "LINEAR_API_TOKEN"];
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct OpencodeConnection {
@@ -68,6 +72,37 @@ fn read_keychain_session(
     }
 }
 
+fn first_non_empty_scope<'a>(scopes: &'a [String], candidates: &[&'a str]) -> Option<&'a str> {
+    scopes.iter().find_map(|scope| {
+        let normalized = scope.trim();
+        if normalized.is_empty() {
+            return None;
+        }
+
+        candidates.iter().copied().find(|candidate| normalized == *candidate)
+    })
+}
+
+fn github_session_supports_mcp(session: &SSOSession) -> bool {
+    first_non_empty_scope(session.scopes(), &["repo", "public_repo"]).is_some()
+}
+
+fn bearer_authorization(token: &str) -> Option<String> {
+    let trimmed = token.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    Some(format!("Bearer {trimmed}"))
+}
+
+fn env_token_authorization(var_names: &[&str]) -> Option<String> {
+    var_names
+        .iter()
+        .find_map(|name| std::env::var(name).ok())
+        .and_then(|token| bearer_authorization(&token))
+}
+
 #[tauri::command]
 fn get_opencode_connection(state: State<'_, OpencodeState>) -> Result<OpencodeConnection, String> {
     clone_opencode_connection(&state)
@@ -100,6 +135,31 @@ fn opencode_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Err("Could not locate the bundled opencode.json configuration.".to_string())
 }
 
+fn bootstrap_opencode_env(
+    config_path: &PathBuf,
+    username: &str,
+    password: &str,
+    memory_subdir: Option<&str>,
+) -> Vec<(String, String)> {
+    let mut envs = vec![
+        (
+            "OPENCODE_CONFIG".to_string(),
+            config_path.to_string_lossy().into_owned(),
+        ),
+        ("OPENCODE_SERVER_USERNAME".to_string(), username.to_string()),
+        ("OPENCODE_SERVER_PASSWORD".to_string(), password.to_string()),
+    ];
+
+    if let Some(memory_subdir) = memory_subdir
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        envs.push(("SMART_VAULT_PATH".to_string(), memory_subdir.to_string()));
+    }
+
+    envs
+}
+
 fn main_window_config(
     app: &tauri::AppHandle,
 ) -> Result<&tauri::utils::config::WindowConfig, String> {
@@ -127,10 +187,20 @@ fn ensure_main_window(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RestartOpencodeOptions {
+    pub folder_path: Option<String>,
+    pub memory_subdir: Option<String>,
+}
+
 #[tauri::command]
-async fn restart_opencode(app: tauri::AppHandle) -> Result<OpencodeConnection, String> {
+async fn restart_opencode(
+    app: tauri::AppHandle,
+    options: Option<RestartOpencodeOptions>,
+) -> Result<OpencodeConnection, String> {
     terminate_legacy_opencode(&app);
-    bootstrap_opencode(&app).await?;
+    bootstrap_opencode(&app, options.unwrap_or_default()).await?;
     let state = app.state::<OpencodeState>();
     clone_opencode_connection(&state)
 }
@@ -214,7 +284,10 @@ async fn wait_for_opencode_connection(
     }
 }
 
-async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
+async fn bootstrap_opencode(
+    app: &tauri::AppHandle,
+    options: RestartOpencodeOptions,
+) -> Result<(), String> {
     let state = app.state::<OpencodeState>();
     if state
         .child
@@ -226,33 +299,49 @@ async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
     }
 
     let config_path = opencode_config_path(app)?;
-    let working_dir = config_path
-        .parent()
-        .ok_or_else(|| "OpenCode config path did not have a parent directory.".to_string())?
-        .to_path_buf();
+    let folder_arg = options
+        .folder_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let working_dir = match folder_arg {
+        Some(folder) => PathBuf::from(folder),
+        None => config_path
+            .parent()
+            .ok_or_else(|| "OpenCode config path did not have a parent directory.".to_string())?
+            .to_path_buf(),
+    };
     let username = format!("tinker-{}", random_url_safe(8));
     let password = random_url_safe(24);
-    let github_token = read_keychain_session(app, AuthProvider::Github)?
-        .map(|session| session.access_token().to_string())
-        .unwrap_or_default();
+    let github_authorization = read_keychain_session(app, AuthProvider::Github)?
+        .filter(github_session_supports_mcp)
+        .and_then(|session| bearer_authorization(session.access_token()));
+    let linear_authorization = env_token_authorization(&LINEAR_API_TOKEN_ENV_NAMES);
+
+    let mut sidecar_args = vec!["serve", "--hostname", "127.0.0.1", "--port", "0"];
+    if let Some(folder) = folder_arg {
+        sidecar_args.extend(["--cwd", folder]);
+    }
 
     let mut sidecar = app
         .shell()
         .sidecar("opencode")
         .map_err(|error| error.to_string())?
-        .args(["serve", "--hostname", "127.0.0.1", "--port", "0"])
-        .envs([
-            (
-                "OPENCODE_CONFIG",
-                config_path.to_string_lossy().into_owned(),
-            ),
-            ("OPENCODE_SERVER_USERNAME", username.clone()),
-            ("OPENCODE_SERVER_PASSWORD", password.clone()),
-        ])
+        .args(sidecar_args)
+        .envs(bootstrap_opencode_env(
+            &config_path,
+            &username,
+            &password,
+            options.memory_subdir.as_deref(),
+        ))
         .current_dir(working_dir);
 
-    if !github_token.is_empty() {
-        sidecar = sidecar.env("TINKER_GITHUB_TOKEN", github_token);
+    if let Some(github_authorization) = github_authorization {
+        sidecar = sidecar.env(TINKER_GITHUB_AUTHORIZATION_ENV, github_authorization);
+    }
+
+    if let Some(linear_authorization) = linear_authorization {
+        sidecar = sidecar.env(TINKER_LINEAR_AUTHORIZATION_ENV, linear_authorization);
     }
 
     let (mut receiver, child) = sidecar.spawn().map_err(|error| error.to_string())?;
@@ -356,12 +445,16 @@ pub fn run() {
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 if let Err(error) = commands::auth::start_auth_sidecar(app.handle().clone()).await {
-                    eprintln!("[better-auth] sidecar warm-start failed (will retry on demand): {error}");
+                    eprintln!(
+                        "[better-auth] sidecar warm-start failed (will retry on demand): {error}"
+                    );
                 }
-                if let Err(error) = commands::opencode::reconcile_opencode_manifests(&app.handle()).await {
+                if let Err(error) =
+                    commands::opencode::reconcile_opencode_manifests(&app.handle()).await
+                {
                     eprintln!("[opencode] orphan manifest cleanup failed: {error}");
                 }
-                bootstrap_opencode(&app.handle()).await?;
+                bootstrap_opencode(&app.handle(), RestartOpencodeOptions::default()).await?;
                 ensure_main_window(&app.handle())?;
                 Ok::<(), String>(())
             })
@@ -381,4 +474,69 @@ pub fn run() {
             terminate_legacy_opencode(&handle);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn github_session(scopes: &[&str]) -> SSOSession {
+        SSOSession::for_test(AuthProvider::Github, scopes)
+    }
+
+    #[test]
+    fn github_session_supports_repo_scopes() {
+        assert!(github_session_supports_mcp(&github_session(&["read:user", "repo"])));
+        assert!(github_session_supports_mcp(&github_session(&["public_repo"])));
+    }
+
+    #[test]
+    fn github_session_rejects_identity_only_scopes() {
+        assert!(!github_session_supports_mcp(&github_session(&["read:user", "user:email"])));
+    }
+
+    #[test]
+    fn bearer_authorization_requires_non_empty_token() {
+        assert_eq!(
+            bearer_authorization("  ghp_123  "),
+            Some("Bearer ghp_123".to_string())
+        );
+        assert_eq!(bearer_authorization("   "), None);
+    }
+
+    #[test]
+    fn bootstrap_opencode_env_includes_smart_vault_path_when_present() {
+        let envs = bootstrap_opencode_env(
+            &PathBuf::from("/tmp/opencode.json"),
+            "tinker-user",
+            "secret",
+            Some("/tmp/memory/local-user"),
+        );
+
+        assert!(envs.contains(&(
+            "OPENCODE_CONFIG".to_string(),
+            "/tmp/opencode.json".to_string()
+        )));
+        assert!(envs.contains(&(
+            "OPENCODE_SERVER_USERNAME".to_string(),
+            "tinker-user".to_string()
+        )));
+        assert!(envs.contains(&("OPENCODE_SERVER_PASSWORD".to_string(), "secret".to_string())));
+        assert!(envs.contains(&(
+            "SMART_VAULT_PATH".to_string(),
+            "/tmp/memory/local-user".to_string()
+        )));
+    }
+
+    #[test]
+    fn bootstrap_opencode_env_omits_smart_vault_path_when_empty() {
+        let envs = bootstrap_opencode_env(
+            &PathBuf::from("/tmp/opencode.json"),
+            "tinker-user",
+            "secret",
+            Some(""),
+        );
+
+        assert!(!envs.iter().any(|(key, _value)| key == "SMART_VAULT_PATH"));
+    }
 }

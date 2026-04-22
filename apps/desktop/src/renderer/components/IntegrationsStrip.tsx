@@ -63,7 +63,10 @@ const toneClass = (status: MCPStatus | undefined, providerConnected: boolean): s
 };
 
 export const IntegrationsStrip = ({ compact = false, mcpStatus, sessions }: IntegrationsStripProps): JSX.Element => {
-  const anyProviderConnected = sessions.google !== null || sessions.github !== null;
+  const anyProviderConnected =
+    sessions.google !== null ||
+    sessions.github !== null ||
+    Object.values(mcpStatus).some((status) => status.status !== 'disabled');
 
   return (
     <section className={`tinker-integrations-strip${compact ? ' tinker-integrations-strip--compact' : ''}`}>
@@ -73,14 +76,17 @@ export const IntegrationsStrip = ({ compact = false, mcpStatus, sessions }: Inte
           {!compact ? <h3>Connected tools</h3> : null}
         </div>
         {!compact ? (
-          <p className="tinker-muted">Google lights up Gmail, Calendar, Drive. GitHub lights up repo, issue, and PR tools.</p>
+          <p className="tinker-muted">
+            Google lights up Gmail, Calendar, and Drive. GitHub uses your Tinker sign-in. Linear can authenticate on
+            first use or via API key.
+          </p>
         ) : null}
       </div>
 
       {!anyProviderConnected && !compact ? (
         <EmptyState
           title="No connections yet"
-          description="Sign in with Google or GitHub to light up your connected tools. Tinker still works as a local coding agent without them."
+          description="Sign in with Google or GitHub, or authenticate Linear on first use. Tinker still works as a local coding agent without them."
           size="s"
           align="start"
           icon={
@@ -106,9 +112,11 @@ export const IntegrationsStrip = ({ compact = false, mcpStatus, sessions }: Inte
 
       <div className="tinker-integrations-strip__grid">
         {INTEGRATIONS.map((integration) => {
-          const providerConnected =
-            integration.provider === 'linear' ? false : sessions[integration.provider as 'google' | 'github'] !== null;
           const status = mcpStatus[integration.id];
+          const providerConnected =
+            integration.provider === 'linear'
+              ? status !== undefined && status.status !== 'disabled'
+              : sessions[integration.provider as 'google' | 'github'] !== null;
 
           return (
             <article key={integration.id} className={`tinker-integration-chip ${toneClass(status, providerConnected)}`}>
@@ -120,7 +128,7 @@ export const IntegrationsStrip = ({ compact = false, mcpStatus, sessions }: Inte
                       ? 'Google'
                       : integration.provider === 'github'
                         ? 'GitHub'
-                        : 'Optional env token'}
+                        : 'OAuth or API key'}
                   </p>
                 ) : null}
               </div>

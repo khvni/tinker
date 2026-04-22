@@ -154,6 +154,25 @@ impl SSOSession {
     pub fn access_token(&self) -> &str {
         &self.access_token
     }
+
+    pub fn scopes(&self) -> &[String] {
+        &self.scopes
+    }
+
+    #[cfg(test)]
+    pub fn for_test(provider: AuthProvider, scopes: &[&str]) -> Self {
+        Self {
+            provider,
+            user_id: "user-1".to_string(),
+            email: "octo@example.com".to_string(),
+            display_name: "Octo".to_string(),
+            avatar_url: None,
+            access_token: "gho_test".to_string(),
+            refresh_token: String::new(),
+            expires_at: "2026-04-22T00:00:00.000Z".to_string(),
+            scopes: scopes.iter().map(|scope| (*scope).to_string()).collect(),
+        }
+    }
 }
 
 #[derive(Serialize)]

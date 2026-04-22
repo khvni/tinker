@@ -5,6 +5,8 @@ import { getDatabase } from './database.js';
 import {
   appendManagedFacts,
   directoryForEntityKind,
+  mergeEntitySources,
+  normalizeEntitySources,
   normalizeFactText,
   sanitizeEntityFileName,
 } from './memory-utils.js';
@@ -119,6 +121,7 @@ const normalizeUpdate = (update: MemoryEntityUpdate): MemoryEntityUpdate | null 
 
   const aliases = update.aliases?.map((alias) => alias.trim()).filter(Boolean);
   const links = update.links?.map((link) => link.trim()).filter(Boolean);
+  const sources = update.sources ? normalizeEntitySources(update.sources, new Date().toISOString()) : undefined;
 
   return {
     name,
@@ -126,7 +129,7 @@ const normalizeUpdate = (update: MemoryEntityUpdate): MemoryEntityUpdate | null 
     facts,
     ...(aliases ? { aliases } : {}),
     ...(links ? { links } : {}),
-    ...(update.sources ? { sources: update.sources } : {}),
+    ...(sources && sources.length > 0 ? { sources } : {}),
   };
 };
 
@@ -144,7 +147,10 @@ const writeEntityUpdate = async (
   const noteExists = await exists(absolutePath);
   const rawText = noteExists ? await readTextFile(absolutePath) : '';
   const parsed = parseFrontmatter(rawText);
-  const frontmatter = noteExists ? mergeAliases(parsed.frontmatter, update.aliases) : mergeAliases({ type: update.kind }, update.aliases);
+  const frontmatterWithAliases = noteExists
+    ? mergeAliases(parsed.frontmatter, update.aliases)
+    : mergeAliases({ type: update.kind }, update.aliases);
+  const frontmatter = mergeEntitySources(frontmatterWithAliases, update.sources, new Date().toISOString());
   const baseBody = noteExists ? parsed.body : `# ${update.name}\n`;
   const merged = appendManagedFacts(baseBody, update.facts);
 

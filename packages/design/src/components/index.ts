@@ -51,3 +51,7 @@ export {
   type EmptyStateProps,
   type EmptyStateSize,
 } from './EmptyState/index.js';
+export {
+  SelectFolderButton,
+  type SelectFolderButtonProps,
+} from './SelectFolderButton/index.js';

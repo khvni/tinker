@@ -2,6 +2,7 @@ import { extractConversationMemory, runDailyMemorySweep } from '@tinker/bridge';
 import {
   applyMemoryUpdates,
   getMemoryRunState,
+  runMemoryMaintenanceSweep,
   shouldRunDailySweep,
   type MemoryRunState,
   type MemoryWriteSummary,
@@ -54,6 +55,7 @@ export const runDailyMemorySweepIfDue = async (
 
   const observedOn = options?.observedOn ?? new Date().toISOString().slice(0, 10);
   const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
+  const maintenance = await runMemoryMaintenanceSweep({ path: vaultPath, isNew: false });
   const payload = await runDailyMemorySweep(client, observedOn);
   const result = await applyMemoryUpdates(
     { path: vaultPath, isNew: false },
@@ -62,7 +64,11 @@ export const runDailyMemorySweepIfDue = async (
   );
 
   return {
-    changed: result.appendedFacts > 0 || result.created.length > 0 || result.updated.length > 0,
+    changed:
+      maintenance.entitiesPruned > 0
+      || result.appendedFacts > 0
+      || result.created.length > 0
+      || result.updated.length > 0,
     state: await readDailySweepState(),
   };
 };

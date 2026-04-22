@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { appendManagedFacts, collectWikilinks, inferEntityKindFromNote } from './memory-utils.js';
+import {
+  appendManagedFacts,
+  collectWikilinks,
+  inferEntityKindFromNote,
+  mergeEntitySources,
+  readEntitySources,
+} from './memory-utils.js';
 
 describe('appendManagedFacts', () => {
   it('creates managed section when missing', () => {
@@ -47,5 +53,66 @@ describe('inferEntityKindFromNote', () => {
 describe('collectWikilinks', () => {
   it('returns unique bare wikilink targets', () => {
     expect(collectWikilinks('See [[Alpha]] and [[Alpha]] plus [[Beta]].')).toEqual(['Alpha', 'Beta']);
+  });
+});
+
+describe('readEntitySources', () => {
+  it('normalizes D12 sources from frontmatter', () => {
+    expect(
+      readEntitySources(
+        {
+          sources: [{ service: 'linear', ref: 'TIN-118', lastSeen: '2026-04-22T00:00:00.000Z' }],
+        },
+        'People/Jane Smith.md',
+        '2026-04-22T12:00:00.000Z',
+      ),
+    ).toEqual([{ service: 'linear', ref: 'TIN-118', lastSeen: '2026-04-22T00:00:00.000Z' }]);
+  });
+
+  it('falls back to legacy keys and default lastSeen', () => {
+    expect(
+      readEntitySources(
+        {
+          sources: [{ integration: 'github', externalId: 'issue-1' }],
+        },
+        'People/Jane Smith.md',
+        '2026-04-22T12:00:00.000Z',
+      ),
+    ).toEqual([{ service: 'github', ref: 'issue-1', lastSeen: '2026-04-22T12:00:00.000Z' }]);
+  });
+
+  it('falls back to vault provenance when frontmatter is silent', () => {
+    expect(readEntitySources({}, 'People/Jane Smith.md', '2026-04-22T12:00:00.000Z')).toEqual([
+      { service: 'vault', ref: 'People/Jane Smith.md', lastSeen: '2026-04-22T12:00:00.000Z' },
+    ]);
+  });
+});
+
+describe('mergeEntitySources', () => {
+  it('preserves object identity when sources do not change', () => {
+    const frontmatter = {
+      sources: [{ service: 'vault', ref: 'People/Jane Smith.md', lastSeen: '2026-04-22T12:00:00.000Z' }],
+    };
+
+    expect(
+      mergeEntitySources(frontmatter, [{ service: 'vault', ref: 'People/Jane Smith.md', lastSeen: '2026-04-22T12:00:00.000Z' }], '2026-04-22T12:00:00.000Z'),
+    ).toBe(frontmatter);
+  });
+
+  it('merges new service provenance onto existing frontmatter', () => {
+    expect(
+      mergeEntitySources(
+        {
+          sources: [{ service: 'vault', ref: 'People/Jane Smith.md', lastSeen: '2026-04-22T12:00:00.000Z' }],
+        },
+        [{ service: 'linear', ref: 'TIN-118', lastSeen: '2026-04-22T13:00:00.000Z' }],
+        '2026-04-22T12:00:00.000Z',
+      ),
+    ).toEqual({
+      sources: [
+        { service: 'vault', ref: 'People/Jane Smith.md', lastSeen: '2026-04-22T12:00:00.000Z' },
+        { service: 'linear', ref: 'TIN-118', lastSeen: '2026-04-22T13:00:00.000Z' },
+      ],
+    });
   });
 });

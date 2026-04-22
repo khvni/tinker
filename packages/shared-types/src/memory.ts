@@ -12,8 +12,9 @@ export type EntityKind =
   | 'other';
 
 export type EntitySource = {
-  integration: string;
-  externalId: string;
+  service: string;
+  ref: string;
+  lastSeen: string;
   url?: string;
 };
 
@@ -32,7 +33,7 @@ export type Relationship = {
   predicate: string;
   objectId: string;
   confidence: number;
-  source: string;
+  sources: EntitySource[];
 };
 
 export type MemorySearchResult = {
