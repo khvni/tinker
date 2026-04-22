@@ -8,9 +8,10 @@ import {
   useState,
   type JSX,
   type KeyboardEvent,
+  type UIEventHandler,
 } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { Badge, Button, EmptyState, ModelPicker, Textarea } from '@tinker/design';
+import { Badge, Button, ClickableBadge, ContextBadge, EmptyState, ModelPicker, Textarea } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities } from '@tinker/memory';
 import type { SkillStore } from '@tinker/shared-types';
@@ -32,6 +33,15 @@ import {
 } from '../chat-composer.js';
 import { useSessionHistoryWindow } from '../useSessionHistoryWindow.js';
 import { messageTextFromBlocks, MessageBlock, partToBlock, type Block } from './Block.js';
+import {
+  CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD,
+  getChatTailSignature,
+  isScrolledNearBottom,
+  resolveContextUsage,
+  sameResolvedContextUsage,
+  type ContextUsageSnapshot,
+  type ResolvedContextUsage,
+} from './chatState.js';
 import { draftReducer } from './draftReducer.js';
 
 type ChatMessageRecord = {
@@ -120,6 +130,64 @@ const syncComposerHeight = (textarea: HTMLTextAreaElement | null): void => {
   textarea.style.overflowY = overflowY;
 };
 
+const readContextUsageTokens = (value: unknown): ContextUsageSnapshot['tokens'] | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const usage = value as {
+    total?: unknown;
+    input?: unknown;
+    output?: unknown;
+    reasoning?: unknown;
+  };
+
+  if (
+    typeof usage.input !== 'number'
+    || typeof usage.output !== 'number'
+    || typeof usage.reasoning !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    ...(typeof usage.total === 'number' ? { total: usage.total } : {}),
+    input: usage.input,
+    output: usage.output,
+    reasoning: usage.reasoning,
+  };
+};
+
+const extractAssistantContextUsage = (
+  messages: readonly { info: Message; parts: Part[] }[],
+): ContextUsageSnapshot | null => {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const info = messages[index]?.info as {
+      role?: unknown;
+      providerID?: unknown;
+      modelID?: unknown;
+      tokens?: unknown;
+    };
+
+    if (info.role !== 'assistant') {
+      continue;
+    }
+
+    const tokens = readContextUsageTokens(info.tokens);
+    if (!tokens) {
+      continue;
+    }
+
+    return {
+      providerID: typeof info.providerID === 'string' ? info.providerID : null,
+      modelID: typeof info.modelID === 'string' ? info.modelID : null,
+      tokens,
+    };
+  }
+
+  return null;
+};
+
 export const Chat = ({
   skillStore,
   modelConnected,
@@ -144,6 +212,8 @@ export const Chat = ({
   const [selectedModelId, setSelectedModelId] = useState<string>();
   const [modelOptionsLoading, setModelOptionsLoading] = useState(true);
   const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
+  const [contextUsage, setContextUsage] = useState<ResolvedContextUsage | null>(null);
+  const [showNewMessagesPill, setShowNewMessagesPill] = useState(false);
   // Global default applied where no per-disclosure override exists. ⌥T flips this and clears overrides.
   const [defaultDisclosureOpen, setDefaultDisclosureOpen] = useState(false);
   const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
@@ -153,7 +223,10 @@ export const Chat = ({
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRequestedRef = useRef(false);
+  const contextUsageSnapshotRef = useRef<ContextUsageSnapshot | null>(null);
   const draftBlocksRef = useRef<Block[]>([]);
+  const shouldStickToBottomRef = useRef(true);
+  const lastTailSignatureRef = useRef('empty');
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
 
   useEffect(() => {
@@ -222,6 +295,8 @@ export const Chat = ({
     const existing = sessionIDRef.current;
     sessionIDRef.current = null;
     abortRequestedRef.current = false;
+    shouldStickToBottomRef.current = true;
+    lastTailSignatureRef.current = 'empty';
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
@@ -229,6 +304,9 @@ export const Chat = ({
     dispatchDraft({ type: 'reset' });
     setHistoryCursor(null);
     setHistoryLoading(false);
+    contextUsageSnapshotRef.current = null;
+    setContextUsage(null);
+    setShowNewMessagesPill(false);
     setDisclosureOverrides({});
     setDefaultDisclosureOpen(false);
   }, [activeSkillsRevision, client]);
@@ -281,7 +359,7 @@ export const Chat = ({
   const loadHistoryPage = async (
     sessionID: string,
     before?: string,
-  ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null }> => {
+  ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null; contextUsage: ContextUsageSnapshot | null }> => {
     const history = await client.session.messages({
       sessionID,
       limit: 100,
@@ -291,19 +369,54 @@ export const Chat = ({
     return {
       messages: formatMessages(history.data ?? []),
       cursor: history.response.headers.get('x-next-cursor') ?? null,
+      contextUsage: extractAssistantContextUsage(history.data ?? []),
     };
   };
 
-  const refreshHistory = async (sessionID: string): Promise<{ messages: ChatMessageRecord[]; cursor: string | null } | null> => {
-    const page = await loadHistoryPage(sessionID);
-    if (!mountedRef.current || sessionIDRef.current !== sessionID) {
-      return null;
+  const applyContextUsageSnapshot = useCallback((usage: ContextUsageSnapshot): void => {
+    contextUsageSnapshotRef.current = usage;
+    const next = resolveContextUsage({
+      usage,
+      modelOptions,
+      fallbackModel: selectedModel,
+    });
+
+    setContextUsage((current) => (sameResolvedContextUsage(current, next) ? current : next));
+  }, [modelOptions, selectedModel]);
+
+  useEffect(() => {
+    const snapshot = contextUsageSnapshotRef.current;
+    if (!snapshot) {
+      return;
     }
 
-    setMessages(page.messages);
-    setHistoryCursor(page.cursor);
-    return page;
-  };
+    const next = resolveContextUsage({
+      usage: snapshot,
+      modelOptions,
+      fallbackModel: selectedModel,
+    });
+
+    setContextUsage((current) => (sameResolvedContextUsage(current, next) ? current : next));
+  }, [modelOptions, selectedModel]);
+
+  const refreshHistory = useCallback(
+    async (
+      sessionID: string,
+    ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null; contextUsage: ContextUsageSnapshot | null } | null> => {
+      const page = await loadHistoryPage(sessionID);
+      if (!mountedRef.current || sessionIDRef.current !== sessionID) {
+        return null;
+      }
+
+      setMessages(page.messages);
+      setHistoryCursor(page.cursor);
+      if (page.contextUsage) {
+        applyContextUsageSnapshot(page.contextUsage);
+      }
+      return page;
+    },
+    [applyContextUsageSnapshot],
+  );
 
   const loadOlderHistory = async (before: string): Promise<void> => {
     const activeSessionID = sessionIDRef.current;
@@ -336,10 +449,72 @@ export const Chat = ({
     loadMore: loadOlderHistory,
   });
 
+  const renderedMessageBlocks = useMemo(
+    () => historyWindow.renderedMessages.flatMap((message) => message.blocks),
+    [historyWindow.renderedMessages],
+  );
+  const chatTailSignature = useMemo(
+    () => getChatTailSignature(renderedMessageBlocks, draftBlocks),
+    [draftBlocks, renderedMessageBlocks],
+  );
+
   const setLogScroller = useCallback((node: HTMLDivElement | null): void => {
     chatLogRef.current = node;
     historyWindow.setScroller(node);
   }, [historyWindow]);
+
+  useLayoutEffect(() => {
+    const scroller = chatLogRef.current;
+    if (!scroller) {
+      return;
+    }
+
+    const tailChanged = lastTailSignatureRef.current !== chatTailSignature;
+    lastTailSignatureRef.current = chatTailSignature;
+    if (!tailChanged) {
+      return;
+    }
+
+    if (shouldStickToBottomRef.current) {
+      scroller.scrollTop = scroller.scrollHeight;
+      setShowNewMessagesPill(false);
+      return;
+    }
+
+    setShowNewMessagesPill((current) => (current ? current : true));
+  }, [chatTailSignature]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto'): void => {
+    const scroller = chatLogRef.current;
+    if (!scroller) {
+      return;
+    }
+
+    shouldStickToBottomRef.current = true;
+    setShowNewMessagesPill(false);
+
+    if (typeof scroller.scrollTo === 'function') {
+      scroller.scrollTo({ top: scroller.scrollHeight, behavior });
+      return;
+    }
+
+    scroller.scrollTop = scroller.scrollHeight;
+  }, []);
+
+  const handleChatScroll = useCallback<UIEventHandler<HTMLDivElement>>(
+    (event) => {
+      historyWindow.handleScroll(event);
+      const nextShouldStick = isScrolledNearBottom(
+        event.currentTarget,
+        CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD,
+      );
+      shouldStickToBottomRef.current = nextShouldStick;
+      if (nextShouldStick) {
+        setShowNewMessagesPill(false);
+      }
+    },
+    [historyWindow],
+  );
 
   const ensureSession = async (): Promise<string> => {
     if (sessionIDRef.current) {
@@ -353,6 +528,17 @@ export const Chat = ({
     }
 
     sessionIDRef.current = session.id;
+    if (selectedModel) {
+      applyContextUsageSnapshot({
+        providerID: selectedModel.providerId,
+        modelID: selectedModel.modelId,
+        tokens: {
+          input: 0,
+          output: 0,
+          reasoning: 0,
+        },
+      });
+    }
 
     try {
       const activeSkills = await skillStore.getActive();
@@ -467,6 +653,12 @@ export const Chat = ({
             || event.type === 'tool_error'
           ) {
             dispatchDraft({ type: 'event', event });
+          } else if (event.type === 'context_usage') {
+            applyContextUsageSnapshot({
+              providerID: event.providerID,
+              modelID: event.modelID,
+              tokens: event.tokens,
+            });
           } else if (event.type === 'file_written') {
             onFileWritten?.(event.path);
           } else if (event.type === 'error') {
@@ -615,67 +807,50 @@ export const Chat = ({
           <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
             ⌥T thinking
           </span>
+          {contextUsage ? <ContextBadge {...contextUsage} /> : null}
           <Badge variant="default" size="small">
             {status}
           </Badge>
         </div>
       </header>
 
-      <div
-        className="tinker-chat-log"
-        ref={setLogScroller}
-        onScroll={historyWindow.handleScroll}
-        tabIndex={-1}
-      >
-        {messages.length === 0 ? (
-          <EmptyState
-            title={modelConnected ? 'Start a conversation' : 'No model connected'}
-            description={
-              modelConnected
-                ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
-                : 'Connect an AI model in Settings before sending a message.'
-            }
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            }
-          />
-        ) : null}
+      <div className="tinker-chat-log-shell">
+        <div
+          className="tinker-chat-log"
+          ref={setLogScroller}
+          onScroll={handleChatScroll}
+          tabIndex={-1}
+        >
+          {messages.length === 0 ? (
+            <EmptyState
+              title={modelConnected ? 'Start a conversation' : 'No model connected'}
+              description={
+                modelConnected
+                  ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+                  : 'Connect an AI model in Settings before sending a message.'
+              }
+              icon={
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              }
+            />
+          ) : null}
 
-        {historyWindow.renderedMessages.flatMap((message) =>
-          message.blocks.map((block) => {
-            if (block.kind === 'text') {
-              return (
-                <ChatMessage
-                  key={block.partID}
-                  role={message.role}
-                  text={block.text}
-                />
-              );
-            }
-
-            return (
-              <MessageBlock
-                key={block.partID}
-                block={block}
-                isOpen={isDisclosureOpen(block.partID)}
-                onToggle={(next) => handleDisclosureToggle(block.partID, next)}
-              />
-            );
-          }),
-        )}
-
-        {draftBlocks.length > 0
-          ? draftBlocks.map((block) => {
+          {historyWindow.renderedMessages.flatMap((message) =>
+            message.blocks.map((block) => {
               if (block.kind === 'text') {
                 return (
-                  <ChatMessage key={block.partID} role="assistant" text={block.text} streaming />
+                  <ChatMessage
+                    key={block.partID}
+                    role={message.role}
+                    text={block.text}
+                  />
                 );
               }
 
@@ -687,8 +862,36 @@ export const Chat = ({
                   onToggle={(next) => handleDisclosureToggle(block.partID, next)}
                 />
               );
-            })
-          : null}
+            }),
+          )}
+
+          {draftBlocks.length > 0
+            ? draftBlocks.map((block) => {
+                if (block.kind === 'text') {
+                  return (
+                    <ChatMessage key={block.partID} role="assistant" text={block.text} streaming />
+                  );
+                }
+
+                return (
+                  <MessageBlock
+                    key={block.partID}
+                    block={block}
+                    isOpen={isDisclosureOpen(block.partID)}
+                    onToggle={(next) => handleDisclosureToggle(block.partID, next)}
+                  />
+                );
+              })
+            : null}
+        </div>
+
+        {showNewMessagesPill ? (
+          <div className="tinker-chat-scroll-pill">
+            <ClickableBadge variant="info" size="small" onClick={() => scrollToBottom('smooth')}>
+              New messages
+            </ClickableBadge>
+          </div>
+        ) : null}
       </div>
 
       <div className={`tinker-composer${busy ? ' tinker-composer--busy' : ''}`}>

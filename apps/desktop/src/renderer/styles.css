@@ -156,13 +156,28 @@ textarea {
   color: var(--color-text-primary);
 }
 
+.tinker-chat-log-shell {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .tinker-chat-log {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
   overflow: auto;
   padding-right: var(--space-1);
+}
+
+.tinker-chat-scroll-pill {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
 }
 
 .tinker-message {

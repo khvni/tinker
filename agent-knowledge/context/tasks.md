@@ -110,7 +110,7 @@ Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
 | 4.10 | Parity verification: side-by-side with OpenCode Desktop from 4.1. Checklist in PR description. | S | 4.9 | not started | Review-as-task. |
 | 4.11 | Input box: multi-line `<Textarea>` (already shipped). `Enter` submits, `Shift+Enter` newline, disabled while streaming, `Escape` calls `session.abort()`. Auto-resize up to 10 lines. | M | 4.2 | review | TIN-48 · PR #58. |
 | 4.12 | Stop button: visible only while streaming, calls `session.abort()`. Replaces send button during stream. | S | 4.11 | review | TIN-49 · PR #58. |
-| 4.13 | Auto-scroll: stick to bottom during streaming unless user scrolled up. `[New messages]` pill appears when user is scrolled up + new content arrives. | M | 4.4 | not started | UX polish. |
+| 4.13 | Auto-scroll: stick to bottom during streaming unless user scrolled up. `[New messages]` pill appears when user is scrolled up + new content arrives. | M | 4.4 | review | TIN-50 + PR #73. Sticky-bottom threshold = 100px; pill uses `ClickableBadge`; helper tests cover tail-signature + threshold logic. |
 | 4.14 | Copy-message button on each assistant message. Hover-reveal. | S | 4.2 | review | TIN-51 · PR #57. Copies raw markdown; hidden while streaming. |
 | 4.15 | Clear existing tool-call / thinking UI from `Chat.tsx` that doesn't match 4.5/4.6 semantics. | S | 4.5, 4.6 | review | TIN-52 · PR #67 (bundled — see 4.5). |
 
@@ -121,7 +121,7 @@ Spec: [[25-mvp-context-badge]] · Depends on: M4.2
 |----|------|------|------------|--------|-------|
 | 5.1 | **Research**: locate OpenCode SDK field for per-session token usage + model context window. Deliverable: 1-page `agent-knowledge/reference/opencode-sdk-usage.md` with exact field paths + example payload. | S | — | done | TIN-53 · PR #16 merged 2026-04-21. |
 | 5.2 | `<ContextBadge percent={n} tokens={used} windowSize={max} model={name} />` primitive in `@tinker/design`. Pill w/ percent. Color: green <50%, amber 50–80%, red >80%. Tooltip w/ exact counts. | M | 5.1 | done | TIN-54 · PR #22 merged 2026-04-22. Pure visual + playground. |
-| 5.3 | Wire badge into Chat pane header. Subscribes to same SSE stream as chat; recomputes on each message. | S | 5.2, 4.4 | not started | One call site. |
+| 5.3 | Wire badge into Chat pane header. Subscribes to same SSE stream as chat; recomputes on each message. | S | 5.2, 4.4 | review | TIN-55 + PR #73. Chat now consumes `context_usage` events from `packages/bridge/src/stream.ts`; badge resolves from provider/model metadata or selected-model fallback. |
 | 5.4 | Playground entry in `routes/design-system.tsx` with three states (low/mid/high). Per D14 canonical rule. | S | 5.2 | review | TIN-56 · PR #40. |
 
 ### M6 — Memory as desktop-native filesystem (per-user subdir)
