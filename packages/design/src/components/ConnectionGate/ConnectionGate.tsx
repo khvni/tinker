@@ -12,9 +12,9 @@ export type ConnectionService = {
   detail?: string;
 };
 
-export type ConnectionGateProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
+export type ConnectionGateProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'title'> & {
   services: ReadonlyArray<ConnectionService>;
-  title?: string;
+  title?: string | null;
 };
 
 const dotStateFor = (status: ConnectionServiceStatus): StatusDotState => {
@@ -52,7 +52,7 @@ export const ConnectionGate = ({
     aria-busy={services.some((s) => s.status === 'pending')}
     {...rest}
   >
-    <p className="tk-connection-gate__title">{title}</p>
+    {title ? <p className="tk-connection-gate__title">{title}</p> : null}
     <ul className="tk-connection-gate__list">
       {services.map((service) => (
         <li

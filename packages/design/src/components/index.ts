@@ -5,9 +5,11 @@ export { ClickableBadge } from './ClickableBadge.js';
 export { ContextBadge, type ContextBadgeProps } from './ContextBadge.js';
 export {
   ConnectionGate,
+  ConnectionSplash,
   type ConnectionGateProps,
   type ConnectionService,
   type ConnectionServiceStatus,
+  type ConnectionSplashProps,
 } from './ConnectionGate/index.js';
 export { StatusDot, type StatusDotState } from './StatusDot.js';
 export { SegmentedControl, type SegmentedControlOption } from './SegmentedControl.js';

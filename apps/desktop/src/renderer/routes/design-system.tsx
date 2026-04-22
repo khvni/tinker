@@ -5,6 +5,7 @@ import {
   Button,
   ClickableBadge,
   ConnectionGate,
+  ConnectionSplash,
   ContextBadge,
   EmptyState,
   IconButton,
@@ -147,6 +148,13 @@ const CONNECTION_GATE_DONE: ReadonlyArray<ConnectionService> = [
   { id: 'exa', label: 'exa', status: 'connected' },
 ];
 
+const CONNECTION_SPLASH_SERVICES: ReadonlyArray<ConnectionService> = [
+  { id: 'host', label: 'Host service', status: 'connected' },
+  { id: 'auth', label: 'Auth sidecar', status: 'connected' },
+  { id: 'opencode', label: 'OpenCode', status: 'pending' },
+  { id: 'mcps', label: 'MCP servers (qmd, smart-connections, exa)', status: 'pending' },
+];
+
 const PlusIcon = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
     <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -224,6 +232,7 @@ const ComponentsTab = (): JSX.Element => {
   const [textValue, setTextValue] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const [textareaValue, setTextareaValue] = useState('Multi-line note.\nSecond line stays aligned to same token set.');
+  const [splashOpen, setSplashOpen] = useState(false);
 
   return (
     <div className="ds-sections">
@@ -404,6 +413,21 @@ const ComponentsTab = (): JSX.Element => {
           <ConnectionGate services={CONNECTION_GATE_MIXED} title="Connecting tools…" />
           <ConnectionGate services={CONNECTION_GATE_DONE} title="Ready" />
         </Row>
+      </Section>
+
+      <Section label="ConnectionSplash">
+        <Row>
+          <Button variant="secondary" onClick={() => setSplashOpen(true)}>
+            Show splash overlay
+          </Button>
+        </Row>
+        {splashOpen ? (
+          <ConnectionSplash
+            services={CONNECTION_SPLASH_SERVICES}
+            subtitle="Boots your local host, auth sidecar, OpenCode, and MCP servers."
+            onClick={() => setSplashOpen(false)}
+          />
+        ) : null}
       </Section>
 
       <Section label="SegmentedControl">
