@@ -100,6 +100,31 @@ fn opencode_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Err("Could not locate the bundled opencode.json configuration.".to_string())
 }
 
+fn bootstrap_opencode_env(
+    config_path: &PathBuf,
+    username: &str,
+    password: &str,
+    memory_subdir: Option<&str>,
+) -> Vec<(String, String)> {
+    let mut envs = vec![
+        (
+            "OPENCODE_CONFIG".to_string(),
+            config_path.to_string_lossy().into_owned(),
+        ),
+        ("OPENCODE_SERVER_USERNAME".to_string(), username.to_string()),
+        ("OPENCODE_SERVER_PASSWORD".to_string(), password.to_string()),
+    ];
+
+    if let Some(memory_subdir) = memory_subdir
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        envs.push(("SMART_VAULT_PATH".to_string(), memory_subdir.to_string()));
+    }
+
+    envs
+}
+
 fn main_window_config(
     app: &tauri::AppHandle,
 ) -> Result<&tauri::utils::config::WindowConfig, String> {
@@ -267,24 +292,13 @@ async fn bootstrap_opencode(
         .sidecar("opencode")
         .map_err(|error| error.to_string())?
         .args(sidecar_args)
-        .envs([
-            (
-                "OPENCODE_CONFIG",
-                config_path.to_string_lossy().into_owned(),
-            ),
-            ("OPENCODE_SERVER_USERNAME", username.clone()),
-            ("OPENCODE_SERVER_PASSWORD", password.clone()),
-        ])
+        .envs(bootstrap_opencode_env(
+            &config_path,
+            &username,
+            &password,
+            options.memory_subdir.as_deref(),
+        ))
         .current_dir(working_dir);
-
-    if let Some(memory_subdir) = options
-        .memory_subdir
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        sidecar = sidecar.env("SMART_VAULT_PATH", memory_subdir);
-    }
 
     if !github_token.is_empty() {
         sidecar = sidecar.env("TINKER_GITHUB_TOKEN", github_token);
@@ -391,9 +405,13 @@ pub fn run() {
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 if let Err(error) = commands::auth::start_auth_sidecar(app.handle().clone()).await {
-                    eprintln!("[better-auth] sidecar warm-start failed (will retry on demand): {error}");
+                    eprintln!(
+                        "[better-auth] sidecar warm-start failed (will retry on demand): {error}"
+                    );
                 }
-                if let Err(error) = commands::opencode::reconcile_opencode_manifests(&app.handle()).await {
+                if let Err(error) =
+                    commands::opencode::reconcile_opencode_manifests(&app.handle()).await
+                {
                     eprintln!("[opencode] orphan manifest cleanup failed: {error}");
                 }
                 bootstrap_opencode(&app.handle(), RestartOpencodeOptions::default()).await?;
@@ -416,4 +434,45 @@ pub fn run() {
             terminate_legacy_opencode(&handle);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bootstrap_opencode_env_includes_smart_vault_path_when_present() {
+        let envs = bootstrap_opencode_env(
+            &PathBuf::from("/tmp/opencode.json"),
+            "tinker-user",
+            "secret",
+            Some("/tmp/memory/local-user"),
+        );
+
+        assert!(envs.contains(&(
+            "OPENCODE_CONFIG".to_string(),
+            "/tmp/opencode.json".to_string()
+        )));
+        assert!(envs.contains(&(
+            "OPENCODE_SERVER_USERNAME".to_string(),
+            "tinker-user".to_string()
+        )));
+        assert!(envs.contains(&("OPENCODE_SERVER_PASSWORD".to_string(), "secret".to_string())));
+        assert!(envs.contains(&(
+            "SMART_VAULT_PATH".to_string(),
+            "/tmp/memory/local-user".to_string()
+        )));
+    }
+
+    #[test]
+    fn bootstrap_opencode_env_omits_smart_vault_path_when_empty() {
+        let envs = bootstrap_opencode_env(
+            &PathBuf::from("/tmp/opencode.json"),
+            "tinker-user",
+            "secret",
+            Some(""),
+        );
+
+        assert!(!envs.iter().any(|(key, _value)| key == "SMART_VAULT_PATH"));
+    }
 }

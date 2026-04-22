@@ -84,10 +84,6 @@ const providerNeedsRefreshToken = (provider: AuthProvider): boolean => {
   return provider === 'google' || provider === 'microsoft';
 };
 
-const providerNeedsWorkspaceRefresh = (provider: AuthProvider): boolean => {
-  return provider === 'github';
-};
-
 const buildStoredUserId = (provider: User['provider'], providerUserId: string): string => {
   return `${provider}:${providerUserId}`;
 };
@@ -279,6 +275,26 @@ const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath
   }
 };
 
+const resolveRestartOpencodeOptions = async (
+  sessions: SSOStatus,
+  folderPath: string | null,
+): Promise<RestartOpencodeOptions> => {
+  return {
+    ...(folderPath ? { folderPath } : {}),
+    memorySubdir: await getActiveMemoryPath(pickCurrentUserId(sessions)),
+  };
+};
+
+const restartWorkspaceOpencode = async (
+  vaultPath: string | null,
+  sessions: SSOStatus,
+): Promise<{ opencode: OpencodeConnection; modelConnected: boolean }> => {
+  const opencode = await restartOpencode(await resolveRestartOpencodeOptions(sessions, vaultPath));
+  await syncConnectorState(opencode, vaultPath, sessions);
+  const modelConnected = await probeModelConnection(opencode, vaultPath);
+  return { opencode, modelConnected };
+};
+
 export const App = (): JSX.Element => {
   const nativeRuntime = useMemo(() => isTauriRuntime(), []);
   const memoryStore = useMemo(() => createMemoryStore(), []);
@@ -360,19 +376,18 @@ export const App = (): JSX.Element => {
         let opencode = initialOpencode;
         let vaultRevision = 0;
         if (storedVaultPath) {
-          try {
-            const memorySubdir = await getActiveMemoryPath(DEFAULT_USER_ID);
-            opencode = await restartOpencode({ folderPath: storedVaultPath, memorySubdir });
-          } catch (error) {
-            console.warn('Could not relaunch OpenCode inside the stored folder. Falling back to default cwd.', error);
-          }
-
           const config = { path: storedVaultPath, isNew: false };
           await vaultService.init(config);
           await indexVault(config);
           await skillStore.init(storedVaultPath);
           await skillStore.reindex();
           vaultRevision = 1;
+        }
+
+        try {
+          opencode = await restartOpencode(await resolveRestartOpencodeOptions(sessions, storedVaultPath));
+        } catch (error) {
+          console.warn('Could not restart OpenCode with the restored workspace. Falling back to the warm-started sidecar.', error);
         }
 
         await syncConnectorState(opencode, storedVaultPath, sessions).catch((error) => {
@@ -698,31 +713,18 @@ export const App = (): JSX.Element => {
     );
   }
 
-  const reloadConnectionState = async (connection: OpencodeConnection, vaultPath: string | null) => {
-    const sessions = await readAuthStatus();
-    await syncConnectorState(connection, vaultPath, sessions);
-    const modelConnected = await probeModelConnection(connection, vaultPath);
-
-    return { sessions, modelConnected };
-  };
-
-  const refreshWorkspaceConnection = async (): Promise<void> => {
+  const refreshWorkspaceConnection = async (sessions: SSOStatus): Promise<void> => {
     requireNativeRuntime('Restarting OpenCode');
-    const memorySubdir = await getActiveMemoryPath(DEFAULT_USER_ID);
-    const opencode = await restartOpencode({
-      ...(state.vaultPath ? { folderPath: state.vaultPath } : {}),
-      memorySubdir,
-    });
-    const nextState = await reloadConnectionState(opencode, state.vaultPath);
-    await syncCurrentUserMemoryPath(nextState.sessions);
+    const nextState = await restartWorkspaceOpencode(state.vaultPath, sessions);
+    await syncCurrentUserMemoryPath(sessions);
 
     setState((current) =>
       current.status !== 'ready'
         ? current
         : {
             ...current,
-            opencode,
-            sessions: nextState.sessions,
+            opencode: nextState.opencode,
+            sessions,
             mcpStatus: {
               ...current.mcpStatus,
               [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
@@ -737,27 +739,21 @@ export const App = (): JSX.Element => {
     setSessionFolderBusy(true);
 
     try {
-      const memorySubdir = await getActiveMemoryPath(DEFAULT_USER_ID);
-      const opencode = await restartOpencode({ folderPath: config.path, memorySubdir });
+      const nextState = await restartWorkspaceOpencode(config.path, state.sessions);
       await vaultService.init(config);
       await indexVault(config);
       await skillStore.init(config.path);
       await skillStore.reindex();
       window.localStorage.setItem(VAULT_PATH_KEY, config.path);
 
-      await syncConnectorState(opencode, config.path, state.sessions).catch((error) => {
-        console.warn('Could not refresh connector state after folder change.', error);
-      });
-      const modelConnected = await probeModelConnection(opencode, config.path);
-
       setState((current) =>
         current.status !== 'ready'
           ? current
           : {
               ...current,
-              opencode,
+              opencode: nextState.opencode,
               vaultPath: config.path,
-              modelConnected,
+              modelConnected: nextState.modelConnected,
               vaultRevision: current.vaultRevision + 1,
               activeSkillsRevision: current.activeSkillsRevision + 1,
             },
@@ -868,21 +864,8 @@ export const App = (): JSX.Element => {
       await upsertUser(toStoredUser(session));
       await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
 
-      if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshWorkspaceConnection();
-      } else {
-        const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
-        await syncCurrentUserMemoryPath(nextState.sessions);
-        setState((current) =>
-          current.status !== 'ready'
-            ? current
-            : {
-                ...current,
-                sessions: nextState.sessions,
-                modelConnected: nextState.modelConnected,
-              },
-        );
-      }
+      const nextSessions = await readAuthStatus();
+      await refreshWorkspaceConnection(nextSessions);
 
       setProviderMessage(provider, `${providerDisplayName(provider)} connected as ${session.email}.`);
     } catch (error) {
@@ -899,22 +882,8 @@ export const App = (): JSX.Element => {
     try {
       requireNativeRuntime(`Disconnecting ${providerDisplayName(provider)}`);
       await invoke('auth_sign_out', { provider });
-
-      if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshWorkspaceConnection();
-      } else {
-        const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
-        await syncCurrentUserMemoryPath(nextState.sessions);
-        setState((current) =>
-          current.status !== 'ready'
-            ? current
-            : {
-                ...current,
-                sessions: nextState.sessions,
-                modelConnected: nextState.modelConnected,
-              },
-        );
-      }
+      const nextSessions = await readAuthStatus();
+      await refreshWorkspaceConnection(nextSessions);
 
       setProviderMessage(provider, `${providerDisplayName(provider)} disconnected.`);
     } catch (error) {
@@ -1004,4 +973,3 @@ export const App = (): JSX.Element => {
     </div>
   );
 };
-
