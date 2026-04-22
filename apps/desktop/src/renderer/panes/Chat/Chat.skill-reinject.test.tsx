@@ -27,6 +27,9 @@ type MockClient = {
       data: { providers: ReadonlyArray<unknown>; default: Record<string, string> };
     }>;
   };
+  mcp: {
+    status: ReturnType<typeof vi.fn>;
+  };
   session: {
     abort: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
@@ -74,6 +77,7 @@ vi.mock('@tinker/memory', () => ({
   listSessionsForUser: () => Promise.resolve([]),
   subscribeMemoryPathChanged: () => () => undefined,
   updateLastActive: () => Promise.resolve(),
+  updateSession: () => Promise.resolve(),
   isGitAvailable: () => Promise.resolve(false),
   syncSkills: () => Promise.resolve({ pulled: [], pushed: [], conflicts: [], message: '' }),
   slugify: (value: string) =>
@@ -137,6 +141,17 @@ describe('<Chat> — skill re-inject decoupled from session reset', () => {
     mocks.client = {
       config: {
         providers: () => Promise.resolve({ data: { providers: [], default: {} } }),
+      },
+      mcp: {
+        status: vi.fn(() =>
+          Promise.resolve({
+            data: {
+              qmd: { status: 'connected' },
+              'smart-connections': { status: 'connected' },
+              exa: { status: 'connected' },
+            },
+          }),
+        ),
       },
       session: {
         abort: vi.fn(() => Promise.resolve()),

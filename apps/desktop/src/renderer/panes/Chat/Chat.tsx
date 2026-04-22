@@ -319,9 +319,10 @@ export const Chat = ({
   // inject on the next prompt without wiping the live session.
   const injectedSkillsSignatureRef = useRef<string | null>(null);
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
+  const loadMcpStatus = useCallback(() => client.mcp.status(), [client]);
   const mcpConnectionGate = useMcpConnectionGate({
     enabled: !hydratingHistory && !awaitingFolder && requiresMcpConnectionGate,
-    loadStatus: () => client.mcp.status(),
+    loadStatus: loadMcpStatus,
   });
   const composerBlocked = busy || hydratingHistory || awaitingFolder || !modelConnected || mcpConnectionGate.blocked;
 
