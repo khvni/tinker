@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { homeDir, join } from '@tauri-apps/api/path';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import {
@@ -18,7 +17,7 @@ import {
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
 import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User, VaultConfig } from '@tinker/shared-types';
-import { DEFAULT_USER_ID, ONBOARDING_KEY, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
+import { DEFAULT_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
   checkExaBootHealth,
@@ -26,10 +25,8 @@ import {
   EXA_MCP_NAME,
   type MCPStatus,
 } from './integrations.js';
-import { FirstRun } from './panes/FirstRun.js';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
-import { SignIn } from './routes/SignIn/index.js';
-import { isTauriRuntime, WEB_PREVIEW_NOTICE } from './runtime.js';
+import { isTauriRuntime } from './runtime.js';
 import { Workspace } from './workspace/Workspace.js';
 
 type ReadyAppState = {
@@ -42,7 +39,6 @@ type ReadyAppState = {
   sessions: SSOStatus;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
-  onboarded: boolean;
   modelConnected: boolean;
   vaultRevision: number;
   activeSkillsRevision: number;
@@ -56,6 +52,11 @@ type AppState =
 
 type ProviderBusyState = Record<AuthProvider, boolean>;
 type ProviderMessageState = Record<AuthProvider, string | null>;
+
+type RestartOpencodeOptions = {
+  folderPath?: string;
+  memorySubdir?: string;
+};
 
 const MODEL_CONNECT_POLL_INTERVAL_MS = 1_500;
 const MODEL_CONNECT_TIMEOUT_MS = 180_000;
@@ -147,19 +148,13 @@ const ensureConnectedMemoryPaths = async (sessions: SSOStatus): Promise<void> =>
   );
 };
 
-const getDefaultVaultPath = async (): Promise<string> => {
-  const home = await homeDir();
-  return join(home, 'Tinker', 'knowledge');
+const restartOpencode = (options: RestartOpencodeOptions): Promise<OpencodeConnection> => {
+  return invoke<OpencodeConnection>('restart_opencode', { options });
 };
 
-const selectVault = async (): Promise<string | null> => {
-  const selected = await openDialog({
-    directory: true,
-    multiple: false,
-    title: 'Select your Tinker vault',
-  });
-
-  return typeof selected === 'string' ? selected : null;
+const selectSessionFolder = async (): Promise<string | null> => {
+  const picked = await openFolderPicker();
+  return picked.trim().length > 0 ? picked : null;
 };
 
 const forwardGoogleAuth = async (
@@ -296,6 +291,7 @@ export const App = (): JSX.Element => {
   const [providerMessages, setProviderMessages] = useState<ProviderMessageState>(EMPTY_PROVIDER_MESSAGES);
   const [memorySweepState, setMemorySweepState] = useState<MemoryRunState | null>(null);
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
+  const [sessionFolderBusy, setSessionFolderBusy] = useState(false);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
 
   const requireNativeRuntime = (action: string): void => {
@@ -343,7 +339,6 @@ export const App = (): JSX.Element => {
             sessions: withDefaultSessions(null),
             mcpStatus: {},
             vaultPath: null,
-            onboarded: false,
             modelConnected: false,
             vaultRevision: 0,
             activeSkillsRevision: 0,
@@ -352,25 +347,36 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const [opencode, sessions] = await Promise.all([invoke<OpencodeConnection>('get_opencode_connection'), readAuthStatus()]);
+        const [initialOpencode, sessions] = await Promise.all([
+          invoke<OpencodeConnection>('get_opencode_connection'),
+          readAuthStatus(),
+        ]);
         await upsertUser(createLocalUser());
         await ensureConnectedMemoryPaths(sessions);
-        const vaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
+        const storedVaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
+        let opencode = initialOpencode;
         let vaultRevision = 0;
-        if (vaultPath) {
-          const config = { path: vaultPath, isNew: false };
+        if (storedVaultPath) {
+          try {
+            const memorySubdir = await getActiveMemoryPath(DEFAULT_USER_ID);
+            opencode = await restartOpencode({ folderPath: storedVaultPath, memorySubdir });
+          } catch (error) {
+            console.warn('Could not relaunch OpenCode inside the stored folder. Falling back to default cwd.', error);
+          }
+
+          const config = { path: storedVaultPath, isNew: false };
           await vaultService.init(config);
           await indexVault(config);
-          await skillStore.init(vaultPath);
+          await skillStore.init(storedVaultPath);
           await skillStore.reindex();
           vaultRevision = 1;
         }
 
-        await syncConnectorState(opencode, vaultPath, sessions).catch((error) => {
+        await syncConnectorState(opencode, storedVaultPath, sessions).catch((error) => {
           console.warn('Could not restore connector state on boot.', error);
         });
-        const modelConnected = await probeModelConnection(opencode, vaultPath);
+        const modelConnected = await probeModelConnection(opencode, storedVaultPath);
 
         if (!active) {
           return;
@@ -385,8 +391,7 @@ export const App = (): JSX.Element => {
           opencode,
           sessions,
           mcpStatus: {},
-          vaultPath,
-          onboarded: window.localStorage.getItem(ONBOARDING_KEY) === '1',
+          vaultPath: storedVaultPath,
           modelConnected,
           vaultRevision,
           activeSkillsRevision: 0,
@@ -701,7 +706,11 @@ export const App = (): JSX.Element => {
 
   const refreshWorkspaceConnection = async (): Promise<void> => {
     requireNativeRuntime('Restarting OpenCode');
-    const opencode = await invoke<OpencodeConnection>('restart_opencode');
+    const memorySubdir = await getActiveMemoryPath(DEFAULT_USER_ID);
+    const opencode = await restartOpencode({
+      ...(state.vaultPath ? { folderPath: state.vaultPath } : {}),
+      memorySubdir,
+    });
     const nextState = await reloadConnectionState(opencode, state.vaultPath);
 
     setState((current) =>
@@ -720,30 +729,39 @@ export const App = (): JSX.Element => {
     );
   };
 
-  const setVaultPath = async (config: VaultConfig): Promise<void> => {
-    requireNativeRuntime('Selecting a vault');
-    await vaultService.init(config);
-    await indexVault(config);
-    await skillStore.init(config.path);
-    await skillStore.reindex();
-    window.localStorage.setItem(VAULT_PATH_KEY, config.path);
+  const setSessionFolder = async (config: VaultConfig): Promise<void> => {
+    requireNativeRuntime('Selecting a folder');
+    setSessionFolderBusy(true);
 
-    await syncConnectorState(state.opencode, config.path, state.sessions).catch((error) => {
-      console.warn('Could not refresh connector state after vault change.', error);
-    });
-    const modelConnected = await probeModelConnection(state.opencode, config.path);
+    try {
+      const memorySubdir = await getActiveMemoryPath(DEFAULT_USER_ID);
+      const opencode = await restartOpencode({ folderPath: config.path, memorySubdir });
+      await vaultService.init(config);
+      await indexVault(config);
+      await skillStore.init(config.path);
+      await skillStore.reindex();
+      window.localStorage.setItem(VAULT_PATH_KEY, config.path);
 
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            vaultPath: config.path,
-            modelConnected,
-            vaultRevision: current.vaultRevision + 1,
-            activeSkillsRevision: current.activeSkillsRevision + 1,
-          },
-    );
+      await syncConnectorState(opencode, config.path, state.sessions).catch((error) => {
+        console.warn('Could not refresh connector state after folder change.', error);
+      });
+      const modelConnected = await probeModelConnection(opencode, config.path);
+
+      setState((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              opencode,
+              vaultPath: config.path,
+              modelConnected,
+              vaultRevision: current.vaultRevision + 1,
+              activeSkillsRevision: current.activeSkillsRevision + 1,
+            },
+      );
+    } finally {
+      setSessionFolderBusy(false);
+    }
   };
 
   const handleActiveSkillsChanged = (): void => {
@@ -901,36 +919,25 @@ export const App = (): JSX.Element => {
     }
   };
 
-  const handleCreateVault = async (): Promise<void> => {
-    requireNativeRuntime('Creating the default vault');
-    await setVaultPath({
-      path: await getDefaultVaultPath(),
-      isNew: true,
-    });
-  };
-
-  const handlePickVault = async (): Promise<void> => {
-    requireNativeRuntime('Selecting an existing vault');
-    const vaultPath = await selectVault();
-    if (vaultPath) {
-      await setVaultPath({ path: vaultPath, isNew: false });
-    }
-  };
-
-  const finishOnboarding = (): void => {
-    if (!nativeRuntime) {
+  const handleSelectSessionFolder = async (): Promise<void> => {
+    if (sessionFolderBusy) {
       return;
     }
 
-    window.localStorage.setItem(ONBOARDING_KEY, '1');
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            onboarded: true,
-          },
-    );
+    requireNativeRuntime('Selecting a folder');
+    const folderPath = await selectSessionFolder();
+    if (!folderPath) {
+      return;
+    }
+
+    await setSessionFolder({ path: folderPath, isNew: false });
+  };
+
+  const handleCreateDefaultVault = async (): Promise<void> => {
+    requireNativeRuntime('Creating the default vault');
+    const home = await homeDir();
+    const defaultPath = await join(home, 'Tinker', 'knowledge');
+    await setSessionFolder({ path: defaultPath, isNew: true });
   };
 
   const handleRunScheduledJobNow = async (jobId: string): Promise<void> => {
@@ -942,95 +949,54 @@ export const App = (): JSX.Element => {
     await engine.runNow(jobId);
   };
 
-  const hasSignedIn =
-    state.sessions.google !== null ||
-    state.sessions.github !== null ||
-    state.sessions.microsoft !== null;
-  const signInGateVisible = nativeRuntime && !hasSignedIn;
-  const workspaceAvailable = nativeRuntime && state.onboarded && hasSignedIn;
   const currentUserId = pickCurrentUserId(state.sessions);
-
-  if (signInGateVisible) {
-    return (
-      <div className="tinker-app">
-        <SignIn
-          nativeRuntimeAvailable={nativeRuntime}
-          providerMessages={providerMessages}
-          onSignIn={handleProviderConnect}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="tinker-app">
-      {!workspaceAvailable ? (
-        <FirstRun
-          nativeRuntimeAvailable={nativeRuntime}
-          runtimeNotice={nativeRuntime ? null : WEB_PREVIEW_NOTICE}
-          modelConnected={state.modelConnected}
-          modelAuthBusy={modelAuthBusy}
-          modelAuthMessage={modelAuthMessage}
-          googleAuthBusy={providerBusy.google}
-          googleAuthMessage={providerMessages.google}
-          githubAuthBusy={providerBusy.github}
-          githubAuthMessage={providerMessages.github}
-          microsoftAuthBusy={providerBusy.microsoft}
-          microsoftAuthMessage={providerMessages.microsoft}
-          sessions={state.sessions}
-          mcpStatus={state.mcpStatus}
-          vaultPath={state.vaultPath}
-          onConnectModel={handleConnectModel}
-          onConnectGoogle={() => handleProviderConnect('google')}
-          onConnectGithub={() => handleProviderConnect('github')}
-          onConnectMicrosoft={() => handleProviderConnect('microsoft')}
-          onCreateVault={handleCreateVault}
-          onSelectVault={handlePickVault}
-          onContinue={finishOnboarding}
-        />
-      ) : (
-        <Workspace
-          key={currentUserId}
-          currentUserId={currentUserId}
-          layoutStore={state.layoutStore}
-          memoryStore={state.memoryStore}
-          schedulerStore={state.schedulerStore}
-          schedulerRevision={state.schedulerRevision}
-          skillStore={state.skillStore}
-          modelConnected={state.modelConnected}
-          modelAuthBusy={modelAuthBusy}
-          modelAuthMessage={modelAuthMessage}
-          googleAuthBusy={providerBusy.google}
-          googleAuthMessage={providerMessages.google}
-          githubAuthBusy={providerBusy.github}
-          githubAuthMessage={providerMessages.github}
-          microsoftAuthBusy={providerBusy.microsoft}
-          microsoftAuthMessage={providerMessages.microsoft}
-          opencode={state.opencode}
-          sessions={state.sessions}
-          mcpStatus={state.mcpStatus}
-          vaultPath={state.vaultPath}
-          vaultRevision={state.vaultRevision}
-          activeSkillsRevision={state.activeSkillsRevision}
-          memorySweepState={memorySweepState}
-          memorySweepBusy={memorySweepBusy}
-          onConnectGoogle={() => handleProviderConnect('google')}
-          onDisconnectGoogle={() => handleProviderDisconnect('google')}
-          onConnectGithub={() => handleProviderConnect('github')}
-          onDisconnectGithub={() => handleProviderDisconnect('github')}
-          onConnectMicrosoft={() => handleProviderConnect('microsoft')}
-          onDisconnectMicrosoft={() => handleProviderDisconnect('microsoft')}
-          onConnectModel={handleConnectModel}
-          onDisconnectModel={handleDisconnectModel}
-          onCreateVault={handleCreateVault}
-          onSelectVault={handlePickVault}
-          onRunScheduledJobNow={handleRunScheduledJobNow}
-          onSchedulerChanged={bumpSchedulerRevision}
-          onActiveSkillsChanged={handleActiveSkillsChanged}
-          onRunMemorySweep={handleRunMemorySweep}
-          onMemoryCommitted={handleMemoryCommitted}
-        />
-      )}
+      <Workspace
+        key={currentUserId}
+        currentUserId={currentUserId}
+        layoutStore={state.layoutStore}
+        memoryStore={state.memoryStore}
+        schedulerStore={state.schedulerStore}
+        schedulerRevision={state.schedulerRevision}
+        skillStore={state.skillStore}
+        modelConnected={state.modelConnected}
+        modelAuthBusy={modelAuthBusy}
+        modelAuthMessage={modelAuthMessage}
+        googleAuthBusy={providerBusy.google}
+        googleAuthMessage={providerMessages.google}
+        githubAuthBusy={providerBusy.github}
+        githubAuthMessage={providerMessages.github}
+        microsoftAuthBusy={providerBusy.microsoft}
+        microsoftAuthMessage={providerMessages.microsoft}
+        opencode={state.opencode}
+        sessions={state.sessions}
+        mcpStatus={state.mcpStatus}
+        vaultPath={state.vaultPath}
+        vaultRevision={state.vaultRevision}
+        activeSkillsRevision={state.activeSkillsRevision}
+        memorySweepState={memorySweepState}
+        memorySweepBusy={memorySweepBusy}
+        sessionFolderBusy={sessionFolderBusy}
+        onSelectSessionFolder={handleSelectSessionFolder}
+        onCreateVault={handleCreateDefaultVault}
+        onSelectVault={handleSelectSessionFolder}
+        onConnectGoogle={() => handleProviderConnect('google')}
+        onDisconnectGoogle={() => handleProviderDisconnect('google')}
+        onConnectGithub={() => handleProviderConnect('github')}
+        onDisconnectGithub={() => handleProviderDisconnect('github')}
+        onConnectMicrosoft={() => handleProviderConnect('microsoft')}
+        onDisconnectMicrosoft={() => handleProviderDisconnect('microsoft')}
+        onConnectModel={handleConnectModel}
+        onDisconnectModel={handleDisconnectModel}
+        onRunScheduledJobNow={handleRunScheduledJobNow}
+        onSchedulerChanged={bumpSchedulerRevision}
+        onActiveSkillsChanged={handleActiveSkillsChanged}
+        onRunMemorySweep={handleRunMemorySweep}
+        onMemoryCommitted={handleMemoryCommitted}
+      />
     </div>
   );
 };
+

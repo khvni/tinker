@@ -39,8 +39,7 @@ textarea {
   background: var(--color-bg-primary);
 }
 
-.tinker-stage,
-.tinker-first-run {
+.tinker-stage {
   display: grid;
   place-items: center;
   width: 100%;
@@ -61,12 +60,6 @@ textarea {
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.01em;
   color: var(--color-text-primary);
-}
-
-.tinker-first-run-grid {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .tinker-eyebrow {
@@ -1283,8 +1276,7 @@ textarea {
 }
 
 @media (max-width: 800px) {
-  .tinker-stage,
-  .tinker-first-run {
+  .tinker-stage {
     padding: var(--space-4);
   }
 

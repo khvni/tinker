@@ -10,7 +10,6 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/drive.readonly',
 ] as const;
 
-export const ONBOARDING_KEY = 'tinker:onboarded';
 export const VAULT_PATH_KEY = 'tinker:vault-path';
 export const DEFAULT_USER_ID = 'local-user';
 export const REFRESH_TOKEN_PROVIDERS = ['google', 'github', 'microsoft'] as const;

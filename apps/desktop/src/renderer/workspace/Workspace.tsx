@@ -59,6 +59,8 @@ type WorkspaceProps = {
   activeSkillsRevision: number;
   memorySweepState: MemoryRunState | null;
   memorySweepBusy: boolean;
+  sessionFolderBusy: boolean;
+  onSelectSessionFolder(): Promise<void>;
   onConnectModel(): Promise<void>;
   onDisconnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
@@ -110,6 +112,8 @@ export const Workspace = ({
   mcpStatus,
   vaultPath,
   activeSkillsRevision,
+  sessionFolderBusy,
+  onSelectSessionFolder,
   onMemoryCommitted,
 }: WorkspaceProps): JSX.Element => {
   const workspaceStoreRef = useRef<WorkspaceStore<TinkerPaneData> | null>(null);
@@ -310,6 +314,8 @@ export const Workspace = ({
       sessionFolderPath: vaultPath,
       vaultPath,
       activeSkillsRevision,
+      sessionFolderBusy,
+      onSelectSessionFolder,
       onFileWritten: handleAgentFileWritten,
       onOpenFileLink: openFileInWorkspace,
       onOpenNewChat: openNewChatPane,
@@ -321,9 +327,11 @@ export const Workspace = ({
       handleAgentFileWritten,
       modelConnected,
       onMemoryCommitted,
+      onSelectSessionFolder,
       openFileInWorkspace,
       openNewChatPane,
       opencode,
+      sessionFolderBusy,
       vaultPath,
       skillStore,
     ],

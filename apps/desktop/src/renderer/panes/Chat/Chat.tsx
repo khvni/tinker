@@ -20,6 +20,7 @@ import {
   EmptyState,
   IconButton,
   ModelPicker,
+  SelectFolderButton,
   Textarea,
 } from '@tinker/design';
 import {
@@ -72,6 +73,8 @@ type ChatProps = {
   sessionFolderPath: string | null;
   vaultPath: string | null;
   activeSkillsRevision: number;
+  sessionFolderBusy?: boolean;
+  onSelectSessionFolder?: () => Promise<void> | void;
   onFileWritten?: (path: string) => void;
   onOpenFileLink?: (path: string) => void;
   onOpenNewChat?: () => void;
@@ -215,6 +218,8 @@ export const Chat = ({
   sessionFolderPath,
   vaultPath,
   activeSkillsRevision,
+  sessionFolderBusy = false,
+  onSelectSessionFolder,
   onFileWritten,
   onOpenFileLink,
   onOpenNewChat,
@@ -222,7 +227,13 @@ export const Chat = ({
   modeToggleSlot,
   reasoningPickerSlot,
 }: ChatProps): JSX.Element => {
-  const readyStatus = modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.';
+  const folderPickerAvailable = typeof onSelectSessionFolder === 'function';
+  const awaitingFolder = !sessionFolderPath && folderPickerAvailable;
+  const readyStatus = awaitingFolder
+    ? 'Pick a folder to start a session.'
+    : modelConnected
+      ? 'OpenCode is ready.'
+      : 'Connect an AI model in Settings to start chatting.';
   const client = useMemo(
     () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
     [opencode.baseUrl, opencode.password, opencode.username, vaultPath],
@@ -966,6 +977,14 @@ export const Chat = ({
             disabled={busy || hydratingHistory}
             emptyLabel="No models available in OpenCode."
           />
+          {folderPickerAvailable ? (
+            <SelectFolderButton
+              folderPath={sessionFolderPath}
+              loading={sessionFolderBusy}
+              disabled={busy || hydratingHistory}
+              onClick={() => void onSelectSessionFolder?.()}
+            />
+          ) : null}
           <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
             ⌥T thinking
           </span>
@@ -999,16 +1018,31 @@ export const Chat = ({
               title={
                 hydratingHistory
                   ? 'Restoring chat history'
-                  : modelConnected
-                    ? 'Start a conversation'
-                    : 'No model connected'
+                  : awaitingFolder
+                    ? 'Select a folder to start'
+                    : modelConnected
+                      ? 'Start a conversation'
+                      : 'No model connected'
               }
               description={
                 hydratingHistory
                   ? 'Loading prior messages from the session folder before OpenCode resumes streaming.'
-                  : modelConnected
-                    ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
-                    : 'Connect an AI model in Settings before sending a message.'
+                  : awaitingFolder
+                    ? 'The agent works inside a local folder. Use the “Select folder” button in the header to pick one.'
+                    : modelConnected
+                      ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+                      : 'Connect an AI model in Settings before sending a message.'
+              }
+              action={
+                awaitingFolder ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => void onSelectSessionFolder?.()}
+                    disabled={sessionFolderBusy}
+                  >
+                    {sessionFolderBusy ? 'Starting…' : 'Select folder'}
+                  </Button>
+                ) : undefined
               }
               icon={
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

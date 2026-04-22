@@ -127,10 +127,20 @@ fn ensure_main_window(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RestartOpencodeOptions {
+    pub folder_path: Option<String>,
+    pub memory_subdir: Option<String>,
+}
+
 #[tauri::command]
-async fn restart_opencode(app: tauri::AppHandle) -> Result<OpencodeConnection, String> {
+async fn restart_opencode(
+    app: tauri::AppHandle,
+    options: Option<RestartOpencodeOptions>,
+) -> Result<OpencodeConnection, String> {
     terminate_legacy_opencode(&app);
-    bootstrap_opencode(&app).await?;
+    bootstrap_opencode(&app, options.unwrap_or_default()).await?;
     let state = app.state::<OpencodeState>();
     clone_opencode_connection(&state)
 }
@@ -214,7 +224,10 @@ async fn wait_for_opencode_connection(
     }
 }
 
-async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
+async fn bootstrap_opencode(
+    app: &tauri::AppHandle,
+    options: RestartOpencodeOptions,
+) -> Result<(), String> {
     let state = app.state::<OpencodeState>();
     if state
         .child
@@ -226,21 +239,34 @@ async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
     }
 
     let config_path = opencode_config_path(app)?;
-    let working_dir = config_path
-        .parent()
-        .ok_or_else(|| "OpenCode config path did not have a parent directory.".to_string())?
-        .to_path_buf();
+    let folder_arg = options
+        .folder_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let working_dir = match folder_arg {
+        Some(folder) => PathBuf::from(folder),
+        None => config_path
+            .parent()
+            .ok_or_else(|| "OpenCode config path did not have a parent directory.".to_string())?
+            .to_path_buf(),
+    };
     let username = format!("tinker-{}", random_url_safe(8));
     let password = random_url_safe(24);
     let github_token = read_keychain_session(app, AuthProvider::Github)?
         .map(|session| session.access_token().to_string())
         .unwrap_or_default();
 
+    let mut sidecar_args = vec!["serve", "--hostname", "127.0.0.1", "--port", "0"];
+    if let Some(folder) = folder_arg {
+        sidecar_args.extend(["--cwd", folder]);
+    }
+
     let mut sidecar = app
         .shell()
         .sidecar("opencode")
         .map_err(|error| error.to_string())?
-        .args(["serve", "--hostname", "127.0.0.1", "--port", "0"])
+        .args(sidecar_args)
         .envs([
             (
                 "OPENCODE_CONFIG",
@@ -250,6 +276,15 @@ async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
             ("OPENCODE_SERVER_PASSWORD", password.clone()),
         ])
         .current_dir(working_dir);
+
+    if let Some(memory_subdir) = options
+        .memory_subdir
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        sidecar = sidecar.env("SMART_VAULT_PATH", memory_subdir);
+    }
 
     if !github_token.is_empty() {
         sidecar = sidecar.env("TINKER_GITHUB_TOKEN", github_token);
@@ -359,7 +394,7 @@ pub fn run() {
                 if let Err(error) = commands::opencode::reconcile_opencode_manifests(&app.handle()).await {
                     eprintln!("[opencode] orphan manifest cleanup failed: {error}");
                 }
-                bootstrap_opencode(&app.handle()).await?;
+                bootstrap_opencode(&app.handle(), RestartOpencodeOptions::default()).await?;
                 ensure_main_window(&app.handle())?;
                 Ok::<(), String>(())
             })
