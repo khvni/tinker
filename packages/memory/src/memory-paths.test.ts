@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDataDir, mockJoin, mockExists, mockMkdir } = vi.hoisted(() => ({
+const { mockDataDir, mockJoin, mockMkdir } = vi.hoisted(() => ({
   mockDataDir: vi.fn<() => Promise<string>>(),
   mockJoin: vi.fn<(...paths: string[]) => Promise<string>>(),
-  mockExists: vi.fn<(path: string) => Promise<boolean>>(),
   mockMkdir: vi.fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>(),
 }));
 
@@ -13,7 +12,6 @@ vi.mock('@tauri-apps/api/path', () => ({
 }));
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
-  exists: mockExists,
   mkdir: mockMkdir,
 }));
 
@@ -22,31 +20,52 @@ import {
   detectMemoryRootPlatform,
   ensureDefaultMemoryRoot,
   resolveDefaultMemoryRoot,
-} from './memory-root.js';
+} from './memory-paths.js';
+
+const stubProcessPlatform = (platform: NodeJS.Platform): void => {
+  vi.stubGlobal('process', { ...process, platform });
+};
 
 describe('detectMemoryRootPlatform', () => {
-  it('detects macOS from Application Support path', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('prefers process.platform for macOS', () => {
+    stubProcessPlatform('darwin');
+    expect(detectMemoryRootPlatform('/tmp/not-used')).toBe('macos');
+  });
+
+  it('prefers process.platform for Windows', () => {
+    stubProcessPlatform('win32');
+    expect(detectMemoryRootPlatform('/tmp/not-used')).toBe('windows');
+  });
+
+  it('prefers process.platform for Linux', () => {
+    stubProcessPlatform('linux');
+    expect(detectMemoryRootPlatform('/tmp/not-used')).toBe('linux');
+  });
+
+  it('falls back to the data directory when process is unavailable', () => {
+    vi.stubGlobal('process', undefined);
+
     expect(detectMemoryRootPlatform('/Users/alice/Library/Application Support')).toBe('macos');
-  });
-
-  it('detects Windows from roaming AppData path', () => {
     expect(detectMemoryRootPlatform('C:\\Users\\Alice\\AppData\\Roaming')).toBe('windows');
-  });
-
-  it('defaults to linux for XDG-style data paths', () => {
     expect(detectMemoryRootPlatform('/home/alice/.local/share')).toBe('linux');
-    expect(detectMemoryRootPlatform('/var/lib/custom-data-home')).toBe('linux');
   });
 });
 
 describe('defaultMemoryRootSegments', () => {
   it('uses lowercase app directory on linux', () => {
-    expect(defaultMemoryRootSegments('/home/alice/.local/share')).toEqual(['tinker', 'memory']);
+    expect(defaultMemoryRootSegments('/home/alice/.local/share', 'linux')).toEqual(['tinker', 'memory']);
   });
 
   it('uses title case app directory on macOS and Windows', () => {
-    expect(defaultMemoryRootSegments('/Users/alice/Library/Application Support')).toEqual(['Tinker', 'memory']);
-    expect(defaultMemoryRootSegments('C:\\Users\\Alice\\AppData\\Roaming')).toEqual(['Tinker', 'memory']);
+    expect(defaultMemoryRootSegments('/Users/alice/Library/Application Support', 'darwin')).toEqual([
+      'Tinker',
+      'memory',
+    ]);
+    expect(defaultMemoryRootSegments('C:\\Users\\Alice\\AppData\\Roaming', 'win32')).toEqual(['Tinker', 'memory']);
   });
 });
 
@@ -54,15 +73,15 @@ describe('default memory root resolution', () => {
   beforeEach(() => {
     mockDataDir.mockReset();
     mockJoin.mockReset();
-    mockExists.mockReset();
     mockMkdir.mockReset();
+    vi.unstubAllGlobals();
   });
 
   it('resolves the linux default root under ~/.local/share/tinker/memory', async () => {
     mockDataDir.mockResolvedValue('/home/alice/.local/share');
     mockJoin.mockResolvedValue('/home/alice/.local/share/tinker/memory');
 
-    await expect(resolveDefaultMemoryRoot()).resolves.toBe('/home/alice/.local/share/tinker/memory');
+    await expect(resolveDefaultMemoryRoot('linux')).resolves.toBe('/home/alice/.local/share/tinker/memory');
     expect(mockJoin).toHaveBeenCalledWith('/home/alice/.local/share', 'tinker', 'memory');
   });
 
@@ -70,7 +89,7 @@ describe('default memory root resolution', () => {
     mockDataDir.mockResolvedValue('/Users/alice/Library/Application Support');
     mockJoin.mockResolvedValue('/Users/alice/Library/Application Support/Tinker/memory');
 
-    await expect(resolveDefaultMemoryRoot()).resolves.toBe('/Users/alice/Library/Application Support/Tinker/memory');
+    await expect(resolveDefaultMemoryRoot('darwin')).resolves.toBe('/Users/alice/Library/Application Support/Tinker/memory');
     expect(mockJoin).toHaveBeenCalledWith('/Users/alice/Library/Application Support', 'Tinker', 'memory');
   });
 
@@ -78,27 +97,16 @@ describe('default memory root resolution', () => {
     mockDataDir.mockResolvedValue('C:\\Users\\Alice\\AppData\\Roaming');
     mockJoin.mockResolvedValue('C:\\Users\\Alice\\AppData\\Roaming\\Tinker\\memory');
 
-    await expect(resolveDefaultMemoryRoot()).resolves.toBe('C:\\Users\\Alice\\AppData\\Roaming\\Tinker\\memory');
+    await expect(resolveDefaultMemoryRoot('win32')).resolves.toBe('C:\\Users\\Alice\\AppData\\Roaming\\Tinker\\memory');
     expect(mockJoin).toHaveBeenCalledWith('C:\\Users\\Alice\\AppData\\Roaming', 'Tinker', 'memory');
   });
 
-  it('creates the directory recursively when missing', async () => {
+  it('creates the directory with recursive mkdir semantics', async () => {
     mockDataDir.mockResolvedValue('/home/alice/.local/share');
     mockJoin.mockResolvedValue('/home/alice/.local/share/tinker/memory');
-    mockExists.mockResolvedValue(false);
     mockMkdir.mockResolvedValue();
 
-    await expect(ensureDefaultMemoryRoot()).resolves.toBe('/home/alice/.local/share/tinker/memory');
-    expect(mockExists).toHaveBeenCalledWith('/home/alice/.local/share/tinker/memory');
+    await expect(ensureDefaultMemoryRoot('linux')).resolves.toBe('/home/alice/.local/share/tinker/memory');
     expect(mockMkdir).toHaveBeenCalledWith('/home/alice/.local/share/tinker/memory', { recursive: true });
-  });
-
-  it('returns the existing directory without creating it again', async () => {
-    mockDataDir.mockResolvedValue('/home/alice/.local/share');
-    mockJoin.mockResolvedValue('/home/alice/.local/share/tinker/memory');
-    mockExists.mockResolvedValue(true);
-
-    await expect(ensureDefaultMemoryRoot()).resolves.toBe('/home/alice/.local/share/tinker/memory');
-    expect(mockMkdir).not.toHaveBeenCalled();
   });
 });
