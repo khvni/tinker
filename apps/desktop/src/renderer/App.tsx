@@ -342,6 +342,7 @@ export const App = (): JSX.Element => {
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
   const [sessionFolderBusy, setSessionFolderBusy] = useState(false);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
+  const initialAuthSyncRef = useRef<boolean>(true);
   const { state: currentUserState, refresh: refreshCurrentUser } = useCurrentUser(nativeRuntime);
 
   const requireNativeRuntime = (action: string): void => {
@@ -445,10 +446,7 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const [opencode, sessions] = await Promise.all([
-          invoke<OpencodeConnection>('get_opencode_connection'),
-          readAuthStatus(),
-        ]);
+        const sessions = await readAuthStatus();
         await migrateLocalUserIdentity('local-user', GUEST_USER_ID);
         await syncStoredUsers(sessions);
         await syncCurrentUserMemoryPath(sessions, { emit: false });
@@ -464,6 +462,10 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
+        const opencode = await restartOpencode(
+          await resolveRestartOpencodeOptions(sessions, storedVaultPath),
+        );
+        await syncConnectorState(opencode, storedVaultPath, sessions);
         const modelConnected = await probeModelConnection(opencode, storedVaultPath);
 
         if (!active) {
@@ -512,6 +514,10 @@ export const App = (): JSX.Element => {
     const activeBaseUrl = state.opencode.baseUrl;
 
     void (async () => {
+      if (initialAuthSyncRef.current) {
+        initialAuthSyncRef.current = false;
+        return;
+      }
       await syncCurrentUserMemoryPath(activeSessions);
       try {
         const nextState = await restartWorkspaceOpencode(activeVaultPath, activeSessions);

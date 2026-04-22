@@ -451,7 +451,6 @@ pub fn run() {
                 {
                     eprintln!("[opencode] orphan manifest cleanup failed: {error}");
                 }
-                bootstrap_opencode(&app.handle(), RestartOpencodeOptions::default()).await?;
                 ensure_main_window(&app.handle())?;
                 Ok::<(), String>(())
             })
