@@ -1,0 +1,363 @@
+.tinker-playbook-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.tinker-playbook-pane__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.tinker-playbook-pane__title {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xxl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.tinker-playbook-pane__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tinker-playbook-pane__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.tinker-playbook-pane__search {
+  flex: 1 1 320px;
+  min-width: 240px;
+}
+
+.tinker-playbook-pane__roles {
+  flex: 0 0 auto;
+}
+
+.tinker-playbook-pane__grid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.tinker-playbook-pane__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ---------- Card ---------- */
+
+.tinker-playbook-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  transition:
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+  cursor: default;
+  outline: none;
+}
+
+.tinker-playbook-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-strong);
+}
+
+.tinker-playbook-card:focus-visible {
+  border-color: var(--color-accent-strong);
+  box-shadow: 0 0 0 3px var(--color-accent-ring);
+}
+
+.tinker-playbook-card--active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-border-strong);
+}
+
+.tinker-playbook-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tinker-playbook-card__title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-tight);
+  min-width: 0;
+}
+
+.tinker-playbook-card--active .tinker-playbook-card__title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.tinker-playbook-card__glyph {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary, var(--color-text-muted));
+  font-size: var(--font-size-md);
+  line-height: 1;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.tinker-playbook-card--active .tinker-playbook-card__glyph {
+  color: var(--color-accent-strong);
+}
+
+.tinker-playbook-card__title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tinker-playbook-card__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.tinker-playbook-card__menu {
+  position: relative;
+}
+
+.tinker-playbook-card__menu-popover {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 10;
+  min-width: 160px;
+  padding: var(--space-1);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.tinker-playbook-card__menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.tinker-playbook-card__menu-item:hover,
+.tinker-playbook-card__menu-item:focus-visible {
+  background: var(--color-bg-hover);
+  outline: none;
+}
+
+.tinker-playbook-card__menu-item--danger {
+  color: var(--color-error);
+}
+
+.tinker-playbook-card__description {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-relaxed);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tinker-playbook-card__description--muted {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.tinker-playbook-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.tinker-playbook-card__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+/* The Toggle becomes secondary to the glyph + background signature. Hide it
+ * on rest but keep it in the accessibility tree; reveal on hover / keyboard
+ * focus so mouse users can still flip state without reading copy. Never use
+ * display: none — that would strip it from the a11y tree. */
+.tinker-playbook-card__toggle .tk-toggle {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.tinker-playbook-card:hover .tinker-playbook-card__toggle .tk-toggle,
+.tinker-playbook-card:focus-within .tinker-playbook-card__toggle .tk-toggle,
+.tinker-playbook-card__toggle .tk-toggle:focus-visible,
+.tinker-playbook-card--active .tinker-playbook-card__toggle .tk-toggle {
+  opacity: 1;
+}
+
+/* ---------- Preview modal ---------- */
+
+.tinker-playbook-pane__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: min(640px, 80vw);
+}
+
+.tinker-playbook-pane__preview-meta {
+  margin: 0;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.01em;
+}
+
+.tinker-playbook-pane__preview-description {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-relaxed);
+}
+
+.tinker-playbook-pane__preview-body {
+  max-inline-size: 72ch;
+  line-height: var(--line-height-relaxed);
+}
+
+/* ---------- Uninstall confirm ---------- */
+
+.tinker-playbook-pane__uninstall {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: min(420px, 80vw);
+}
+
+.tinker-playbook-pane__uninstall-copy {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-relaxed);
+}
+
+.tinker-playbook-pane__uninstall-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tinker-playbook-pane__uninstall-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Settings modal ---------- */
+
+.tinker-playbook-settings {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: min(440px, 80vw);
+}
+
+.tinker-playbook-settings__section-eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.tinker-playbook-settings__section-title {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.tinker-playbook-settings__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@container (min-width: 480px) {
+  .tinker-playbook-settings__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.tinker-playbook-settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.tinker-playbook-settings__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.tinker-playbook-settings__sync-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.tinker-playbook-settings__sync-row .tk-progress--spinner {
+  flex: 0 0 auto;
+}
+
+.tinker-playbook-settings__error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}

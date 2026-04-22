@@ -1,6 +1,7 @@
 import {
   bucketForFrontmatter,
   bucketForRelativePath,
+  PENDING_MEMORY_CATEGORY,
   type MemoryCategoryId,
   type MemoryEntryBucket,
 } from './memory-categories.js';
@@ -23,7 +24,7 @@ export type DemoMemoryPreview = {
 };
 
 export const DEMO_MEMORY_REFERENCE_TIME_MS = Date.parse('2026-04-22T14:00:00.000Z');
-export const DEMO_MEMORY_SELECTED_RELATIVE_PATH = 'pending/synthesis-auto-20260408-glass-article.md';
+export const DEMO_MEMORY_SELECTED_RELATIVE_PATH = 'Pending/synthesis-auto-20260408-glass-article.md';
 
 const stubText = (title: string, detail: string): string => `# ${title}
 
@@ -143,13 +144,13 @@ information architecture problem." Structured around a 4-layer model:`;
 
 export const DEMO_MEMORY_NOTES: readonly SeededMemoryNote[] = [
   createSeedNote(
-    'pending/glass-scheduled-doc-map.md',
+    'Pending/glass-scheduled-doc-map.md',
     '2026-04-21T16:00:00.000Z',
     stubText(
       'Glass Scheduled Doc Map',
       'Overview of upcoming Glass writing and maintenance work queued for review.',
     ),
-    { kind: 'organization' },
+    { kind: 'Organization' },
   ),
   createSeedNote(
     DEMO_MEMORY_SELECTED_RELATIVE_PATH,
@@ -159,29 +160,29 @@ export const DEMO_MEMORY_NOTES: readonly SeededMemoryNote[] = [
 New article actively in progress (Apr 8): "Glass — Every Knowledge Worker Deserves an AI Agent." Notion page 33c3d1a93361819ea948c6cde3c5e24d is source of truth, with local mirror at ~/ramp-claude-desktop/glass-article-draft.md. Three core principles articulated: (1) the capability ceiling stays high, (2) one person's breakthrough is everyone's baseline, (3) the best teacher is the tool itself. Draws language from the Internal AI Roadmap ("stressed and scattered adoption," "urgency without structure," "connective tissue"). Intended for external publication. Multiple sessions dedicated to drafting, iterating structure, and capturing screenshots via Servo.
 `,
     {
-      kind: 'active-work',
+      kind: 'Active Work',
       display_path:
-        '/Users/seb.goddijn/project-glass/memory/pending/synthesis-auto-20260408-glass-article.md',
+        '/Users/seb.goddijn/project-glass/memory/Pending/synthesis-auto-20260408-glass-article.md',
       changes: SELECTED_CHANGES_PREVIEW,
     },
   ),
   createSeedNote(
-    'pending/project-glass.md',
+    'Pending/project-glass.md',
     '2026-04-21T12:00:00.000Z',
     stubText('Project Glass', 'Working summary for the local-first AI workspace reference project.'),
-    { kind: 'organization' },
+    { kind: 'Organization' },
   ),
   createSeedNote(
-    'pending/ai-hackathon-planning.md',
+    'Pending/ai-hackathon-planning.md',
     '2026-04-21T10:00:00.000Z',
     stubText('AI Hackathon Planning', 'Draft brief for a short internal hackathon focused on agent UX.'),
-    { kind: 'active-work' },
+    { kind: 'Active Work' },
   ),
-  ...createStubNotes('people', PEOPLE_TITLES, '2026-04-20T12:00:00.000Z', 'people'),
-  ...createStubNotes('active-work', ACTIVE_WORK_TITLES, '2026-04-20T12:00:00.000Z', 'active-work'),
-  ...createStubNotes('capabilities', CAPABILITY_TITLES, '2026-04-20T12:00:00.000Z', 'capabilities'),
-  ...createStubNotes('preferences', PREFERENCE_TITLES, '2026-04-20T12:00:00.000Z', 'preferences'),
-  ...createStubNotes('organization', ORGANIZATION_TITLES, '2026-04-20T12:00:00.000Z', 'organization'),
+  ...createStubNotes('People', PEOPLE_TITLES, '2026-04-20T12:00:00.000Z', 'People'),
+  ...createStubNotes('Active Work', ACTIVE_WORK_TITLES, '2026-04-20T12:00:00.000Z', 'Active Work'),
+  ...createStubNotes('Capabilities', CAPABILITY_TITLES, '2026-04-20T12:00:00.000Z', 'Capabilities'),
+  ...createStubNotes('Preferences', PREFERENCE_TITLES, '2026-04-20T12:00:00.000Z', 'Preferences'),
+  ...createStubNotes('Organization', ORGANIZATION_TITLES, '2026-04-20T12:00:00.000Z', 'Organization'),
 ] as const;
 
 const readFrontmatterString = (
@@ -203,7 +204,8 @@ const toPreviewFile = (rootPath: string, note: SeededMemoryNote): MemoryMarkdown
   const { frontmatter, body } = parseFrontmatter(note.text);
   const bucket = bucketForRelativePath(note.relativePath);
   const category =
-    bucketForFrontmatter(frontmatter) ?? (bucket && bucket !== 'pending' ? bucket : null);
+    bucketForFrontmatter(frontmatter) ??
+    (bucket && bucket !== PENDING_MEMORY_CATEGORY ? bucket : null);
 
   return {
     absolutePath,
@@ -227,12 +229,12 @@ const sortNewestFirst = (left: SeededMemoryNote, right: SeededMemoryNote): numbe
 
 export const createDemoMemoryPreview = (rootPath = '/memory/demo'): DemoMemoryPreview => {
   const buckets: Record<MemoryEntryBucket, MemoryMarkdownFile[]> = {
-    pending: [],
-    people: [],
-    'active-work': [],
-    capabilities: [],
-    preferences: [],
-    organization: [],
+    Pending: [],
+    People: [],
+    'Active Work': [],
+    Capabilities: [],
+    Preferences: [],
+    Organization: [],
   };
   const markdownByAbsolutePath: Record<string, string> = {};
 
@@ -247,7 +249,7 @@ export const createDemoMemoryPreview = (rootPath = '/memory/demo'): DemoMemoryPr
     markdownByAbsolutePath[file.absolutePath] = note.text;
   }
 
-  const selected = buckets.pending.find(
+  const selected = buckets.Pending.find(
     (file) => file.relativePath === DEMO_MEMORY_SELECTED_RELATIVE_PATH,
   );
   if (!selected) {
@@ -260,7 +262,7 @@ export const createDemoMemoryPreview = (rootPath = '/memory/demo'): DemoMemoryPr
       buckets,
     },
     selection: {
-      bucket: 'pending',
+      bucket: 'Pending',
       file: selected,
     },
     markdownByAbsolutePath,

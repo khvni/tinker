@@ -1,6 +1,7 @@
 import { StrictMode, Suspense, lazy, useEffect, type JSX, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/host-grotesk';
+import { ToastProvider } from '@tinker/design';
 import '@tinker/panes/styles.css';
 import { App } from './App.js';
 import { registerWorkspacePaneRenderers } from './workspace/register-pane-renderers.js';
@@ -55,4 +56,8 @@ const renderRoute = (): JSX.Element => {
   return <App />;
 };
 
-createRoot(container).render(<StrictMode>{renderRoute()}</StrictMode>);
+createRoot(container).render(
+  <StrictMode>
+    <ToastProvider>{renderRoute()}</ToastProvider>
+  </StrictMode>,
+);

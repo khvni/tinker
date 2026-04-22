@@ -1,8 +1,11 @@
 import type { JSX } from 'react';
 import type { TinkerPaneData } from '@tinker/shared-types';
 import { MemoryPane } from '../panes/MemoryPane/index.js';
+import { PlaybookPane } from './components/PlaybookPane/index.js';
 import { SettingsPane } from './components/SettingsPane/index.js';
 import { getRenderer, registerPane } from './pane-registry.js';
+
+type RegisterablePaneKind = 'settings' | 'memory' | 'playbook';
 
 const renderSettingsPane = (
   _data: Extract<TinkerPaneData, { readonly kind: 'settings' }>,
@@ -16,14 +19,20 @@ const renderMemoryPane = (
   return <MemoryPane />;
 };
 
-const isMissingPaneError = (kind: 'settings' | 'memory', error: unknown): boolean => {
+const renderPlaybookPane = (
+  _data: Extract<TinkerPaneData, { readonly kind: 'playbook' }>,
+): JSX.Element => {
+  return <PlaybookPane />;
+};
+
+const isMissingPaneError = (kind: RegisterablePaneKind, error: unknown): boolean => {
   return (
     error instanceof Error &&
     error.message.startsWith(`getRenderer: no renderer registered for pane kind "${kind}".`)
   );
 };
 
-const ensurePaneRegistered = (kind: 'settings' | 'memory', register: () => void): void => {
+const ensurePaneRegistered = (kind: RegisterablePaneKind, register: () => void): void => {
   try {
     getRenderer(kind);
     return;
@@ -36,8 +45,9 @@ const ensurePaneRegistered = (kind: 'settings' | 'memory', register: () => void)
   register();
 };
 
-// Future settings and memory tasks should replace the component internals,
-// not the registry wiring. M1.3/M1.4 extend this same boot entrypoint.
+// Future settings, memory, and playbook tasks should replace the component
+// internals, not the registry wiring. M1.3/M1.4/TIN-114 extend this same boot
+// entrypoint.
 export const registerWorkspacePaneRenderers = (): void => {
   ensurePaneRegistered('settings', () => {
     registerPane('settings', renderSettingsPane);
@@ -45,5 +55,9 @@ export const registerWorkspacePaneRenderers = (): void => {
 
   ensurePaneRegistered('memory', () => {
     registerPane('memory', renderMemoryPane);
+  });
+
+  ensurePaneRegistered('playbook', () => {
+    registerPane('playbook', renderPlaybookPane);
   });
 };

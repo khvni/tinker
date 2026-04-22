@@ -12,13 +12,16 @@ import {
 } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
 import {
+  Badge,
   Button,
   ComposerChip,
+  ContextBadge,
   ContextPill,
   EmptyState,
   Menu,
   ModelPicker,
   PromptComposer,
+  SelectFolderButton,
   StatusDot,
   type MenuItem,
 } from '@tinker/design';
@@ -57,6 +60,8 @@ import {
   pickDefaultModelOptionId,
   type WorkspaceModelOption,
 } from '../../opencode.js';
+import { SaveAsSkillButton } from './components/SaveAsSkillButton/index.js';
+import { SaveAsSkillModal, buildSkillTranscript } from './components/SaveAsSkillModal/index.js';
 import { ChatMessage } from '../ChatMessage/index.js';
 import { FolderPill } from './components/FolderPill/index.js';
 import { McpConnectionGate } from './components/McpConnectionGate/index.js';
@@ -87,12 +92,24 @@ type ChatProps = {
   opencode: OpencodeConnection;
   sessionFolderPath: string | null;
   vaultPath: string | null;
+  /**
+   * Per-user memory root the skill store is initialized against. Used by the
+   * "Save conversation as skill" flow to drive git auto-sync after publish.
+   * `null` while the store has not booted yet.
+   */
+  skillsRootPath: string | null;
   activeSkillsRevision: number;
   sessionFolderBusy?: boolean;
   onSelectSessionFolder?: () => Promise<void> | void;
   onFileWritten?: (path: string) => void;
   onOpenFileLink?: (path: string) => void;
+  onOpenNewChat?: () => void;
   onMemoryCommitted?: () => void;
+  /**
+   * Bumped by the parent when the active-skill set changes so sessions can
+   * re-inject. Also called after "Save as skill" publishes a new skill.
+   */
+  onActiveSkillsChanged?: () => void;
   onDuplicatePane?: () => void;
   onClosePane?: () => void;
   paneIsActive?: boolean;
@@ -237,12 +254,15 @@ export const Chat = ({
   opencode,
   sessionFolderPath,
   vaultPath,
+  skillsRootPath,
   activeSkillsRevision,
   sessionFolderBusy = false,
   onSelectSessionFolder,
   onFileWritten,
   onOpenFileLink,
+  onOpenNewChat,
   onMemoryCommitted,
+  onActiveSkillsChanged,
   onDuplicatePane,
   onClosePane,
   paneIsActive = true,
@@ -270,13 +290,14 @@ export const Chat = ({
   const [modelOptions, setModelOptions] = useState<ReadonlyArray<WorkspaceModelOption>>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>();
   const [modelOptionsLoading, setModelOptionsLoading] = useState(true);
-  const [, setStatus] = useState(readyStatus);
+  const [status, setStatus] = useState(readyStatus);
   const [contextUsage, setContextUsage] = useState<ResolvedContextUsage | null>(null);
   const [showNewMessagesPill, setShowNewMessagesPill] = useState(false);
   const [requiresMcpConnectionGate, setRequiresMcpConnectionGate] = useState(false);
   // Global default applied where no per-disclosure override exists. ⌥T flips this and clears overrides.
   const [defaultDisclosureOpen, setDefaultDisclosureOpen] = useState(false);
   const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
+  const [saveAsSkillOpen, setSaveAsSkillOpen] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<SessionMode>(DEFAULT_SESSION_MODE);
   const [thinkingLevel, setThinkingLevel] = useState<ReasoningLevel>(DEFAULT_REASONING_LEVEL);
@@ -293,13 +314,21 @@ export const Chat = ({
   const attentionRaisedForDraftRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const lastTailSignatureRef = useRef('empty');
+  // Tracks which (sessionID, activeSkillsRevision) pair we last injected
+  // skill context for, so toggling / installing a skill triggers a fresh
+  // inject on the next prompt without wiping the live session.
+  const injectedSkillsSignatureRef = useRef<string | null>(null);
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
+  const loadMcpStatus = useCallback(() => client.mcp.status(), [client]);
   const mcpConnectionGate = useMcpConnectionGate({
     enabled: !hydratingHistory && !awaitingFolder && requiresMcpConnectionGate,
-    loadStatus: () => client.mcp.status(),
+    loadStatus: loadMcpStatus,
   });
   const composerBlocked = busy || hydratingHistory || awaitingFolder || !modelConnected || mcpConnectionGate.blocked;
 
+  const saveAsSkillDefaultBody = useMemo(() => {
+    return saveAsSkillOpen ? buildSkillTranscript(messages) : '';
+  }, [saveAsSkillOpen, messages]);
   const releaseRef = useRef(onReleaseOpencode);
   releaseRef.current = onReleaseOpencode;
 
@@ -432,6 +461,7 @@ export const Chat = ({
     abortRequestedRef.current = false;
     shouldStickToBottomRef.current = true;
     lastTailSignatureRef.current = 'empty';
+    injectedSkillsSignatureRef.current = null;
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
@@ -531,7 +561,11 @@ export const Chat = ({
     return () => {
       cancelled = true;
     };
-  }, [activateSession, activeSkillsRevision, client, currentUserId, readyStatus, sessionFolderPath]);
+    // NOTE: intentionally NOT depending on `activeSkillsRevision`. Toggling or
+    // installing a skill used to force this effect — which aborts the live
+    // OpenCode session, wipes messages, and rehydrates from disk. Re-injection
+    // now happens lazily in `injectActiveSkillsIfStale` before each prompt.
+  }, [activateSession, client, currentUserId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     if (!activeSessionId || !selectedModel) {
@@ -826,16 +860,28 @@ export const Chat = ({
       }
     }
 
+    return session.id;
+  };
+
+  // Injects active skills into the session if we haven't already injected
+  // this (sessionID, activeSkillsRevision) combination. This runs before each
+  // prompt so toggling / installing a skill mid-session takes effect on the
+  // next user message without tearing down the live session.
+  const injectActiveSkillsIfStale = async (sessionID: string): Promise<void> => {
+    const signature = `${sessionID}:${activeSkillsRevision}`;
+    if (injectedSkillsSignatureRef.current === signature) {
+      return;
+    }
+
     try {
       const activeSkills = await skillStore.getActive();
       if (activeSkills.length > 0) {
-        await injectActiveSkills(client, session.id, activeSkills);
+        await injectActiveSkills(client, sessionID, activeSkills);
       }
+      injectedSkillsSignatureRef.current = signature;
     } catch (error) {
       console.warn('Failed to inject active skills into the session.', error);
     }
-
-    return session.id;
   };
 
   const abortActiveStream = async (): Promise<void> => {
@@ -927,6 +973,12 @@ export const Chat = ({
 
     try {
       const activeSessionID = await ensureSession();
+      if (abortRequestedRef.current) {
+        setStatus(readyStatus);
+        return;
+      }
+
+      await injectActiveSkillsIfStale(activeSessionID);
       if (abortRequestedRef.current) {
         setStatus(readyStatus);
         return;
@@ -1114,6 +1166,36 @@ export const Chat = ({
 
   return (
     <section className="tinker-pane tinker-pane--chat">
+      <header className="tinker-chat-header">
+        <div className="tinker-chat-header__left">
+          {folderPickerAvailable ? (
+            <SelectFolderButton
+              folderPath={sessionFolderPath}
+              loading={sessionFolderBusy}
+              disabled={busy || hydratingHistory}
+              onClick={() => void onSelectSessionFolder?.()}
+            />
+          ) : null}
+          <SaveAsSkillButton
+            disabled={busy || hydratingHistory || messages.length === 0}
+            onClick={() => setSaveAsSkillOpen(true)}
+          />
+          <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
+            ⌥T thinking
+          </span>
+        </div>
+        <div className="tinker-chat-header__right">
+          {contextUsage ? <ContextBadge {...contextUsage} /> : null}
+          <Badge variant="default" size="small">
+            {status}
+          </Badge>
+          {onOpenNewChat ? (
+            <Button variant="ghost" size="s" onClick={onOpenNewChat}>
+              New chat tab
+            </Button>
+          ) : null}
+        </div>
+      </header>
       <div className="tinker-chat-log-shell">
         <div
           className="tinker-chat-log"
@@ -1339,6 +1421,17 @@ export const Chat = ({
           trailingSlot={<FolderPill />}
         />
       </div>
+
+      <SaveAsSkillModal
+        open={saveAsSkillOpen}
+        onClose={() => setSaveAsSkillOpen(false)}
+        skillStore={skillStore}
+        skillsRootPath={skillsRootPath}
+        defaultBody={saveAsSkillDefaultBody}
+        onPublished={() => {
+          onActiveSkillsChanged?.();
+        }}
+      />
     </section>
   );
 };

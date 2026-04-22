@@ -3,8 +3,8 @@ import DOMPurify from 'dompurify';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { Badge, Button, EmptyState, IconButton, Textarea } from '@tinker/design';
 import {
-  MEMORY_CATEGORY_LABELS,
   type MemoryCategoryId,
+  PENDING_MEMORY_CATEGORY,
   type MemoryEntryBucket,
   type MemoryMarkdownFile,
 } from '@tinker/memory';
@@ -61,8 +61,7 @@ const PencilIcon = (): JSX.Element => (
 );
 
 const CategoryBadge = ({ category }: { category: MemoryCategoryId }): JSX.Element => {
-  const label = MEMORY_CATEGORY_LABELS[category];
-  return <Badge variant="default" size="medium">{label}</Badge>;
+  return <Badge variant="default" size="medium">{category}</Badge>;
 };
 
 type StatusLineProps = {
@@ -72,7 +71,7 @@ type StatusLineProps = {
 };
 
 const StatusLine = ({ bucket, modifiedAt, formatter }: StatusLineProps): JSX.Element => {
-  if (bucket === 'pending') {
+  if (bucket === PENDING_MEMORY_CATEGORY) {
     return (
       <span className="tinker-memory-detail__status">
         <span className="tinker-memory-detail__status-dot" aria-hidden="true" />
@@ -233,13 +232,13 @@ export const MemoryDetail = ({
     );
   }
 
-  const showActions = bucket === 'pending';
+  const showActions = bucket === PENDING_MEMORY_CATEGORY;
   const controlsBusy = isBusy || isSaving;
   const isEditing = mode === 'edit';
   const isDirty = draft !== savedDraft;
   const canStartEditing = allowEditing && effectivePreview.status === 'ready' && !controlsBusy;
   const diffEmpty = !diffLoading && diffText.trim().length === 0;
-  const badgeCategory = file.category ?? (bucket === 'pending' ? null : bucket);
+  const badgeCategory = file.category ?? (bucket === PENDING_MEMORY_CATEGORY ? null : bucket);
 
   const handleSave = async (): Promise<void> => {
     if (file === null || !allowEditing || isSaving) {

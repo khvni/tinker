@@ -13,23 +13,21 @@ type AssertEqual<A, B> =
 type Expect<T extends true> = T;
 
 // ────────────────────────────────────────────────────────────────────────────
-// `TinkerPaneKind` is exactly the four MVP kinds, no more no less.
+// `TinkerPaneKind` covers every shipped kind (MVP + playbook post-MVP).
 // ────────────────────────────────────────────────────────────────────────────
 
 type _KindLiterals = Expect<
-  AssertEqual<TinkerPaneKind, 'chat' | 'file' | 'settings' | 'memory'>
+  AssertEqual<TinkerPaneKind, 'chat' | 'file' | 'settings' | 'memory' | 'playbook'>
 >;
 
 const _chatKind: TinkerPaneKind = 'chat';
 const _fileKind: TinkerPaneKind = 'file';
 const _settingsKind: TinkerPaneKind = 'settings';
 const _memoryKind: TinkerPaneKind = 'memory';
+const _playbookKind: TinkerPaneKind = 'playbook';
 
 // @ts-expect-error — unknown kind literal must be rejected
 const _bogusKind: TinkerPaneKind = 'not-a-pane';
-
-// @ts-expect-error — deferred Playbook UI is a future route, not an MVP pane kind
-const _playbookKind: TinkerPaneKind = 'playbook';
 
 // ────────────────────────────────────────────────────────────────────────────
 // `TinkerPaneData` accepts each valid variant.
@@ -41,8 +39,6 @@ const _chatDataWithFolder: TinkerPaneData = { kind: 'chat', folderPath: '/tmp', 
 const _fileData: TinkerPaneData = { kind: 'file', path: '/tmp/a.md', mime: 'text/markdown' };
 const _settingsData: TinkerPaneData = { kind: 'settings' };
 const _memoryData: TinkerPaneData = { kind: 'memory' };
-
-// @ts-expect-error — deferred Playbook UI is not part of the persisted pane payload union
 const _playbookData: TinkerPaneData = { kind: 'playbook' };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -76,6 +72,8 @@ const _narrowCheck = (data: TinkerPaneData): string => {
       return 'settings';
     case 'memory':
       return 'memory';
+    case 'playbook':
+      return 'playbook';
   }
 };
 
@@ -87,6 +85,7 @@ const _exhaustive = (data: TinkerPaneData): never => {
     case 'file':
     case 'settings':
     case 'memory':
+    case 'playbook':
       throw new Error('handled');
     default: {
       const _unreachable: never = data;
@@ -101,10 +100,11 @@ void _chatKind;
 void _fileKind;
 void _settingsKind;
 void _memoryKind;
-void _bogusKind;
 void _playbookKind;
+void _bogusKind;
 void _chatData;
 void _chatDataWithSession;
+void _chatDataWithFolder;
 void _fileData;
 void _settingsData;
 void _memoryData;

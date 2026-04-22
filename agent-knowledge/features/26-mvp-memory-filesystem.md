@@ -20,6 +20,13 @@ mvp: true
   - macOS: `~/Library/Application Support/Tinker/memory`
   - Linux: `~/.local/share/tinker/memory`
   - Windows: `%APPDATA%\Tinker\memory`
+- Each per-user memory directory must always contain these exact top-level folders:
+  - `Pending`
+  - `People`
+  - `Active Work`
+  - `Capabilities`
+  - `Preferences`
+  - `Organization`
 - Settings pane surface: "Memory folder" row, current path visible, `<Button>Change location…</Button>` opens folder picker → validates writable → updates setting → moves contents → respawns OpenCode so MCPs see the new path.
 - Memory pane (registered in M1.5): lists `.md` files in memory folder (name + modified-at). Click opens as a FilePane tab with the Markdown renderer (M3.9).
 - MVP injection: on `session.prompt()`, read top-N (default 5) most-recently-modified `.md` files in memory folder → prepend as `noReply` system context via existing `bridge/memory-injector.ts`.
@@ -51,6 +58,8 @@ See `agent-knowledge/context/tasks.md` §M6.
 ## Notes for agents
 
 - Keep the memory folder HUMAN-READABLE. `.md` only. Flat structure (or single `sessions/` subfolder). No sqlite, no json sidecar files.
+- Filesystem folders are the category contract. Sidebar labels, counts, and move targets come from those exact folder names on disk. Never introduce lowercase / hyphenated aliases like `pending` or `active-work`.
+- Filesystem category discovery never reads frontmatter. Only `.md` files inside the six canonical folders count toward the Memory view.
 - Path resolution: always read from `app_settings.memory_path` at query time — never cache in a module-level variable. Path can change mid-session.
 - Path change = cross-pillar event (M6.9 fans out to M6.7 + M6.8 + M7.7). Implement as a simple pub/sub in `@tinker/memory` rather than tight coupling.
 - Injection N=5 is a constant for MVP. Do not expose it as a setting in MVP — one less knob to regress.

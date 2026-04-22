@@ -224,9 +224,15 @@ describe('default memory root resolution', () => {
 
     expect(mockWriteTextFile).toHaveBeenCalledTimes(DEMO_MEMORY_NOTES.length);
     expect(mockWriteTextFile).toHaveBeenCalledWith(
-      '/tmp/custom-memory/guest/pending/synthesis-auto-20260408-glass-article.md',
+      '/tmp/custom-memory/guest/Pending/synthesis-auto-20260408-glass-article.md',
       expect.stringContaining('Writing Articles on AI Agents and Software Strategy'),
     );
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Pending', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/People', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Active Work', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Capabilities', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Preferences', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Organization', { recursive: true });
   });
 
   it('does not re-seed the demo scaffold when the memory root already has content', async () => {
@@ -237,6 +243,12 @@ describe('default memory root resolution', () => {
 
     expect(mockWriteTextFile).not.toHaveBeenCalled();
     expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Pending', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/People', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Active Work', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Capabilities', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Preferences', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Organization', { recursive: true });
   });
 
   it('validates that a candidate memory root is writable', async () => {

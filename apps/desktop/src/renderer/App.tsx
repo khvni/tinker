@@ -19,7 +19,7 @@ import {
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
 import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
-import { GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
+import { DEFAULT_USER_ID, GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
   BUILTIN_MCP_NAMES,
@@ -59,6 +59,7 @@ type ReadyAppState = {
   defaultBindingKey: BindingKey;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
+  skillsRootPath: string | null;
   modelConnected: boolean;
   vaultRevision: number;
   activeSkillsRevision: number;
@@ -473,6 +474,7 @@ export const App = (): JSX.Element => {
             defaultBindingKey: previewKey,
             mcpStatus: {},
             vaultPath: null,
+            skillsRootPath: null,
             modelConnected: false,
             vaultRevision: 0,
             activeSkillsRevision: 0,
@@ -487,13 +489,21 @@ export const App = (): JSX.Element => {
         await syncCurrentUserMemoryPath(sessions, { emit: false });
         const storedVaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
+        // Skills live per-user at `<memory_root>/<user-id>/.tinker/skills/`, so
+        // the skill store is initialized against the active memory path rather
+        // than the vault path (TIN-113). The user-scoped re-init happens in the
+        // `signedInUserId` effect below once `useCurrentUser` resolves; at boot
+        // we seed against the default (offline / pre-sign-in) user so the
+        // store is usable immediately.
+        const bootUserMemoryPath = await getActiveMemoryPath(DEFAULT_USER_ID);
+        await skillStore.init(bootUserMemoryPath);
+        await skillStore.reindex();
+
         let vaultRevision = 0;
         if (storedVaultPath) {
           const config = { path: storedVaultPath, isNew: false };
           await vaultService.init(config);
           await indexVault(config);
-          await skillStore.init(storedVaultPath);
-          await skillStore.reindex();
           vaultRevision = 1;
         }
 
@@ -522,6 +532,7 @@ export const App = (): JSX.Element => {
           defaultBindingKey: defaultKey,
           mcpStatus: {},
           vaultPath: storedVaultPath,
+          skillsRootPath: bootUserMemoryPath,
           modelConnected,
           vaultRevision,
           activeSkillsRevision: 0,
@@ -543,6 +554,56 @@ export const App = (): JSX.Element => {
       active = false;
     };
   }, [layoutStore, memoryStore, nativeRuntime, schedulerStore, skillStore, vaultService]);
+
+  // Skills are scoped per-user. Re-init the skill store whenever the signed-in
+  // user changes so skill writes land under the new user's memory path.
+  // (D22: per-call config; no stashed state between calls.) Sessions now live
+  // on `useCurrentUser` (post-M8.10), so the memo pulls from there.
+  const signedInUserId = useMemo(
+    () =>
+      currentUserState.status === 'ready'
+        ? pickCurrentUserId(currentUserState.sessions)
+        : DEFAULT_USER_ID,
+    [currentUserState],
+  );
+
+  useEffect(() => {
+    if (!nativeRuntime || state.status !== 'ready') {
+      return;
+    }
+
+    let active = true;
+
+    void (async () => {
+      try {
+        const userMemoryPath = await getActiveMemoryPath(signedInUserId);
+        await skillStore.init(userMemoryPath);
+        await skillStore.reindex();
+
+        if (!active) {
+          return;
+        }
+
+        setState((current) =>
+          current.status !== 'ready'
+            ? current
+            : {
+                ...current,
+                skillsRootPath: userMemoryPath,
+                activeSkillsRevision: current.activeSkillsRevision + 1,
+              },
+        );
+      } catch (error) {
+        if (active) {
+          console.warn('Failed to initialize the skill store for the current user.', error);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [nativeRuntime, signedInUserId, skillStore, state.status]);
 
   useEffect(() => {
     if (!nativeRuntime || state.status !== 'ready' || !state.vaultPath) {
@@ -576,7 +637,6 @@ export const App = (): JSX.Element => {
 
       try {
         await indexVault({ path: activeVaultPath, isNew: false });
-        await skillStore.reindex();
 
         if (!active) {
           return;
@@ -617,7 +677,7 @@ export const App = (): JSX.Element => {
       }
       unsubscribe();
     };
-  }, [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null, vaultService, skillStore]);
+  }, [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null, vaultService]);
 
   useEffect(() => {
     if (!nativeRuntime || state.status !== 'ready') {
@@ -871,8 +931,6 @@ export const App = (): JSX.Element => {
       await syncConnectorState(connection, folderPath, currentSessions);
       await vaultService.init({ path: folderPath, isNew });
       await indexVault({ path: folderPath, isNew });
-      await skillStore.init(folderPath);
-      await skillStore.reindex();
       window.localStorage.setItem(VAULT_PATH_KEY, folderPath);
 
       setState((current) =>
@@ -1159,6 +1217,7 @@ export const App = (): JSX.Element => {
         mcpStatus={state.mcpStatus}
         vaultPath={state.vaultPath}
         activeSkillsRevision={state.activeSkillsRevision}
+        skillsRootPath={state.skillsRootPath}
         memorySweepState={memorySweepState}
         memorySweepBusy={memorySweepBusy}
         onContinueAsGuest={handleContinueAsGuest}

@@ -1,7 +1,6 @@
 import { useMemo, useState, type JSX } from 'react';
 import { SearchInput } from '@tinker/design';
 import {
-  MEMORY_CATEGORY_LABELS,
   MEMORY_CATEGORY_ORDER,
   type MemoryCategoryId,
   type MemoryEntryBucket,
@@ -115,11 +114,11 @@ const ChevronDownIcon = (): JSX.Element => (
 );
 
 const CATEGORY_ICONS: Record<MemoryCategoryId, () => JSX.Element> = {
-  people: PeopleIcon,
-  'active-work': CheckIcon,
-  capabilities: StarIcon,
-  preferences: CrosshairIcon,
-  organization: HouseIcon,
+  People: PeopleIcon,
+  'Active Work': CheckIcon,
+  Capabilities: StarIcon,
+  Preferences: CrosshairIcon,
+  Organization: HouseIcon,
 };
 
 type MemoryPendingRowProps = {
@@ -171,7 +170,6 @@ const CategorySection = ({
   const [isOpen, setIsOpen] = useState(false);
   const CategoryIcon = CATEGORY_ICONS[category];
   const filtered = files.filter((file) => matchesQuery(file, searchQuery));
-  const label = MEMORY_CATEGORY_LABELS[category];
 
   return (
     <div className="tinker-memory-sidebar__section">
@@ -189,7 +187,7 @@ const CategorySection = ({
         <span className="tinker-memory-sidebar__section-icon" aria-hidden="true">
           <CategoryIcon />
         </span>
-        <span className="tinker-memory-sidebar__section-label">{label}</span>
+        <span className="tinker-memory-sidebar__section-label">{category}</span>
         <span className="tinker-memory-sidebar__section-count">{filtered.length}</span>
       </button>
       {isOpen ? (
@@ -234,9 +232,9 @@ export const MemorySidebar = ({
   const nowMs = useMemo(() => referenceTimeMs ?? Date.now(), [referenceTimeMs]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
-  const pendingFiles = buckets.pending.filter((file) => matchesQuery(file, normalizedQuery));
+  const pendingFiles = buckets.Pending.filter((file) => matchesQuery(file, normalizedQuery));
   const totalFilesAcrossBuckets =
-    buckets.pending.length +
+    buckets.Pending.length +
     MEMORY_CATEGORY_ORDER.reduce((total, id) => total + buckets[id].length, 0);
 
   return (
@@ -280,7 +278,7 @@ export const MemorySidebar = ({
                         isNew={isNew}
                         relativeSuffix={suffix}
                         onSelect={() => {
-                          onSelect(file, 'pending');
+                          onSelect(file, 'Pending');
                         }}
                       />
                     );

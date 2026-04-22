@@ -25,12 +25,12 @@ const makeFile = (
 });
 
 const emptyBuckets = (): Record<MemoryEntryBucket, MemoryMarkdownFile[]> => ({
-  pending: [],
-  people: [],
-  'active-work': [],
-  capabilities: [],
-  preferences: [],
-  organization: [],
+  Pending: [],
+  People: [],
+  'Active Work': [],
+  Capabilities: [],
+  Preferences: [],
+  Organization: [],
 });
 
 describe('<MemorySidebar>', () => {
@@ -70,11 +70,11 @@ describe('<MemorySidebar>', () => {
 
   it('renders pending entries with unread dot until seen, and fires onSelect', async () => {
     const buckets = emptyBuckets();
-    buckets.pending = [
-      makeFile('/memory/u/pending/alice.md', 'pending/alice.md', '2026-04-22T14:00:00.000Z'),
-      makeFile('/memory/u/pending/bob.md', 'pending/bob.md', '2026-04-22T12:00:00.000Z'),
+    buckets.Pending = [
+      makeFile('/memory/u/Pending/alice.md', 'Pending/alice.md', '2026-04-22T14:00:00.000Z'),
+      makeFile('/memory/u/Pending/bob.md', 'Pending/bob.md', '2026-04-22T12:00:00.000Z'),
     ];
-    buckets.people = [makeFile('/memory/u/people/khani.md', 'people/khani.md', '2026-04-21T08:00:00.000Z')];
+    buckets.People = [makeFile('/memory/u/People/khani.md', 'People/khani.md', '2026-04-21T08:00:00.000Z')];
 
     const onSelect = vi.fn();
 
@@ -86,7 +86,7 @@ describe('<MemorySidebar>', () => {
           onSearchChange={() => undefined}
           selectedPath={null}
           onSelect={onSelect}
-          seenPaths={new Set(['/memory/u/pending/bob.md'])}
+          seenPaths={new Set(['/memory/u/Pending/bob.md'])}
         />,
       );
     });
@@ -110,13 +110,13 @@ describe('<MemorySidebar>', () => {
       aliceRow.click();
     });
 
-    expect(onSelect).toHaveBeenCalledWith(buckets.pending[0], 'pending');
+    expect(onSelect).toHaveBeenCalledWith(buckets.Pending[0], 'Pending');
   });
 
   it('expands category sections on header click and selects the row', async () => {
     const buckets = emptyBuckets();
-    buckets['active-work'] = [
-      makeFile('/memory/u/active-work/ship.md', 'active-work/ship.md', '2026-04-22T09:00:00.000Z'),
+    buckets['Active Work'] = [
+      makeFile('/memory/u/Active Work/ship.md', 'Active Work/ship.md', '2026-04-22T09:00:00.000Z'),
     ];
 
     const onSelect = vi.fn();
@@ -159,14 +159,14 @@ describe('<MemorySidebar>', () => {
       shipRow.click();
     });
 
-    expect(onSelect).toHaveBeenCalledWith(buckets['active-work'][0], 'active-work');
+    expect(onSelect).toHaveBeenCalledWith(buckets['Active Work'][0], 'Active Work');
   });
 
   it('filters entries by search query (case-insensitive)', async () => {
     const buckets = emptyBuckets();
-    buckets.pending = [
-      makeFile('/memory/u/pending/alpha.md', 'pending/alpha.md', '2026-04-22T10:00:00.000Z'),
-      makeFile('/memory/u/pending/zeta.md', 'pending/zeta.md', '2026-04-22T09:00:00.000Z'),
+    buckets.Pending = [
+      makeFile('/memory/u/Pending/alpha.md', 'Pending/alpha.md', '2026-04-22T10:00:00.000Z'),
+      makeFile('/memory/u/Pending/zeta.md', 'Pending/zeta.md', '2026-04-22T09:00:00.000Z'),
     ];
 
     await act(async () => {

@@ -11,9 +11,11 @@
 /**
  * Union of pane kinds shipped in the MVP workspace.
  *
- * Narrow enough that deferred pane kinds stay out of the runtime workspace.
+ * `playbook` ships post-MVP (TIN-114) as the skills marketplace pane. It is
+ * registered with the pane registry so arbitrary layouts can adopt it, but is
+ * intentionally absent from the default layout (see `layout.default.ts`).
  */
-export type TinkerPaneKind = 'chat' | 'file' | 'settings' | 'memory';
+export type TinkerPaneKind = 'chat' | 'file' | 'settings' | 'memory' | 'playbook';
 
 /**
  * Discriminated union of pane payloads, keyed by `kind`.
@@ -22,9 +24,10 @@ export type TinkerPaneKind = 'chat' | 'file' | 'settings' | 'memory';
  *
  *   if (data.kind === 'file') { data.path; data.mime; }
  *
- * `settings` and `memory` carry no payload fields in the MVP but keep the
- * `kind` discriminator so the union stays narrowable and so future payload
- * additions don't require touching call sites that already destructure `kind`.
+ * `settings`, `memory`, and `playbook` carry no payload fields in the MVP but
+ * keep the `kind` discriminator so the union stays narrowable and so future
+ * payload additions don't require touching call sites that already destructure
+ * `kind`.
  *
  * `chat` stores an optional persisted SQLite session id so pane-local chat
  * preferences survive layout restore and app restart.
@@ -38,4 +41,5 @@ export type TinkerPaneData =
     }
   | { readonly kind: 'file'; readonly path: string; readonly mime: string }
   | { readonly kind: 'settings' }
-  | { readonly kind: 'memory' };
+  | { readonly kind: 'memory' }
+  | { readonly kind: 'playbook' };

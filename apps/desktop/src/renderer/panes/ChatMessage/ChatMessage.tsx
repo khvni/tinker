@@ -12,7 +12,6 @@ type ChatMessageProps = {
   text: string;
   streaming?: boolean;
   onOpenFileLink?: ((path: string) => void) | undefined;
-  onSaveAsSkill?: () => void;
 };
 
 const COPIED_FLASH_MS = 1000;
@@ -114,7 +113,6 @@ export const ChatMessage = ({
   text,
   streaming = false,
   onOpenFileLink,
-  onSaveAsSkill,
 }: ChatMessageProps): JSX.Element => {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -181,11 +179,6 @@ export const ChatMessage = ({
           >
             {copied ? 'Copied' : 'Copy'}
           </Button>
-          {onSaveAsSkill ? (
-            <Button variant="ghost" size="s" onClick={onSaveAsSkill}>
-              Save as skill
-            </Button>
-          ) : null}
         </div>
       ) : null}
     </div>

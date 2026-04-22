@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { ToastProvider } from '@tinker/design';
 import type { SkillStore } from '@tinker/shared-types';
 
 const { opencodeMocks } = vi.hoisted(() => ({
@@ -65,6 +66,14 @@ vi.mock('@tinker/memory', () => ({
   getActiveMemoryPath: () => Promise.resolve('/memory/test-user'),
   subscribeMemoryPathChanged: () => () => undefined,
   updateLastActive: () => Promise.resolve(),
+  isGitAvailable: () => Promise.resolve(false),
+  syncSkills: () => Promise.resolve({ pulled: [], pushed: [], conflicts: [], message: '' }),
+  slugify: (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gu, '-')
+      .replace(/^-+|-+$/gu, '') || 'skill',
+  isValidSkillSlug: (value: string) => /^[a-z0-9][a-z0-9-]*$/u.test(value),
 }));
 
 // Import after the mocks are registered.
@@ -102,13 +111,18 @@ const baseProps = {
   },
   sessionFolderPath: null,
   vaultPath: null,
+  skillsRootPath: null,
   activeSkillsRevision: 0,
 };
 
 describe('Chat chrome', () => {
   it('renders the chat pane chrome classes — log, composer', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
 
     expect(markup).toContain('tinker-pane tinker-pane--chat');
     expect(markup).toContain('tinker-chat-log');
@@ -118,13 +132,21 @@ describe('Chat chrome', () => {
 
   it('omits the ContextPill when no model is selected', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markup).not.toContain('tk-context-pill');
   });
 
   it('renders mode + model + thinking chips in composer bottom row', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markup).toContain('tk-composer-chip');
     expect(markup).toContain('tk-modelpicker');
     expect(markup).toContain('>Auto Accept<');
@@ -133,7 +155,11 @@ describe('Chat chrome', () => {
 
   it('renders the EmptyState inside the chat log', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markup).toContain('No model connected');
     const logIdx = markup.indexOf('tinker-chat-log');
     const titleIdx = markup.indexOf('No model connected');
@@ -143,7 +169,11 @@ describe('Chat chrome', () => {
 
   it('renders the attachment placeholder button disabled inside the composer', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markup).toContain('Attachments coming soon');
     expect(markup).toContain('aria-label="Attachments coming soon"');
     expect(markup).toContain('disabled=""');
@@ -151,20 +181,32 @@ describe('Chat chrome', () => {
 
   it('renders the send button with an arrow icon', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markup).toContain('tk-prompt-composer__send');
     expect(markup).toContain('aria-label="Send message"');
   });
 
   it('renders kebab menu with pane options', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markup).toContain('aria-label="Pane options"');
   });
 
   it('renders StatusDot reflecting modelConnected=false', () => {
     opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markup).toContain('tk-statusdot--muted');
   });
 
@@ -172,8 +214,16 @@ describe('Chat chrome', () => {
     opencodeMocks.selectedModel = undefined;
     // Render two independent Chat instances; both should show send button (not stop)
     // because neither has started streaming.
-    const markupA = renderToStaticMarkup(<Chat {...baseProps} />);
-    const markupB = renderToStaticMarkup(<Chat {...baseProps} />);
+    const markupA = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
+    const markupB = renderToStaticMarkup(
+      <ToastProvider>
+        <Chat {...baseProps} />
+      </ToastProvider>,
+    );
     expect(markupA).toContain('aria-label="Send message"');
     expect(markupB).toContain('aria-label="Send message"');
   });

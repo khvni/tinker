@@ -3,42 +3,33 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Validate that a directory slug is a simple lowercase token.
-///
-/// Accepts `^[a-z][a-z0-9-]*$` only — which matches our five MVP memory
-/// categories (`people`, `active-work`, `capabilities`, `preferences`,
-/// `organization`). Rejects absolute paths, traversal tokens, capitals, and
-/// empty strings.
+const ALLOWED_MEMORY_DIRECTORIES: [&str; 6] = [
+    "Pending",
+    "People",
+    "Active Work",
+    "Capabilities",
+    "Preferences",
+    "Organization",
+];
+
+/// Validate that a destination directory exactly matches one of the canonical
+/// Memory folders on disk.
 pub(crate) fn validate_destination_dir(value: &str) -> Result<(), String> {
-    if value.is_empty() {
-        return Err("Destination directory cannot be empty.".to_string());
+    if ALLOWED_MEMORY_DIRECTORIES.contains(&value) {
+        return Ok(());
     }
 
-    let mut chars = value.chars();
-    let first = chars.next().ok_or_else(|| "Destination directory cannot be empty.".to_string())?;
-    if !first.is_ascii_lowercase() {
-        return Err(format!(
-            "Destination directory must start with a lowercase letter: \"{value}\"."
-        ));
-    }
-
-    for character in chars {
-        let is_valid = character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-';
-        if !is_valid {
-            return Err(format!(
-                "Destination directory contains an invalid character: \"{value}\"."
-            ));
-        }
-    }
-
-    Ok(())
+    Err(format!(
+        "Destination directory must exactly match one of: {}.",
+        ALLOWED_MEMORY_DIRECTORIES.join(", ")
+    ))
 }
 
 fn has_pending_segment(path: &Path) -> bool {
     path.components().any(|component| {
         matches!(
             component.as_os_str().to_str(),
-            Some(segment) if segment == "pending"
+            Some(segment) if segment == "Pending"
         )
     })
 }
@@ -184,12 +175,13 @@ mod memory_test {
     use super::validate_destination_dir;
 
     #[test]
-    fn accepts_canonical_category_slugs() {
-        validate_destination_dir("people").expect("people should be valid");
-        validate_destination_dir("active-work").expect("active-work should be valid");
-        validate_destination_dir("capabilities").expect("capabilities should be valid");
-        validate_destination_dir("preferences").expect("preferences should be valid");
-        validate_destination_dir("organization").expect("organization should be valid");
+    fn accepts_canonical_memory_folder_names() {
+        validate_destination_dir("Pending").expect("Pending should be valid");
+        validate_destination_dir("People").expect("People should be valid");
+        validate_destination_dir("Active Work").expect("Active Work should be valid");
+        validate_destination_dir("Capabilities").expect("Capabilities should be valid");
+        validate_destination_dir("Preferences").expect("Preferences should be valid");
+        validate_destination_dir("Organization").expect("Organization should be valid");
     }
 
     #[test]
@@ -211,14 +203,14 @@ mod memory_test {
 
     #[test]
     fn rejects_uppercase_or_leading_digit() {
-        assert!(validate_destination_dir("People").is_err());
         assert!(validate_destination_dir("1people").is_err());
         assert!(validate_destination_dir("-people").is_err());
+        assert!(validate_destination_dir("active-work").is_err());
     }
 
     #[test]
     fn rejects_whitespace_and_punctuation() {
-        assert!(validate_destination_dir("active work").is_err());
         assert!(validate_destination_dir("people!").is_err());
+        assert!(validate_destination_dir(" Active Work ").is_err());
     }
 }

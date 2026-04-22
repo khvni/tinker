@@ -2,6 +2,7 @@ import { readTextFile, stat } from '@tauri-apps/plugin-fs';
 import {
   bucketForFrontmatter,
   bucketForRelativePath,
+  PENDING_MEMORY_CATEGORY,
   type MemoryCategoryId,
   type MemoryEntryBucket,
 } from './memory-categories.js';
@@ -56,7 +57,8 @@ const readFileMetadata = async (
     const { frontmatter, body } = parseFrontmatter(text);
     const pathBucket = bucketForRelativePath(relativePath);
     const category =
-      bucketForFrontmatter(frontmatter) ?? (pathBucket && pathBucket !== 'pending' ? pathBucket : null);
+      bucketForFrontmatter(frontmatter) ??
+      (pathBucket && pathBucket !== PENDING_MEMORY_CATEGORY ? pathBucket : null);
 
     return {
       title: deriveNoteTitle(relativePath, frontmatter, body),
@@ -120,12 +122,12 @@ export const listMemoryMarkdownFiles = async (
 
 const emptyBuckets = (): Record<MemoryEntryBucket, IndexedMemoryMarkdownFile[]> => {
   const buckets: Record<MemoryEntryBucket, IndexedMemoryMarkdownFile[]> = {
-    pending: [],
-    people: [],
-    'active-work': [],
-    capabilities: [],
-    preferences: [],
-    organization: [],
+    Pending: [],
+    People: [],
+    'Active Work': [],
+    Capabilities: [],
+    Preferences: [],
+    Organization: [],
   };
   return buckets;
 };

@@ -26,13 +26,13 @@ vi.mock('../../../../renderers/MarkdownRenderer.js', () => ({
 import { MemoryDetail } from './MemoryDetail.js';
 
 const makeFile = (overrides: Partial<MemoryMarkdownFile> = {}): MemoryMarkdownFile => ({
-  absolutePath: '/memory/u/pending/alice.md',
-  relativePath: 'pending/alice.md',
+  absolutePath: '/memory/u/Pending/alice.md',
+  relativePath: 'Pending/alice.md',
   name: 'alice.md',
   title: 'Alice',
   modifiedAt: '2026-04-22T14:00:00.000Z',
   category: null,
-  displayPath: '/memory/u/pending/alice.md',
+  displayPath: '/memory/u/Pending/alice.md',
   changesPreview: null,
   ...overrides,
 });
@@ -109,7 +109,7 @@ describe('<MemoryDetail>', () => {
       root.render(
         <MemoryDetail
           file={makeFile()}
-          bucket="pending"
+          bucket="Pending"
           diffText=""
           diffLoading={false}
           onApprove={onApprove}
@@ -147,13 +147,14 @@ describe('<MemoryDetail>', () => {
       root.render(
         <MemoryDetail
           file={makeFile({
-            absolutePath: '/memory/u/active-work/ship.md',
-            relativePath: 'active-work/ship.md',
+            absolutePath: '/memory/u/Active Work/ship.md',
+            relativePath: 'Active Work/ship.md',
             name: 'ship.md',
             title: 'Ship MVP',
-            category: 'active-work',
+            category: 'Active Work',
+            displayPath: '/memory/u/Active Work/ship.md',
           })}
-          bucket="active-work"
+          bucket="Active Work"
           diffText=""
           diffLoading={false}
           onApprove={() => undefined}
@@ -178,11 +179,11 @@ describe('<MemoryDetail>', () => {
           file={makeFile({
             name: 'synthesis-auto-20260408-glass-article.md',
             title: 'Writing Articles on AI Agents and Software Strategy',
-            category: 'active-work',
+            category: 'Active Work',
             displayPath:
-              '/Users/seb.goddijn/project-glass/memory/pending/synthesis-auto-20260408-glass-article.md',
+              '/Users/seb.goddijn/project-glass/memory/Pending/synthesis-auto-20260408-glass-article.md',
           })}
-          bucket="pending"
+          bucket="Pending"
           diffText=""
           diffLoading={false}
           onApprove={() => undefined}
@@ -196,7 +197,7 @@ describe('<MemoryDetail>', () => {
     expect(container.textContent).toContain('Writing Articles on AI Agents and Software Strategy');
     expect(container.textContent).toContain('Active Work');
     expect(container.textContent).toContain(
-      '/Users/seb.goddijn/project-glass/memory/pending/synthesis-auto-20260408-glass-article.md',
+      '/Users/seb.goddijn/project-glass/memory/Pending/synthesis-auto-20260408-glass-article.md',
     );
   });
 
@@ -205,7 +206,7 @@ describe('<MemoryDetail>', () => {
       root.render(
         <MemoryDetail
           file={makeFile()}
-          bucket="pending"
+          bucket="Pending"
           diffText="+ new line\n- old line"
           diffLoading={false}
           onApprove={() => undefined}
@@ -222,7 +223,7 @@ describe('<MemoryDetail>', () => {
       root.render(
         <MemoryDetail
           file={makeFile()}
-          bucket="pending"
+          bucket="Pending"
           diffText=""
           diffLoading={false}
           onApprove={() => undefined}
@@ -243,7 +244,7 @@ describe('<MemoryDetail>', () => {
       root.render(
         <MemoryDetail
           file={makeFile()}
-          bucket="pending"
+          bucket="Pending"
           diffText=""
           diffLoading={false}
           onApprove={() => undefined}
@@ -288,8 +289,8 @@ describe('<MemoryDetail>', () => {
     });
     await flushEffects();
 
-    expect(mockWriteTextFile).toHaveBeenCalledWith('/memory/u/pending/alice.md', '# Updated draft');
-    expect(onSaved).toHaveBeenCalledWith('/memory/u/pending/alice.md');
+    expect(mockWriteTextFile).toHaveBeenCalledWith('/memory/u/Pending/alice.md', '# Updated draft');
+    expect(onSaved).toHaveBeenCalledWith('/memory/u/Pending/alice.md');
     expect(container.querySelector('textarea')).toBeNull();
     expect(container.textContent).toContain('Read mode');
     expect(container.textContent).toContain('Updated draft');
@@ -300,7 +301,7 @@ describe('<MemoryDetail>', () => {
       root.render(
         <MemoryDetail
           file={makeFile()}
-          bucket="pending"
+          bucket="Pending"
           diffText=""
           diffLoading={false}
           onApprove={() => undefined}

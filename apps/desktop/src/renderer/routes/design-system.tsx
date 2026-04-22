@@ -34,6 +34,15 @@ import {
   type StatusDotState,
 } from '@tinker/design';
 import '@tinker/design/styles/tokens.css';
+import type {
+  ReasoningLevel,
+  RoleProfile,
+  Skill,
+  SkillDraft,
+  SkillGitConfig,
+  SkillSearchResult,
+  SkillStore,
+} from '@tinker/shared-types';
 import {
   DEMO_MEMORY_PREVIEW,
   DEMO_MEMORY_REFERENCE_TIME_MS,
@@ -47,7 +56,7 @@ import { Titlebar } from '../workspace/components/Titlebar/index.js';
 import { FolderPill } from '../panes/Chat/components/FolderPill/index.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
-import type { ReasoningLevel } from '@tinker/shared-types';
+import { PlaybookPane } from '../workspace/components/PlaybookPane/index.js';
 import { SignIn } from './SignIn/index.js';
 import { MemorySidebar } from '../panes/MemoryPane/components/MemorySidebar/index.js';
 import './design-system.css';
@@ -62,6 +71,7 @@ type PlaygroundTab =
   | 'toast'
   | 'empty'
   | 'chat'
+  | 'playbook'
   | 'chat-composer'
   | 'settings-shell'
   | 'sign-in'
@@ -77,6 +87,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'toast', label: 'Toast' },
   { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
+  { value: 'playbook', label: 'Playbook' },
   { value: 'chat-composer', label: 'Chat Composer' },
   { value: 'settings-shell', label: 'Settings Shell' },
   { value: 'sign-in', label: 'Sign In' },
@@ -1349,6 +1360,162 @@ const ChatTab = (): JSX.Element => {
   );
 };
 
+/* ------------------------ Playbook ----------------------- */
+
+const PLAYBOOK_FIXTURE_LONG_DESCRIPTION =
+  'A guided end-to-end walk through of how to review a customer churn signal, triage supporting evidence in the memory graph, and decide whether to open a retention play with the account owner. Use when you want the agent to lead you through the decision, not just surface the data.';
+
+const PLAYBOOK_FIXTURES: ReadonlyArray<Skill> = [
+  {
+    id: 'gong-call-analysis',
+    slug: 'gong-call-analysis',
+    title: 'Gong Call Analysis',
+    role: 'sales',
+    description: 'Summarize a Gong transcript and surface next-step risks.',
+    tools: ['gong'],
+    tags: ['sales', 'calls'],
+    version: '1.0.0',
+    author: null,
+    body: '# Gong Call Analysis\n\nStep 1…',
+    relativePath: '.tinker/skills/gong-call-analysis.md',
+    frontmatter: {
+      id: 'gong-call-analysis',
+      title: 'Gong Call Analysis',
+      role: 'sales',
+      version: '1.0.0',
+    },
+    lastModified: '2026-04-22T00:00:00.000Z',
+    active: true,
+    installedAt: '2026-04-22T00:00:00.000Z',
+  },
+  {
+    id: 'pr-review-walkthrough',
+    slug: 'pr-review-walkthrough',
+    title: 'PR Review Walkthrough',
+    role: 'engineering',
+    description: PLAYBOOK_FIXTURE_LONG_DESCRIPTION,
+    tools: ['github'],
+    tags: ['code-review'],
+    version: '1.0.0',
+    author: null,
+    body: '# PR Review\n\nStep 1…',
+    relativePath: '.tinker/skills/pr-review-walkthrough.md',
+    frontmatter: {
+      id: 'pr-review-walkthrough',
+      title: 'PR Review Walkthrough',
+      role: 'engineering',
+      version: '1.0.0',
+    },
+    lastModified: '2026-04-22T00:00:00.000Z',
+    active: false,
+    installedAt: '2026-04-22T00:00:00.000Z',
+  },
+  {
+    id: 'weekly-exec-digest',
+    slug: 'weekly-exec-digest',
+    title: 'Weekly Exec Digest',
+    role: 'operations',
+    description: 'Compile the weekly digest from vault notes tagged #exec.',
+    tools: [],
+    tags: ['digest', 'ops'],
+    version: '1.0.0',
+    author: null,
+    body: '# Weekly Exec Digest\n\nStep 1…',
+    relativePath: '.tinker/skills/weekly-exec-digest.md',
+    frontmatter: {
+      id: 'weekly-exec-digest',
+      title: 'Weekly Exec Digest',
+      role: 'operations',
+      version: '1.0.0',
+    },
+    lastModified: '2026-04-22T00:00:00.000Z',
+    active: false,
+    installedAt: '2026-04-22T00:00:00.000Z',
+  },
+];
+
+const createFakeSkillStore = (initial: ReadonlyArray<Skill>): SkillStore => {
+  const records = new Map<string, Skill>(initial.map((skill) => [skill.slug, { ...skill }]));
+  let gitConfig: SkillGitConfig | null = null;
+
+  return {
+    init: () => Promise.resolve(),
+    list: () => Promise.resolve([...records.values()]),
+    get: (slug) => Promise.resolve(records.get(slug) ?? null),
+    search: (): Promise<SkillSearchResult[]> => Promise.resolve([]),
+    getActive: () => Promise.resolve([...records.values()].filter((skill) => skill.active)),
+    getRoleProfile: (): Promise<RoleProfile> =>
+      Promise.resolve({ roleLabel: '', connectedTools: [], frequentedSkills: [] }),
+    setActive: (slug, active) => {
+      const entry = records.get(slug);
+      if (entry) {
+        records.set(slug, { ...entry, active });
+      }
+      return Promise.resolve();
+    },
+    installFromFile: () => Promise.reject(new Error('playground fake: installFromFile not supported')),
+    installFromDraft: (_draft: SkillDraft) =>
+      Promise.reject(new Error('playground fake: installFromDraft not supported')),
+    uninstall: (slug) => {
+      records.delete(slug);
+      return Promise.resolve();
+    },
+    reindex: () => Promise.resolve({ skillsIndexed: records.size }),
+    getGitConfig: () => Promise.resolve(gitConfig),
+    setGitConfig: (config) => {
+      gitConfig = config;
+      return Promise.resolve();
+    },
+  };
+};
+
+const PlaybookPlaygroundFrame = ({ children }: { children: ReactNode }): JSX.Element => (
+  <div className="ds-settings-frame">{children}</div>
+);
+
+const PlaybookTabInner = (): JSX.Element => {
+  // Separate stores per section so interactive state doesn't bleed across
+  // the populated + empty fixtures.
+  const [populatedStore] = useState(() => createFakeSkillStore(PLAYBOOK_FIXTURES));
+  const [emptyStore] = useState(() => createFakeSkillStore([]));
+
+  return (
+    <div className="ds-sections">
+      <Section label="Populated — three fixtures, mixed roles, one active">
+        <PlaybookPlaygroundFrame>
+          <PlaybookPane
+            runtimeOverride={{
+              skillStore: populatedStore,
+              skillsRootPath: '/fake/memory/demo-user',
+              onActiveSkillsChanged: () => undefined,
+            }}
+            gitAvailabilityOverride={async () => false}
+          />
+        </PlaybookPlaygroundFrame>
+      </Section>
+
+      <Section label="Empty — no skills installed">
+        <PlaybookPlaygroundFrame>
+          <PlaybookPane
+            runtimeOverride={{
+              skillStore: emptyStore,
+              skillsRootPath: '/fake/memory/demo-user',
+              onActiveSkillsChanged: () => undefined,
+            }}
+            gitAvailabilityOverride={async () => false}
+          />
+        </PlaybookPlaygroundFrame>
+      </Section>
+    </div>
+  );
+};
+
+const PlaybookTab = (): JSX.Element => (
+  <ToastProvider>
+    <PlaybookTabInner />
+  </ToastProvider>
+);
+
 /* -------------------- Chat Composer -------------------- */
 
 const ChatComposerTab = (): JSX.Element => {
@@ -1482,7 +1649,6 @@ const ChatComposerTab = (): JSX.Element => {
     </div>
   );
 };
-
 /* -------------------- Settings Shell --------------------- */
 
 const UserIcon = () => (
@@ -1776,6 +1942,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <EmptyStateTab />;
     case 'chat':
       return <ChatTab />;
+    case 'playbook':
+      return <PlaybookTab />;
     case 'chat-composer':
       return <ChatComposerTab />;
     case 'settings-shell':
