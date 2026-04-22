@@ -9,7 +9,7 @@ import {
   Workspace as PanesWorkspace,
 } from '@tinker/panes';
 import '@tinker/panes/styles.css';
-import type { MemoryRunState } from '@tinker/memory';
+import { getActiveMemoryPath, type MemoryRunState } from '@tinker/memory';
 import {
   createDefaultWorkspacePreferences,
   type LayoutStore,
@@ -78,7 +78,7 @@ type WorkspaceProps = {
   memorySweepBusy: boolean;
   onContinueAsGuest(): Promise<void>;
   sessionFolderBusy: boolean;
-  onSelectSessionFolder(): Promise<void>;
+  onSelectSessionFolder(): Promise<string | null>;
   onContinueAsGuest(): Promise<void>;
   onConnectModel(): Promise<void>;
   onDisconnectModel(): Promise<void>;
@@ -89,13 +89,15 @@ type WorkspaceProps = {
   onDisconnectGithub(): Promise<void>;
   onDisconnectMicrosoft(): Promise<void>;
   onCreateVault(): Promise<void>;
-  onSelectVault(): Promise<void>;
+  onSelectVault(): Promise<string | null>;
   onActiveSkillsChanged(): void;
   onRunScheduledJobNow(jobId: string): Promise<void>;
   onSchedulerChanged(): void;
   onRunMemorySweep(): Promise<void>;
   onMemoryCommitted(): void;
   onRequestMcpRespawn(): Promise<void>;
+  getConnectionForPane: (paneData: Extract<TinkerPaneData, { readonly kind: 'chat' }>) => OpencodeConnection;
+  releaseConnectionForPane: (paneData: Extract<TinkerPaneData, { readonly kind: 'chat' }>) => void;
 };
 
 const createWorkspaceTabId = (): string => {
@@ -161,6 +163,8 @@ export const Workspace = ({
   onMemoryCommitted,
   mcpStatus,
   onRequestMcpRespawn,
+  getConnectionForPane,
+  releaseConnectionForPane,
 }: WorkspaceProps): JSX.Element => {
   const workspaceStoreRef = useRef<WorkspaceStore<TinkerPaneData> | null>(null);
   const attentionStoreRef = useRef(createAttentionStore());
@@ -358,15 +362,29 @@ export const Workspace = ({
       chat: {
         kind: 'chat',
         defaultTitle: 'Chat',
-        render: ({ pane, tabId, isActive }) => (
-          <RegisteredChatPane
-            tabId={tabId}
-            paneId={pane.id}
-            isActive={isActive}
-            paneData={requirePaneData('chat', pane.data)}
-            onAttentionSignal={(reason) => signalPaneAttention(pane.id, reason)}
-          />
-        ),
+        render: ({ pane, tabId, isActive }) => {
+          const handleSelectSessionFolder = async (): Promise<void> => {
+            const folderPath = await onSelectSessionFolder();
+            if (folderPath) {
+              const memorySubdir = await getActiveMemoryPath(currentUserId);
+              workspaceStore.getState().actions.updatePaneData(tabId, pane.id, (prev) => ({
+                ...prev,
+                folderPath,
+                memorySubdir,
+              } as unknown as TinkerPaneData));
+            }
+          };
+          return (
+            <RegisteredChatPane
+              tabId={tabId}
+              paneId={pane.id}
+              isActive={isActive}
+              paneData={requirePaneData('chat', pane.data)}
+              onAttentionSignal={(reason) => signalPaneAttention(pane.id, reason)}
+              onSelectSessionFolder={handleSelectSessionFolder}
+            />
+          );
+        },
       },
       file: {
         kind: 'file',
@@ -384,7 +402,7 @@ export const Workspace = ({
         render: ({ pane }) => <>{getRenderer('memory')(requirePaneData('memory', pane.data))}</>,
       },
     };
-  }, [signalPaneAttention]);
+  }, [signalPaneAttention, onSelectSessionFolder, currentUserId, workspaceStore]);
 
   const chatPaneRuntime = useMemo(
     () => ({
@@ -392,11 +410,15 @@ export const Workspace = ({
       currentUserId,
       modelConnected,
       opencode,
+      getConnectionForPane,
+      releaseConnectionForPane,
       sessionFolderPath: vaultPath,
       vaultPath,
       activeSkillsRevision,
       sessionFolderBusy,
-      onSelectSessionFolder,
+      onSelectSessionFolder: async () => {
+        await onSelectSessionFolder();
+      },
       onFileWritten: handleAgentFileWritten,
       onOpenFileLink: openFileInWorkspace,
       onOpenNewChat: openNewChatPane,
@@ -405,6 +427,7 @@ export const Workspace = ({
     [
       activeSkillsRevision,
       currentUserId,
+      getConnectionForPane,
       handleAgentFileWritten,
       modelConnected,
       onMemoryCommitted,
@@ -412,6 +435,7 @@ export const Workspace = ({
       openFileInWorkspace,
       openNewChatPane,
       opencode,
+      releaseConnectionForPane,
       sessionFolderBusy,
       vaultPath,
       skillStore,

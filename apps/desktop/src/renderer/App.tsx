@@ -80,11 +80,6 @@ type CurrentUserState = {
   avatarUrl: string | null;
 };
 
-type RestartOpencodeOptions = {
-  folderPath?: string;
-  memorySubdir?: string;
-};
-
 const MODEL_CONNECT_POLL_INTERVAL_MS = 1_500;
 const MODEL_CONNECT_TIMEOUT_MS = 180_000;
 const VAULT_REINDEX_DEBOUNCE_MS = 300;
@@ -185,10 +180,6 @@ const syncCurrentUserMemoryPath = async (
     connectedSessions.map((session) => getActiveMemoryPath(buildStoredUserId(session.provider, session.userId))),
   );
   await syncActiveMemoryPath(pickCurrentUserId(sessions), options);
-};
-
-const restartOpencode = (options: RestartOpencodeOptions): Promise<OpencodeConnection> => {
-  return invoke<OpencodeConnection>('restart_opencode', { options });
 };
 
 const selectSessionFolder = async (): Promise<string | null> => {
@@ -316,26 +307,6 @@ const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath
   }
 };
 
-const resolveRestartOpencodeOptions = async (
-  sessions: SSOStatus,
-  folderPath: string | null,
-): Promise<RestartOpencodeOptions> => {
-  return {
-    ...(folderPath ? { folderPath } : {}),
-    memorySubdir: await getActiveMemoryPath(pickCurrentUserId(sessions)),
-  };
-};
-
-const restartWorkspaceOpencode = async (
-  vaultPath: string | null,
-  sessions: SSOStatus,
-): Promise<{ opencode: OpencodeConnection; modelConnected: boolean }> => {
-  const opencode = await restartOpencode(await resolveRestartOpencodeOptions(sessions, vaultPath));
-  await syncConnectorState(opencode, vaultPath, sessions);
-  const modelConnected = await probeModelConnection(opencode, vaultPath);
-  return { opencode, modelConnected };
-};
-
 export const App = (): JSX.Element => {
   const nativeRuntime = useMemo(() => isTauriRuntime(), []);
   const memoryStore = useMemo(() => createMemoryStore(), []);
@@ -354,6 +325,7 @@ export const App = (): JSX.Element => {
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
   const [sessionFolderBusy, setSessionFolderBusy] = useState(false);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
+  const refcountsRef = useRef<Record<BindingKey, number>>({});
   const { state: currentUserState, refresh: refreshCurrentUser } = useCurrentUser(nativeRuntime);
 
   const requireNativeRuntime = (action: string): void => {
@@ -381,33 +353,75 @@ export const App = (): JSX.Element => {
     setProviderMessages((current) => ({ ...current, [provider]: message }));
   };
 
-  const refreshWorkspaceConnection = useCallback(async (sessions: SSOStatus): Promise<void> => {
-    if (!nativeRuntime || state.status !== 'ready') {
-      return;
-    }
-
-    requireNativeRuntime('Restarting OpenCode');
-    const nextState = await restartWorkspaceOpencode(state.vaultPath, sessions);
-    await syncCurrentUserMemoryPath(sessions, { emit: false });
-
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            opencodes: {
-              ...current.opencodes,
-              [current.defaultBindingKey]: nextState.opencode,
+  const acquireOpencode = useCallback(
+    async (folderPath: string, memorySubdir: string, userId: string): Promise<OpencodeConnection> => {
+      requireNativeRuntime('Acquiring OpenCode connection');
+      const key = bindingKey(folderPath, memorySubdir, userId);
+      const conn = await invoke<OpencodeConnection>('start_opencode', { folderPath, userId, memorySubdir });
+      refcountsRef.current[key] = (refcountsRef.current[key] ?? 0) + 1;
+      setState((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              opencodes: { ...current.opencodes, [key]: conn },
             },
-            mcpStatus: {
-              ...current.mcpStatus,
-              [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
-              ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
+      );
+      return conn;
+    },
+    [nativeRuntime],
+  );
+
+  const releaseOpencode = useCallback(
+    async (folderPath: string, memorySubdir: string, userId: string): Promise<void> => {
+      if (!nativeRuntime || state.status !== 'ready') return;
+      const key = bindingKey(folderPath, memorySubdir, userId);
+      const nextCount = (refcountsRef.current[key] ?? 1) - 1;
+      refcountsRef.current[key] = nextCount;
+
+      if (nextCount > 0 || key === state.defaultBindingKey) {
+        return;
+      }
+
+      const conn = state.opencodes[key];
+      if (!conn) return;
+
+      await invoke('stop_opencode', { pid: conn.pid });
+      setState((current) => {
+        if (current.status !== 'ready') return current;
+        const { [key]: _, ...rest } = current.opencodes;
+        return { ...current, opencodes: rest };
+      });
+    },
+    [nativeRuntime, state.status, state.status === 'ready' ? state.defaultBindingKey : ''],
+  );
+
+  const refreshAllConnectorState = useCallback(
+    async (sessions: SSOStatus): Promise<void> => {
+      if (!nativeRuntime || state.status !== 'ready') {
+        return;
+      }
+      await syncCurrentUserMemoryPath(sessions, { emit: false });
+      for (const conn of Object.values(state.opencodes)) {
+        await syncConnectorState(conn, state.vaultPath, sessions);
+      }
+      const modelConnected = await probeModelConnection(defaultConnection(state), state.vaultPath);
+      setState((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              modelConnected,
+              mcpStatus: {
+                ...current.mcpStatus,
+                [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
+                ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
+              },
             },
-            modelConnected: nextState.modelConnected,
-          },
-    );
-  }, [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null]);
+      );
+    },
+    [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null],
+  );
 
   useEffect(() => {
     if (!nativeRuntime || state.status !== 'ready' || currentUserState.status !== 'ready') {
@@ -421,13 +435,13 @@ export const App = (): JSX.Element => {
         return;
       }
 
-      void refreshWorkspaceConnection(sessions).catch((error) => {
+      void refreshAllConnectorState(sessions).catch((error) => {
         console.warn('Failed to refresh OpenCode after a memory path change.', error);
       });
     });
   }, [
     nativeRuntime,
-    refreshWorkspaceConnection,
+    refreshAllConnectorState,
     state.status,
     currentUserState.status,
     currentUserState.status === 'ready' ? currentUserState.sessions : null,
@@ -521,52 +535,6 @@ export const App = (): JSX.Element => {
       active = false;
     };
   }, [layoutStore, memoryStore, nativeRuntime, schedulerStore, skillStore, vaultService]);
-
-  useEffect(() => {
-    if (!nativeRuntime || state.status !== 'ready' || currentUserState.status !== 'ready') {
-      return;
-    }
-
-    let active = true;
-    const activeSessions = currentUserState.sessions;
-    const activeVaultPath = state.vaultPath;
-    const activeBaseUrl = defaultConnection(state)?.baseUrl;
-
-    void (async () => {
-      await syncCurrentUserMemoryPath(activeSessions);
-      try {
-        const nextState = await restartWorkspaceOpencode(activeVaultPath, activeSessions);
-        if (!active) {
-          return;
-        }
-
-        setState((current) =>
-          current.status !== 'ready' || current.opencodes[current.defaultBindingKey]?.baseUrl !== activeBaseUrl
-            ? current
-            : {
-                ...current,
-                opencodes: {
-                  ...current.opencodes,
-                  [current.defaultBindingKey]: nextState.opencode,
-                },
-                modelConnected: nextState.modelConnected,
-              },
-        );
-      } catch (error) {
-        console.warn('Could not restart OpenCode after auth change.', error);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [
-    currentUserState.status,
-    currentUserState.status === 'ready' ? currentUserState.sessions : EMPTY_AUTH_STATUS,
-    nativeRuntime,
-    state.status,
-    state.status === 'ready' ? state.vaultPath : null,
-  ]);
 
   useEffect(() => {
     if (!nativeRuntime || state.status !== 'ready' || !state.vaultPath) {
@@ -885,29 +853,25 @@ export const App = (): JSX.Element => {
     return { sessions, modelConnected };
   };
 
-  const setSessionFolder = async (config: VaultConfig): Promise<void> => {
+  const bindSessionFolder = async (folderPath: string, isNew: boolean): Promise<void> => {
     requireNativeRuntime('Selecting a folder');
     setSessionFolderBusy(true);
 
     try {
-      const nextState = await restartWorkspaceOpencode(config.path, currentSessions);
-      await vaultService.init(config);
-      await indexVault(config);
-      await skillStore.init(config.path);
+      const memorySubdir = await getActiveMemoryPath(currentUserId);
+      await acquireOpencode(folderPath, memorySubdir, currentUserId);
+      await vaultService.init({ path: folderPath, isNew });
+      await indexVault({ path: folderPath, isNew });
+      await skillStore.init(folderPath);
       await skillStore.reindex();
-      window.localStorage.setItem(VAULT_PATH_KEY, config.path);
+      window.localStorage.setItem(VAULT_PATH_KEY, folderPath);
 
       setState((current) =>
         current.status !== 'ready'
           ? current
           : {
               ...current,
-              opencodes: {
-                ...current.opencodes,
-                [current.defaultBindingKey]: nextState.opencode,
-              },
-              vaultPath: config.path,
-              modelConnected: nextState.modelConnected,
+              vaultPath: folderPath,
               vaultRevision: current.vaultRevision + 1,
               activeSkillsRevision: current.activeSkillsRevision + 1,
             },
@@ -1020,7 +984,7 @@ export const App = (): JSX.Element => {
 
       const nextState = await refreshCurrentUser();
       if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshWorkspaceConnection(nextState.sessions);
+        await refreshAllConnectorState(nextState.sessions);
       } else {
         const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
         await syncCurrentUserMemoryPath(reloaded.sessions);
@@ -1053,7 +1017,7 @@ export const App = (): JSX.Element => {
 
       const nextState = await refreshCurrentUser();
       if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshWorkspaceConnection(nextState.sessions);
+        await refreshAllConnectorState(nextState.sessions);
       } else {
         const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
         await syncCurrentUserMemoryPath(reloaded.sessions);
@@ -1095,7 +1059,7 @@ export const App = (): JSX.Element => {
       const nextUserState = await refreshCurrentUser();
 
       if (providersToClear.includes('github')) {
-        await refreshWorkspaceConnection(nextUserState.sessions);
+        await refreshAllConnectorState(nextUserState.sessions);
       } else {
         const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
         await syncCurrentUserMemoryPath(reloaded.sessions);
@@ -1118,25 +1082,26 @@ export const App = (): JSX.Element => {
     }
   };
 
-  const handleSelectSessionFolder = async (): Promise<void> => {
+  const handleSelectSessionFolder = async (): Promise<string | null> => {
     if (sessionFolderBusy) {
-      return;
+      return null;
     }
 
     requireNativeRuntime('Selecting a folder');
     const folderPath = await selectSessionFolder();
     if (!folderPath) {
-      return;
+      return null;
     }
 
-    await setSessionFolder({ path: folderPath, isNew: false });
+    await bindSessionFolder(folderPath, false);
+    return folderPath;
   };
 
   const handleCreateDefaultVault = async (): Promise<void> => {
     requireNativeRuntime('Creating the default vault');
     const home = await homeDir();
     const defaultPath = await join(home, 'Tinker', 'knowledge');
-    await setSessionFolder({ path: defaultPath, isNew: true });
+    await bindSessionFolder(defaultPath, true);
   };
 
   const handleRunScheduledJobNow = async (jobId: string): Promise<void> => {
@@ -1206,7 +1171,24 @@ export const App = (): JSX.Element => {
         onActiveSkillsChanged={handleActiveSkillsChanged}
         onRunMemorySweep={handleRunMemorySweep}
         onMemoryCommitted={handleMemoryCommitted}
-        onRequestMcpRespawn={() => refreshWorkspaceConnection(currentSessions)}
+        onRequestMcpRespawn={() => refreshAllConnectorState(currentSessions)}
+        getConnectionForPane={(paneData) => {
+          if (state.status !== 'ready') return WEB_PREVIEW_CONNECTION;
+          const folderPath = (paneData as unknown as { folderPath?: string }).folderPath;
+          const memorySubdir = (paneData as unknown as { memorySubdir?: string }).memorySubdir;
+          if (folderPath && memorySubdir) {
+            return connectionFor(state, bindingKey(folderPath, memorySubdir, currentUserId));
+          }
+          return defaultConnection(state);
+        }}
+        releaseConnectionForPane={(paneData) => {
+          if (state.status !== 'ready') return;
+          const folderPath = (paneData as unknown as { folderPath?: string }).folderPath;
+          const memorySubdir = (paneData as unknown as { memorySubdir?: string }).memorySubdir;
+          if (folderPath && memorySubdir) {
+            void releaseOpencode(folderPath, memorySubdir, currentUserId);
+          }
+        }}
       />
     </div>
   );
