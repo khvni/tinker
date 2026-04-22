@@ -15,6 +15,7 @@ import {
   Progress,
   SearchInput,
   SegmentedControl,
+  SelectFolderButton,
   Skeleton,
   StatusDot,
   TextInput,
@@ -34,19 +35,13 @@ import {
   SettingsShell,
   type SettingsShellSection,
 } from '../workspace/components/SettingsShell/index.js';
+import { AccountPanel } from '../workspace/components/AccountPanel/index.js';
+import { Titlebar } from '../workspace/components/Titlebar/index.js';
 import { AttachmentIcon } from '../panes/Chat/AttachmentIcon.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
-import { Account, type AccountUser } from '../panes/Settings/sections/Account/index.js';
 import { SignIn } from './SignIn/index.js';
 import './design-system.css';
-
-const DEMO_ACCOUNT_USER: AccountUser = {
-  displayName: 'Ada Lovelace',
-  email: 'ada@example.com',
-  avatarUrl: 'https://i.pravatar.cc/96?u=tinker-demo-ada',
-  provider: 'google',
-};
 
 type PlaygroundTab =
   | 'colors'
@@ -59,8 +54,8 @@ type PlaygroundTab =
   | 'empty'
   | 'chat'
   | 'settings-shell'
-  | 'account'
-  | 'sign-in';
+  | 'sign-in'
+  | 'titlebar';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
@@ -73,8 +68,8 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
   { value: 'settings-shell', label: 'Settings Shell' },
-  { value: 'account', label: 'Account' },
   { value: 'sign-in', label: 'Sign In' },
+  { value: 'titlebar', label: 'Titlebar' },
 ];
 
 const BADGE_VARIANTS: ReadonlyArray<{ variant: BadgeVariant; label: string }> = [
@@ -493,6 +488,15 @@ const ComponentsTab = (): JSX.Element => {
               onChange={(event) => setSearchValue(event.target.value)}
             />
           </div>
+        </Row>
+      </Section>
+
+      <Section label="SelectFolderButton">
+        <Row>
+          <SelectFolderButton onClick={() => {}} />
+          <SelectFolderButton folderPath="/Users/khani/projects/tinker" onClick={() => {}} />
+          <SelectFolderButton folderPath="/Users/khani/projects/tinker" loading onClick={() => {}} />
+          <SelectFolderButton disabled onClick={() => {}} />
         </Row>
       </Section>
 
@@ -1416,15 +1420,31 @@ const SettingsSectionBody = ({
   </div>
 );
 
+const SAMPLE_ACCOUNT_SESSION = {
+  provider: 'google' as const,
+  userId: 'demo-user',
+  email: 'demo@tinker.local',
+  displayName: 'Demo User',
+  accessToken: '',
+  refreshToken: '',
+  expiresAt: new Date().toISOString(),
+  scopes: [],
+};
+
 const SETTINGS_SECTIONS: ReadonlyArray<SettingsShellSection> = [
   {
     id: 'account',
     label: 'Account',
     icon: <UserIcon />,
     content: (
-      <div className="ds-settings-body">
-        <Account user={DEMO_ACCOUNT_USER} onSignOut={() => undefined} />
-      </div>
+      <AccountPanel
+        session={SAMPLE_ACCOUNT_SESSION}
+        signOutBusy={false}
+        signOutMessage={null}
+        onSignOut={async () => {
+          console.warn('Sample sign-out');
+        }}
+      />
     ),
   },
   {
@@ -1478,6 +1498,36 @@ const SettingsShellTab = (): JSX.Element => (
       </div>
     </Section>
 
+    <Section label="Account panel — signed in (provider: Google)">
+      <div className="ds-settings-frame">
+        <AccountPanel
+          session={SAMPLE_ACCOUNT_SESSION}
+          signOutBusy={false}
+          signOutMessage={null}
+          onSignOut={async () => {
+            console.warn('Sample sign-out');
+          }}
+        />
+      </div>
+    </Section>
+
+    <Section label="Account panel — signing out (busy + notice)">
+      <div className="ds-settings-frame">
+        <AccountPanel
+          session={SAMPLE_ACCOUNT_SESSION}
+          signOutBusy
+          signOutMessage="Clearing keychain…"
+          onSignOut={async () => {}}
+        />
+      </div>
+    </Section>
+
+    <Section label="Account panel — not signed in">
+      <div className="ds-settings-frame">
+        <AccountPanel session={null} signOutBusy={false} signOutMessage={null} onSignOut={async () => {}} />
+      </div>
+    </Section>
+
     <Section label="Controlled — Memory active">
       <div className="ds-settings-frame">
         <SettingsShell sections={SETTINGS_SECTIONS} activeSectionId="memory" />
@@ -1487,50 +1537,6 @@ const SettingsShellTab = (): JSX.Element => (
     <Section label="Empty — default EmptyPane">
       <div className="ds-settings-frame">
         <SettingsShell sections={[]} />
-      </div>
-    </Section>
-  </div>
-);
-
-const AccountTab = (): JSX.Element => (
-  <div className="ds-sections">
-    <Section label="Signed in (Google)">
-      <div className="ds-settings-frame">
-        <div className="ds-settings-body">
-          <Account user={DEMO_ACCOUNT_USER} onSignOut={() => undefined} />
-        </div>
-      </div>
-    </Section>
-
-    <Section label="Signed in — signing out (busy)">
-      <div className="ds-settings-frame">
-        <div className="ds-settings-body">
-          <Account
-            user={DEMO_ACCOUNT_USER}
-            onSignOut={() => undefined}
-            busy
-            message="Clearing keychain…"
-          />
-        </div>
-      </div>
-    </Section>
-
-    <Section label="No avatar — initials fallback (GitHub)">
-      <div className="ds-settings-frame">
-        <div className="ds-settings-body">
-          <Account
-            user={{ displayName: 'Grace Hopper', email: 'grace@example.com', provider: 'github' }}
-            onSignOut={() => undefined}
-          />
-        </div>
-      </div>
-    </Section>
-
-    <Section label="Not signed in">
-      <div className="ds-settings-frame">
-        <div className="ds-settings-body">
-          <Account user={null} onSignOut={() => undefined} />
-        </div>
       </div>
     </Section>
   </div>
@@ -1554,6 +1560,39 @@ const SignInTab = (): JSX.Element => (
           nativeRuntimeAvailable={false}
           providerMessages={{}}
           onSignIn={async () => {}}
+        />
+      </div>
+    </Section>
+  </div>
+);
+
+const TitlebarTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="No session — bare brand">
+      <Titlebar
+        sessionFolderPath={null}
+        onNewSession={() => undefined}
+        onOpenMemory={() => undefined}
+        onOpenSettings={() => undefined}
+      />
+    </Section>
+
+    <Section label="With session folder crumb">
+      <Titlebar
+        sessionFolderPath="/Users/khani/Desktop/projects/tinker"
+        onNewSession={() => undefined}
+        onOpenMemory={() => undefined}
+        onOpenSettings={() => undefined}
+      />
+    </Section>
+
+    <Section label="Dark theme preview">
+      <div data-theme="dark" style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-4)' }}>
+        <Titlebar
+          sessionFolderPath="/Users/khani/Desktop/projects/tinker"
+          onNewSession={() => undefined}
+          onOpenMemory={() => undefined}
+          onOpenSettings={() => undefined}
         />
       </div>
     </Section>
@@ -1584,10 +1623,10 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ChatTab />;
     case 'settings-shell':
       return <SettingsShellTab />;
-    case 'account':
-      return <AccountTab />;
     case 'sign-in':
       return <SignInTab />;
+    case 'titlebar':
+      return <TitlebarTab />;
   }
 };
 

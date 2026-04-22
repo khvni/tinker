@@ -39,8 +39,8 @@ User signs in with Google / Microsoft / GitHub. Gmail, Calendar, Drive, Linear (
 - `[2026-04-14]` `@google/gmail-mcp-server` — already in `opencode.json`
 - `[2026-04-14]` `@google/calendar-mcp-server` — already in `opencode.json`
 - `[2026-04-14]` `@google/drive-mcp-server` — already in `opencode.json`
-- `[2026-04-14]` `@tacticlaunch/mcp-linear` — already configured, gated on env var
-- `[2026-04-15]` GitHub MCP server = `@modelcontextprotocol/server-github`, wired behind `TINKER_GITHUB_TOKEN`
+- `[2026-04-22]` Linear MCP server = official remote `https://mcp.linear.app/mcp` — OpenCode handles OAuth on first use; `Authorization` header fallback stays available for API-key-based legacy setups
+- `[2026-04-22]` GitHub MCP server = official remote `https://api.githubcopilot.com/mcp/`, wired behind a GitHub OAuth access token passed from Tinker's keychain-backed auth flow
 
 ## Implementation Outline
 
@@ -67,7 +67,7 @@ Self-healing (feature 11)
 
 ### 2. Connector activation (TypeScript — renderer)
 - `[2026-04-15]` On successful auth, renderer reloads sidecar state, forwards Google auth into OpenCode, and re-reads MCP status for UI
-- `[2026-04-15]` GitHub MCP is activated by restarting OpenCode with `TINKER_GITHUB_TOKEN` in process env, then connecting `github` server from renderer
+- `[2026-04-22]` GitHub MCP is activated by restarting OpenCode with `TINKER_GITHUB_AUTHORIZATION` in process env so the remote MCP can reuse the signed-in user's GitHub access token
 - `[2026-04-14]` UI reflects connection state in a compact status indicator (not a modal)
 
 ### 3. First-run flow (PRD §2.5)

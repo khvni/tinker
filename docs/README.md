@@ -18,6 +18,7 @@ Public documentation for Tinker — a local-first desktop AI workspace. Authorit
 
 ### For contributors
 - **[Auth architecture](./auth-architecture.md)** — consumer OAuth flow, identity vs. integration layers, Better Auth rationale
+- **[Development](./development.md)** — local setup + MVP smoke-test checklist
 - **[Enterprise fork guide](./enterprise-fork-guide.md)** — how any enterprise dev adapts Tinker to a single-tenant IdP (Entra ID, Okta, etc.)
 - **[SAML provider adapter](./saml-adapter.md)** — enterprise-fork recipe for replacing Better Auth social providers with a SAML 2.0 flow (ADFS, Shibboleth, legacy Okta / Ping SAML apps)
 - **[Architectural decisions](./decisions.md)** — decision log with reasoning

@@ -1,0 +1,63 @@
+.tk-select-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  max-width: 220px;
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+  line-height: 16px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.tk-select-folder:hover:not(.tk-select-folder--disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.tk-select-folder:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.tk-select-folder__icon,
+.tk-select-folder__chevron {
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.tk-select-folder__label {
+  font-weight: var(--font-weight-regular);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-select-folder--has-folder .tk-select-folder__label {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.tk-select-folder--loading {
+  cursor: progress;
+}
+
+.tk-select-folder--loading .tk-select-folder__label {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.tk-select-folder--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

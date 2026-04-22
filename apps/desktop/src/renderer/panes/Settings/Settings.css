@@ -1,8 +1,0 @@
-.tinker-settings {
-  position: relative;
-}
-
-.tinker-settings__section {
-  display: grid;
-  gap: var(--space-5);
-}

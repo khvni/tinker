@@ -14,5 +14,3 @@ export const isTauriRuntime = (): boolean => {
   return typeof candidate?.invoke === 'function';
 };
 
-export const WEB_PREVIEW_NOTICE =
-  'Browser preview only. pnpm dev:web does not start Tauri, the OpenCode sidecar, SQLite, native dialogs, or OAuth. Use pnpm dev:desktop to exercise the full app runtime.';

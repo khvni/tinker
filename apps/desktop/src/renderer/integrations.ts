@@ -1,3 +1,5 @@
+import type { SSOSession } from '@tinker/shared-types';
+
 export type MCPStatus = {
   status:
     | 'checking'
@@ -21,18 +23,23 @@ type MCPStatusResponse = {
 };
 
 export const EXA_MCP_NAME = 'exa';
-export const EXA_HEALTH_TIMEOUT_MS = 5_000;
+export const GITHUB_MCP_NAME = 'github';
+export const LINEAR_MCP_NAME = 'linear';
+export const TRACKED_MCP_NAMES = [EXA_MCP_NAME, GITHUB_MCP_NAME, LINEAR_MCP_NAME] as const;
+export const MCP_HEALTH_TIMEOUT_MS = 5_000;
+export const EXA_HEALTH_TIMEOUT_MS = MCP_HEALTH_TIMEOUT_MS;
 export const EXA_HEALTH_TIMEOUT_MESSAGE = `Exa health check timed out after ${EXA_HEALTH_TIMEOUT_MS / 1_000}s.`;
 export const EXA_CHECKING_STATUS: MCPStatus = { status: 'checking' };
+export const GITHUB_RECONNECT_MESSAGE = 'Reconnect GitHub to grant repository access before using GitHub MCP tools.';
 
-const formatErrorMessage = (error: unknown): string => {
+const formatErrorMessage = (error: unknown, fallbackMessage: string): string => {
   if (error instanceof Error) {
     return error.message;
   }
   if (typeof error === 'string') {
     return error;
   }
-  return 'Exa health check failed.';
+  return fallbackMessage;
 };
 
 const withTimeout = async <T>(
@@ -77,6 +84,60 @@ export const normalizeExaBootStatus = (status: MCPStatusLike | undefined): MCPSt
   };
 };
 
+const normalizeTrackedMcpStatus = (name: string, status: MCPStatusLike | undefined): MCPStatus => {
+  if (!status?.status) {
+    return { status: 'disabled' };
+  }
+
+  const error = status.error?.trim();
+  switch (status.status) {
+    case 'checking':
+    case 'connected':
+    case 'disabled':
+    case 'error':
+    case 'failed':
+    case 'needs_auth':
+    case 'needs_client_registration':
+      return error ? { status: status.status, error } : { status: status.status };
+    default:
+      return {
+        status: 'error',
+        error: error ?? `${name} reported an unknown status "${status.status}".`,
+      };
+  }
+};
+
+export const githubSessionNeedsReconnect = (session: SSOSession | null | undefined): boolean => {
+  if (!session) {
+    return false;
+  }
+
+  return !session.scopes.some((scope) => {
+    const normalized = scope.trim();
+    return normalized === 'repo' || normalized === 'public_repo';
+  });
+};
+
+export const resolveTrackedMcpStatuses = (
+  data: MCPStatusResponse['data'],
+  githubSession: SSOSession | null | undefined,
+): Record<string, MCPStatus> => {
+  const statuses: Record<string, MCPStatus> = {
+    [EXA_MCP_NAME]: normalizeExaBootStatus(data?.[EXA_MCP_NAME]),
+    [GITHUB_MCP_NAME]: normalizeTrackedMcpStatus('GitHub', data?.[GITHUB_MCP_NAME]),
+    [LINEAR_MCP_NAME]: normalizeTrackedMcpStatus('Linear', data?.[LINEAR_MCP_NAME]),
+  };
+
+  if (githubSessionNeedsReconnect(githubSession)) {
+    statuses[GITHUB_MCP_NAME] = {
+      status: 'needs_auth',
+      error: GITHUB_RECONNECT_MESSAGE,
+    };
+  }
+
+  return statuses;
+};
+
 export const checkExaBootHealth = async (
   loadStatus: () => Promise<MCPStatusResponse>,
   timeoutMs = EXA_HEALTH_TIMEOUT_MS,
@@ -86,14 +147,39 @@ export const checkExaBootHealth = async (
     if (response.data === undefined && response.error !== undefined) {
       return {
         status: 'error',
-        error: formatErrorMessage(response.error),
+        error: formatErrorMessage(response.error, 'Exa health check failed.'),
       };
     }
     return normalizeExaBootStatus(response.data?.[EXA_MCP_NAME]);
   } catch (error) {
     return {
       status: 'error',
-      error: formatErrorMessage(error),
+      error: formatErrorMessage(error, 'Exa health check failed.'),
     };
+  }
+};
+
+export const checkTrackedMcpBootHealth = async (
+  loadStatus: () => Promise<MCPStatusResponse>,
+  githubSession: SSOSession | null | undefined,
+  timeoutMs = MCP_HEALTH_TIMEOUT_MS,
+): Promise<Record<string, MCPStatus>> => {
+  try {
+    const response = await withTimeout(loadStatus(), timeoutMs, `MCP health check timed out after ${timeoutMs / 1_000}s.`);
+    if (response.data === undefined && response.error !== undefined) {
+      const error = formatErrorMessage(response.error, 'MCP health check failed.');
+      return Object.fromEntries(TRACKED_MCP_NAMES.map((name) => [name, { status: 'error', error }])) as Record<
+        string,
+        MCPStatus
+      >;
+    }
+
+    return resolveTrackedMcpStatuses(response.data, githubSession);
+  } catch (error) {
+    const message = formatErrorMessage(error, 'MCP health check failed.');
+    return Object.fromEntries(TRACKED_MCP_NAMES.map((name) => [name, { status: 'error', error: message }])) as Record<
+      string,
+      MCPStatus
+    >;
   }
 };

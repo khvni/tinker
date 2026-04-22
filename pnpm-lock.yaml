@@ -57,6 +57,9 @@ importers:
       '@tauri-apps/plugin-sql':
         specifier: ^2.4.0
         version: 2.4.0
+      '@tinker/attention':
+        specifier: workspace:*
+        version: link:../../packages/attention
       '@tinker/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
@@ -115,6 +118,12 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2.10.1
         version: 2.10.1
+      '@testing-library/jest-dom':
+        specifier: ^6.6.3
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@types/papaparse':
         specifier: ^5.5.2
         version: 5.5.2
@@ -254,6 +263,9 @@ importers:
 
   packages/panes:
     dependencies:
+      '@tinker/attention':
+        specifier: workspace:*
+        version: link:../attention
       zustand:
         specifier: ^5.0.2
         version: 5.0.12(@types/react@19.2.14)(react@19.2.5)
