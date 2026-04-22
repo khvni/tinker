@@ -8,6 +8,8 @@ deferred: post-mvp
 ---
 
 > **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP has no skills system; markdown + MCP covers the same surface at lower complexity. Do not start work until MVP ships.
+>
+> **[2026-04-22] Integration note (TIN-208 / PR #106):** Playbook storage / parser / prompt-injection work can merge ahead of the browse UI, but the UI itself stays out of the MVP shell until the route split in TIN-203 lands. Do **not** add a `playbook` pane kind, pane renderer, titlebar button, or other Workspace/App chrome entry point before that route decision is implemented.
 
 # Feature 02 — Playbook Skill Marketplace
 
@@ -31,7 +33,8 @@ Skills are markdown files that teach the agent how to perform a specific task. T
 
 ### v1 Scope
 - `[2026-04-14]` **Local skill directory** in the user's vault (e.g., `<vault>/.tinker/skills/*.md`)
-- `[2026-04-14]` **Skill browser UI** — list, search, preview, install/uninstall actions (Dockview pane)
+- `[2026-04-14]` **Skill browser UI** — list, search, preview, install/uninstall actions
+- `[2026-04-22]` Browse UI lands as a **full workspace route**, not a docked pane or titlebar shortcut. Until TIN-203 ships, the UI stays deferred even if storage/runtime pieces land first.
 - `[2026-04-14]` **Skill authoring** — right-click "save as skill" from a chat turn; edit in pane
 - `[2026-04-14]` **Optional Git sync** — point Tinker at a Git repo URL; skills sync both directions (pull updates, push authored skills)
 
@@ -82,7 +85,7 @@ Notes:
 - `[2026-04-14]` File system is source of truth; SQLite is cache — re-index on file change
 
 ### 2. Skill browser UI
-- `[2026-04-14]` Dockview pane (openable from command palette)
+- `[2026-04-22]` Full workspace route, not a pane in `@tinker/panes`
 - `[2026-04-14]` List view: name, description, connected-tools-required, installed-status
 - `[2026-04-14]` Preview: rendered markdown with syntax highlighting
 - `[2026-04-14]` Actions: install (copy into vault), uninstall (remove from vault), edit (open in pane), publish (Git push)
@@ -130,12 +133,12 @@ Notes:
 
 ## Acceptance Criteria
 
-- [x] Skills list renders in a Dockview pane (`apps/desktop/src/renderer/panes/Playbook.tsx`)
-- [x] User can author a new skill from a chat turn (Chat "Save as skill" button → Playbook pane prefilled draft)
-- [x] User can install a skill from an arbitrary `.md` file (Playbook "Install from file" button → `openDialog` → `SkillStore.installFromFile`)
-- [x] Git sync pulls and pushes skills to a configured remote (`packages/memory/src/skill-git.ts`, Playbook Git sync tab)
-- [x] Skill frontmatter is indexed into SQLite for Coach queries (`skills` + `skills_fts` tables in `database.ts`, `SkillStore.search`)
-- [x] Installed skills are activated in the OpenCode session (`packages/bridge/src/skill-injector.ts` + `Chat.ensureSession`)
+- [ ] Skills list renders in the deferred Playbook browse surface once the post-MVP route lands
+- [ ] User can author a new skill from a chat turn (Chat "Save as skill" button → Playbook authoring surface prefilled draft)
+- [ ] User can install a skill from an arbitrary `.md` file (Playbook "Install from file" button → `openDialog` → `SkillStore.installFromFile`)
+- [ ] Git sync pulls and pushes skills to a configured remote (`packages/memory/src/skill-git.ts`, Playbook Git sync tab)
+- [ ] Skill frontmatter is indexed into SQLite for Coach queries (`skills` + `skills_fts` tables in `database.ts`, `SkillStore.search`)
+- [ ] Installed skills are activated in the OpenCode session (`packages/bridge/src/skill-injector.ts` + `Chat.ensureSession`)
 
 ## Connections
 - [[05-coach-skill-discovery]] — consumer of the skill index

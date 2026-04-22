@@ -125,6 +125,26 @@ describe('<Titlebar>', () => {
     );
   });
 
+  it('keeps the actions cluster to the two Paper window toggles only', () => {
+    const markup = renderToStaticMarkup(
+      <Titlebar
+        sessionFolderPath={null}
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
+      />,
+    );
+    const container = document.createElement('div');
+    container.innerHTML = markup;
+
+    const buttons = Array.from(container.querySelectorAll('button')).map((button) =>
+      button.getAttribute('aria-label'),
+    );
+
+    expect(buttons).toEqual(['Toggle left sidebar', 'Toggle right inspector']);
+  });
+
   it('leaves the traffic-light spacer free to inherit drag-region from the header', () => {
     const markup = renderToStaticMarkup(
       <Titlebar
