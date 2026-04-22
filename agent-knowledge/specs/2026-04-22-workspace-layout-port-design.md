@@ -22,7 +22,7 @@ Pillar: **M1 — Panes+tabs workspace**. MVP scope per [[D25]].
 1. Render Tinker's left sidebar rail so the workspace matches the Paper artboard 1:1 in both dark and light themes.
 2. Keep `@tinker/panes` as the single layout engine (per [[D16]]) — sidebar + titlebar are plain React, everything inside the content frame continues to be the recursive split tree.
 3. Preserve every primitive + pane + runtime already wired into `Workspace.tsx` (chat runtime, memory runtime, settings runtime, file runtime, attention store, layout persistence).
-4. Enforce one-pane-per-tab: each pane renders exactly one kind (chat / file / settings / memory). No in-pane tab switcher.
+4. Enforce one-pane-per-tab: each pane renders exactly one kind (chat / file / settings / memory). No in-pane tab switcher. Deferred chrome surfaces stay outside the split tree.
 5. Ship without adding a new dependency, new pane kind, or new primitive.
 
 ## 2. Non-goals (explicit, with why)
@@ -67,7 +67,7 @@ Each item below is a separate PR / Linear ticket. The MVP acceptance checklist f
 | # | Spin-off | Rationale |
 |---|---|---|
 | 6.1 | Sidebar-card attention badges (TIN-148 already on file) | Post-MVP visual. Depends on `@tinker/attention` store + a sidebar-card subscribing component. |
-| 6.2 | Wire the remaining rail items (Explorer / Skills / Agents / Connections / Playbook / Analytics) | D25 deferrals. When the corresponding pane/kind ships, enable the rail item and bind it to the open-pane handler. |
+| 6.2 | Wire the remaining rail items (Explorer / Skills / Agents / Connections / Playbook / Analytics) | D25 deferrals. When TIN-203's route split lands, add them as full-workspace routes. Do **not** introduce new pane kinds or titlebar shortcuts for them in the MVP shell. |
 | 6.3 | Shortcut registry (anomalyco's `CommandProvider` equivalent) | File the ticket only if MVP ships and shortcuts become a real user request. Anomalyco's concrete bindings are catalogued in the reference doc §3. |
 | 6.4 | Sidebar collapse toggle + `mod+b` | Paper artboard shows an always-on sidebar. Add when Paper or the user actually asks for hide-sidebar. |
 | 6.5 | Sidebar-aware session deep-linking | No Tinker URL routing yet. |

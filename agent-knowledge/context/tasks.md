@@ -148,7 +148,8 @@ Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5, M8.3 (current user resol
 | 6.8 | Simple memory append (MVP, toggleable): after assistant response finishes streaming, write `<memory_root>/<user-id>/sessions/YYYY-MM-DD-HHMM-<session-id>.md` with the user prompt + final assistant message. Setting `app_settings.memory_auto_append` default `true`. | M | 6.3, 4.4 | review | TIN-64 · PR #97. Append-only; toggle now lives in the Settings pane. |
 | 6.9 | Path-change / user-switch propagation: 6.6 AND M8.8 both trigger 6.7/6.8 to re-resolve path + trigger M7.7 (MCP env var refresh). | S | 6.6, 6.7, 6.8, 7.7, 8.8 | review | TIN-65 · PR #97. Shared `memory.path-changed` event invalidates chat caches + restarts OpenCode on switch/root move. |
 | 6.10 | Categorised memory view per Paper IQ-0: `MemorySidebar` (search + filter + Pending/People/Active Work/Capabilities/Preferences/Organization accordion with counts + unread dots) + `MemoryDetail` (header + CONTENT/CHANGES sections + Approve/Dismiss). Rust `memory_approve` / `memory_dismiss` / `memory_diff` commands, frontmatter `kind:` → folder lookup, tombstone log. | L | 6.4 | review | TIN-196 · PR #116. |
-| 6.11 | Memory filesystem parity: each user memory root creates exact category folders `Pending`, `People`, `Active Work`, `Capabilities`, `Preferences`, `Organization`; sidebar counts come straight from those folders; approve/move commands preserve spaces + capitalization. | M | 6.10 | review | TIN-205 · PR #123 · branch `khvni/tin-205`. |
+| 6.11 | Memory detail inline read/edit: render selected markdown in-place, switch same surface into edit mode, save/cancel inline, and remove the workspace-tab escape hatch. Keep selection stable after save. | M | 6.10 | review | TIN-206 · PR #122. Current `main` still uses `MemoryPane` paths; TIN-203 will move the same behavior under `MemoryView`. |
+| 6.12 | Memory filesystem parity: each user memory root creates exact category folders `Pending`, `People`, `Active Work`, `Capabilities`, `Preferences`, `Organization`; sidebar counts come straight from those folders; approve/move commands preserve spaces + capitalization. | M | 6.10 | review | TIN-205 · PR #123 · branch `khvni/tin-205`. |
 
 ### M7 — Built-in MCP servers (qmd, smart-connections, exa)
 Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
@@ -248,6 +249,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | Ticket | Feature | Scope | Status | Notes |
 |--------|---------|-------|--------|-------|
 | TIN-112 | 02 | Playbook shared skill schema + markdown frontmatter spec | review | PR #46 |
+| TIN-208 | 02 / cross-cutting | PR #106 integration guard: keep deferred Playbook UI out of `Workspace` / `Titlebar` / pane registration until TIN-203 route split; document merge path + add regression tests. | review | PR #121 · Branch `khvni/tin-208-shell`. No Playbook UI merged here; this codifies the split path for PR #106. |
 | TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
 | TIN-167 | release | Cross-platform tag-triggered GitHub Release pipeline + updater manifest | review | PR #49. Supersedes TIN-164 scope on `v*` tag trigger; reconcile before merge. |
 | TIN-176 | UI.1 | Paper design source audit + tokens.css parity report | review | `agent-knowledge/reference/paper-design-audit.md`. Dark tokens 1:1 match; light surface tokens drift (D23 layer reversal inverted in code). Blocks downstream UI cleanup chain. |

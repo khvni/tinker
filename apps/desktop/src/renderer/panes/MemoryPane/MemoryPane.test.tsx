@@ -12,7 +12,6 @@ import type {
   MemoryEntryBucket,
   MemoryMarkdownFile,
 } from '@tinker/memory';
-import { FilePaneRuntimeContext } from '../FilePane/file-pane-runtime.js';
 import { MemoryPaneRuntimeContext } from '../../workspace/memory-pane-runtime.js';
 
 const memoryPaneTestMocks = vi.hoisted(() => {
@@ -59,16 +58,19 @@ vi.mock('@tinker/memory', () => ({
   PENDING_MEMORY_CATEGORY: 'Pending',
 }));
 
-const { mockReadTextFile, mockRenderMarkdown, mockApprove, mockDismiss, mockDiff } = vi.hoisted(() => ({
+const { mockReadTextFile, mockWriteTextFile, mockRenderMarkdown, mockApprove, mockDismiss, mockDiff } =
+  vi.hoisted(() => ({
   mockReadTextFile: vi.fn<(path: string) => Promise<string>>(),
+  mockWriteTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(),
   mockRenderMarkdown: vi.fn<(text: string) => Promise<string>>(),
   mockApprove: vi.fn<(filePath: string, destinationDir: string) => Promise<string>>(),
   mockDismiss: vi.fn<(filePath: string) => Promise<void>>(),
   mockDiff: vi.fn<(filePath: string) => Promise<string>>(),
-}));
+  }));
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readTextFile: mockReadTextFile,
+  writeTextFile: mockWriteTextFile,
 }));
 
 vi.mock('../../renderers/MarkdownRenderer.js', () => ({
@@ -100,6 +102,22 @@ const flushEffects = async (): Promise<void> => {
   });
 };
 
+const updateTextareaValue = async (
+  textarea: HTMLTextAreaElement,
+  value: string,
+): Promise<void> => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+  const setValue = descriptor?.set;
+  if (!setValue) {
+    throw new Error('Expected textarea value setter.');
+  }
+
+  await act(async () => {
+    setValue.call(textarea, value);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+};
+
 const makeFile = (overrides: Partial<MemoryMarkdownFile> = {}): MemoryMarkdownFile => ({
   absolutePath: '/memory/u/Pending/alice.md',
   relativePath: 'Pending/alice.md',
@@ -111,23 +129,28 @@ const makeFile = (overrides: Partial<MemoryMarkdownFile> = {}): MemoryMarkdownFi
 describe('<MemoryPane>', () => {
   let container: HTMLDivElement;
   let root: Root;
-  let openFile: ReturnType<typeof vi.fn>;
+  let diskContents: string;
 
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    openFile = vi.fn();
+    diskContents = '# Alice';
 
     memoryPaneTestMocks.listCategorisedMemoryFiles.mockReset();
     memoryPaneTestMocks.subscribeMemoryPathChanged.mockClear();
     mockReadTextFile.mockReset();
+    mockWriteTextFile.mockReset();
     mockRenderMarkdown.mockReset();
     mockApprove.mockReset();
     mockDismiss.mockReset();
     mockDiff.mockReset();
 
-    mockRenderMarkdown.mockResolvedValue('<p>body</p>');
+    mockReadTextFile.mockImplementation(async () => diskContents);
+    mockWriteTextFile.mockImplementation(async (_path, contents) => {
+      diskContents = contents;
+    });
+    mockRenderMarkdown.mockImplementation(async (text) => `<p>${text}</p>`);
     mockDiff.mockResolvedValue('');
   });
 
@@ -144,9 +167,7 @@ describe('<MemoryPane>', () => {
     await act(async () => {
       root.render(
         <MemoryPaneRuntimeContext.Provider value={{ currentUserId: 'local-user' }}>
-          <FilePaneRuntimeContext.Provider value={{ vaultRevision: 0, openFile }}>
-            <MemoryPane />
-          </FilePaneRuntimeContext.Provider>
+          <MemoryPane />
         </MemoryPaneRuntimeContext.Provider>,
       );
     });
@@ -265,5 +286,63 @@ describe('<MemoryPane>', () => {
 
     expect(memoryPaneTestMocks.listCategorisedMemoryFiles).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain('bob.md');
+  });
+
+  it('reloads memory after save and keeps the same file selected', async () => {
+    memoryPaneTestMocks.listCategorisedMemoryFiles
+      .mockResolvedValueOnce({ rootPath: '/memory/u', buckets: { ...emptyBuckets(), Pending: [makeFile()] } })
+      .mockResolvedValueOnce({
+        rootPath: '/memory/u',
+        buckets: {
+          ...emptyBuckets(),
+          Pending: [makeFile({ modifiedAt: '2026-04-22T15:00:00.000Z' })],
+        },
+      });
+
+    await render();
+
+    const row = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('alice.md'),
+    );
+    if (!(row instanceof HTMLButtonElement)) {
+      throw new Error('Expected pending row.');
+    }
+    await act(async () => {
+      row.click();
+    });
+    await flushEffects();
+
+    const editButton = container.querySelector('button[aria-label="Edit"]');
+    if (!(editButton instanceof HTMLButtonElement)) {
+      throw new Error('Expected Edit button.');
+    }
+    await act(async () => {
+      editButton.click();
+    });
+    await flushEffects();
+
+    const textarea = container.querySelector('textarea');
+    if (!(textarea instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected inline editor.');
+    }
+    await updateTextareaValue(textarea, '# Updated note');
+    await flushEffects();
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Save',
+    );
+    if (!(saveButton instanceof HTMLButtonElement)) {
+      throw new Error('Expected Save button.');
+    }
+    await act(async () => {
+      saveButton.click();
+    });
+    await flushEffects();
+
+    expect(mockWriteTextFile).toHaveBeenCalledWith('/memory/u/Pending/alice.md', '# Updated note');
+    expect(memoryPaneTestMocks.listCategorisedMemoryFiles).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('.tinker-memory-sidebar__row--selected')?.textContent).toContain('alice.md');
+    expect(container.textContent).toContain('Read mode');
+    expect(container.textContent).toContain('Updated note');
   });
 });

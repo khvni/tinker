@@ -28,6 +28,9 @@ const _memoryKind: TinkerPaneKind = 'memory';
 // @ts-expect-error — unknown kind literal must be rejected
 const _bogusKind: TinkerPaneKind = 'not-a-pane';
 
+// @ts-expect-error — deferred Playbook UI is a future route, not an MVP pane kind
+const _playbookKind: TinkerPaneKind = 'playbook';
+
 // ────────────────────────────────────────────────────────────────────────────
 // `TinkerPaneData` accepts each valid variant.
 // ────────────────────────────────────────────────────────────────────────────
@@ -38,6 +41,9 @@ const _chatDataWithFolder: TinkerPaneData = { kind: 'chat', folderPath: '/tmp', 
 const _fileData: TinkerPaneData = { kind: 'file', path: '/tmp/a.md', mime: 'text/markdown' };
 const _settingsData: TinkerPaneData = { kind: 'settings' };
 const _memoryData: TinkerPaneData = { kind: 'memory' };
+
+// @ts-expect-error — deferred Playbook UI is not part of the persisted pane payload union
+const _playbookData: TinkerPaneData = { kind: 'playbook' };
 
 // ────────────────────────────────────────────────────────────────────────────
 // `TinkerPaneData` rejects malformed variants.
@@ -96,11 +102,13 @@ void _fileKind;
 void _settingsKind;
 void _memoryKind;
 void _bogusKind;
+void _playbookKind;
 void _chatData;
 void _chatDataWithSession;
 void _fileData;
 void _settingsData;
 void _memoryData;
+void _playbookData;
 void _badFileMissingFields;
 void _badFilePathType;
 void _badKindData;

@@ -1158,7 +1158,6 @@ export const App = (): JSX.Element => {
         sessions={currentSessions}
         mcpStatus={state.mcpStatus}
         vaultPath={state.vaultPath}
-        vaultRevision={state.vaultRevision}
         activeSkillsRevision={state.activeSkillsRevision}
         memorySweepState={memorySweepState}
         memorySweepBusy={memorySweepBusy}
