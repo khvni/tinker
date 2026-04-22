@@ -50,6 +50,17 @@ export const DATABASE_SCHEMA = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS users_provider_provider_user_id_idx
     ON users (provider, provider_user_id)`,
+  `CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    folder_path TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_active_at TEXT NOT NULL,
+    model_id TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS sessions_user_id_last_active_at_idx
+    ON sessions (user_id, last_active_at)`,
   `CREATE TABLE IF NOT EXISTS skills (
     slug TEXT PRIMARY KEY,
     title TEXT NOT NULL,
