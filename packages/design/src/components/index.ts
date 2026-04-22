@@ -8,3 +8,9 @@ export { Toggle } from './Toggle.js';
 export { TextInput } from './TextInput.js';
 export { SearchInput } from './SearchInput.js';
 export { Textarea } from './Textarea.js';
+export {
+  ModelPicker,
+  type ModelPickerItem,
+  type ModelPickerProps,
+  type ModelPickerGroup,
+} from './ModelPicker/index.js';

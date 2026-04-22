@@ -447,3 +447,10 @@
 .ds-chat__composer > .tk-textarea {
   min-height: 72px;
 }
+
+/* Give the ModelPicker panel (which anchors bottom: calc(100% + 4px)) enough
+ * room to render above its trigger inside the playground flow. */
+.ds-modelpicker-anchor {
+  display: inline-block;
+  margin-top: 336px;
+}
