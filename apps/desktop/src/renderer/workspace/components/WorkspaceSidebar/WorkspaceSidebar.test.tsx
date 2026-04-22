@@ -7,6 +7,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import type { TinkerPaneKind } from '@tinker/shared-types';
 import { WorkspaceSidebar } from './WorkspaceSidebar.js';
 
 const noop = (): void => {};
@@ -16,6 +17,9 @@ describe('WorkspaceSidebar', () => {
     const markup = renderToStaticMarkup(
       <WorkspaceSidebar
         userInitial="K"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem="chat"
         onOpenChat={noop}
         onOpenMemory={noop}
         onOpenSettings={noop}
@@ -29,14 +33,21 @@ describe('WorkspaceSidebar', () => {
     expect(markup).toContain('aria-label="Memory"');
     expect(markup).toContain('aria-label="Settings"');
     expect(markup).toContain('aria-label="Account"');
-    expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('>K<');
+
+    const chatButtonPattern = /<button[^>]*aria-label="Chats"[^>]*aria-current="page"/;
+    expect(markup).toMatch(chatButtonPattern);
+    const workspacesButtonPattern = /<button[^>]*aria-label="Workspaces"[^>]*aria-current="page"/;
+    expect(markup).not.toMatch(workspacesButtonPattern);
   });
 
   it('disables deferred nav items', () => {
     const markup = renderToStaticMarkup(
       <WorkspaceSidebar
         userInitial="T"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
         onOpenSettings={noop}
@@ -55,6 +66,9 @@ describe('WorkspaceSidebar', () => {
     const withBadge = renderToStaticMarkup(
       <WorkspaceSidebar
         userInitial="K"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem={null}
         showPlaybookBadge
         onOpenChat={noop}
         onOpenMemory={noop}
@@ -65,6 +79,9 @@ describe('WorkspaceSidebar', () => {
     const withoutBadge = renderToStaticMarkup(
       <WorkspaceSidebar
         userInitial="K"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
         onOpenSettings={noop}
@@ -89,6 +106,9 @@ describe('WorkspaceSidebar', () => {
       root.render(
         <WorkspaceSidebar
           userInitial="K"
+          avatarUrl={null}
+          accountLabel="Account · Guest"
+          activeRailItem={null}
           onOpenChat={onOpenChat}
           onOpenMemory={onOpenMemory}
           onOpenSettings={onOpenSettings}
@@ -120,5 +140,179 @@ describe('WorkspaceSidebar', () => {
       root.unmount();
     });
     container.remove();
+  });
+
+  it('aria-current follows activeRailItem across chat/memory/settings', () => {
+    const cases: ReadonlyArray<{ readonly kind: TinkerPaneKind; readonly activeLabel: string }> = [
+      { kind: 'chat', activeLabel: 'Chats' },
+      { kind: 'memory', activeLabel: 'Memory' },
+      { kind: 'settings', activeLabel: 'Settings' },
+    ];
+
+    for (const { kind, activeLabel } of cases) {
+      const markup = renderToStaticMarkup(
+        <WorkspaceSidebar
+          userInitial="K"
+          avatarUrl={null}
+          accountLabel="Account · Guest"
+          activeRailItem={kind}
+          onOpenChat={noop}
+          onOpenMemory={noop}
+          onOpenSettings={noop}
+          onOpenAccount={noop}
+        />,
+      );
+
+      const activePattern = new RegExp(`<button[^>]*aria-label="${activeLabel}"[^>]*aria-current="page"`);
+      expect(markup).toMatch(activePattern);
+
+      for (const otherLabel of ['Chats', 'Memory', 'Settings'].filter((label) => label !== activeLabel)) {
+        const otherPattern = new RegExp(`<button[^>]*aria-label="${otherLabel}"[^>]*aria-current="page"`);
+        expect(markup).not.toMatch(otherPattern);
+      }
+    }
+
+    const nullMarkup = renderToStaticMarkup(
+      <WorkspaceSidebar
+        userInitial="K"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem={null}
+        onOpenChat={noop}
+        onOpenMemory={noop}
+        onOpenSettings={noop}
+        onOpenAccount={noop}
+      />,
+    );
+    expect(nullMarkup).not.toContain('aria-current="page"');
+  });
+
+  it('renders avatar image when avatarUrl provided', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceSidebar
+        userInitial="K"
+        avatarUrl="https://example.com/a.png"
+        accountLabel="Account · alice@example.com"
+        activeRailItem={null}
+        onOpenChat={noop}
+        onOpenMemory={noop}
+        onOpenSettings={noop}
+        onOpenAccount={noop}
+      />,
+    );
+
+    expect(markup).toMatch(/<img[^>]*src="https:\/\/example\.com\/a\.png"/);
+    expect(markup).toMatch(/<img[^>]*alt=""/);
+    expect(markup).toMatch(/<img[^>]*loading="lazy"/);
+    expect(markup).toMatch(/<img[^>]*class="tinker-workspace-sidebar__avatar-image"/);
+  });
+
+  it('falls back to initial when avatarUrl is null', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceSidebar
+        userInitial="G"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem={null}
+        onOpenChat={noop}
+        onOpenMemory={noop}
+        onOpenSettings={noop}
+        onOpenAccount={noop}
+      />,
+    );
+
+    expect(markup).not.toContain('tinker-workspace-sidebar__avatar-image');
+    expect(markup).toContain('>G<');
+  });
+
+  it('falls back to initial when avatar image fails to load', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkspaceSidebar
+          userInitial="G"
+          avatarUrl="https://example.com/broken.png"
+          accountLabel="Account · alice@example.com"
+          activeRailItem={null}
+          onOpenChat={noop}
+          onOpenMemory={noop}
+          onOpenSettings={noop}
+          onOpenAccount={noop}
+        />,
+      );
+    });
+
+    const img = container.querySelector<HTMLImageElement>('img.tinker-workspace-sidebar__avatar-image');
+    if (!img) {
+      throw new Error('avatar image not found');
+    }
+
+    await act(async () => {
+      img.dispatchEvent(new Event('error'));
+    });
+
+    const imgAfter = container.querySelector('img.tinker-workspace-sidebar__avatar-image');
+    expect(imgAfter).toBeNull();
+    const initial = container.querySelector('.tinker-workspace-sidebar__avatar');
+    expect(initial?.textContent).toBe('G');
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('account tooltip uses accountLabel', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceSidebar
+        userInitial="G"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem={null}
+        onOpenChat={noop}
+        onOpenMemory={noop}
+        onOpenSettings={noop}
+        onOpenAccount={noop}
+      />,
+    );
+
+    const accountTooltipPattern = /<button[^>]*aria-label="Account"[^>]*title="Account · Guest"/;
+    expect(markup).toMatch(accountTooltipPattern);
+  });
+
+  it('rail items carry their label as title tooltip', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceSidebar
+        userInitial="K"
+        avatarUrl={null}
+        accountLabel="Account · Guest"
+        activeRailItem={null}
+        onOpenChat={noop}
+        onOpenMemory={noop}
+        onOpenSettings={noop}
+        onOpenAccount={noop}
+      />,
+    );
+
+    const labels = [
+      'Workspaces',
+      'Explorer',
+      'Chats',
+      'Skills',
+      'Agents',
+      'Connections',
+      'Memory',
+      'New tab',
+      'Playbook',
+      'Analytics',
+      'Settings',
+    ];
+    for (const label of labels) {
+      const pattern = new RegExp(`<button[^>]*aria-label="${label}"[^>]*title="${label}"`);
+      expect(markup).toMatch(pattern);
+    }
   });
 });
