@@ -8,7 +8,7 @@ Used to record a 10-minute demo video. Click-through, deterministic, seed data
 lives in `src/seed/*.ts` so the primary user can swap in real `before`/`after`
 spreadsheets, transcripts, memory entries, etc. without touching components.
 
-## Run
+## Run · browser
 
 ```bash
 cd demo-flow
@@ -20,6 +20,39 @@ pnpm preview                       # serve the production build
 
 Fonts load from Google Fonts (Host Grotesk + JetBrains Mono). No other
 network dependencies at runtime.
+
+## Run · desktop app (Electron)
+
+The UI already draws its own title-bar + traffic lights, so wrapping it in a
+native window is essentially a 40-line `electron/main.cjs` shim.
+
+```bash
+cd demo-flow
+pnpm install --ignore-workspace    # one-time; pulls in electron + concurrently
+
+pnpm shell                         # dev mode: Vite HMR + native window, auto-reload
+pnpm shell:build                   # prod mode: build to dist/ then open as app
+```
+
+`pnpm shell` runs the Vite dev server and Electron side-by-side via
+`concurrently`; edits to `src/**` hot-reload inside the native window.
+`pnpm shell:build` is what you want for recording the demo video — no dev
+banner, no reload logs.
+
+**macOS** uses `hiddenInset` so the native traffic-lights sit where the drawn
+chrome expects them. Other platforms get a standard frame — the drawn
+traffic-lights then read as decoration, which is fine for a prototype.
+
+Override the dev URL (e.g. to point at a staging build) with:
+
+```bash
+TINKER_DEV_URL=http://localhost:5280/ pnpm shell
+```
+
+> First `pnpm install` may print `Ignored build scripts: electron`. That's
+> pnpm's guard against arbitrary post-install scripts. Run `pnpm rebuild
+> electron` once to let it extract the binary, or just run `pnpm shell` —
+> pnpm will finish the extraction on first launch.
 
 ## Demo path · ideal 10-minute walkthrough
 
@@ -92,13 +125,16 @@ accent; everything else is warm neutrals + hairlines.
 
 - No backend. No real tool execution. No real email / Salesforce / Graph calls.
 - No persistence — refresh resets the state machine.
-- No Electron shell in this commit (the drawn title bar + traffic lights do
-  the job visually); a native wrapper is 15 min of work on top if needed.
+- `pnpm shell:build` does NOT currently package a distributable `.app` /
+  `.dmg` / `.exe`. It launches Electron against the local build. Use
+  `electron-builder` if you need a notarised app bundle (~30 min of config).
 
 ## Folder layout
 
 ```
 demo-flow/
+├── electron/
+│   └── main.cjs                       ← native shell entry (pnpm shell)
 ├── public/
 │   └── keysight-wave.svg              ← background watermark
 ├── src/
