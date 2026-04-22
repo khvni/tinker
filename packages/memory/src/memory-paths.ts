@@ -21,6 +21,18 @@ export type MemoryPathChangedDetail = {
   nextRoot: string;
 };
 
+export type ActiveMemoryPathState = {
+  userId: string | null;
+  path: string | null;
+};
+
+export type ActiveMemoryPathChangedDetail = {
+  previousPath: string | null;
+  nextPath: string;
+  previousUserId: string | null;
+  nextUserId: string;
+};
+
 type RelativeMemoryTree = {
   directories: string[];
   files: string[];
@@ -33,6 +45,7 @@ const normalizeDirectoryForDetection = (directory: string): string => {
 const MEMORY_ROOT_SETTING_KEY = 'memory_root';
 const MEMORY_ROOT_PROBE_FILE_PREFIX = '.tinker-memory-root-probe';
 const memoryPathListeners = new Set<(detail: MemoryPathChangedDetail) => void>();
+const activeMemoryPathListeners = new Set<(detail: ActiveMemoryPathChangedDetail) => void>();
 
 const createMemorySettingsStore = (): SettingsStore => {
   return createSettingsStore();
@@ -106,6 +119,31 @@ const removeDirectoryContents = async (rootPath: string): Promise<void> => {
 
 const emitMemoryPathChanged = (detail: MemoryPathChangedDetail): void => {
   for (const listener of memoryPathListeners) {
+    listener(detail);
+  }
+};
+
+export const resolveActiveMemoryPathChange = (
+  previousState: ActiveMemoryPathState,
+  nextState: { userId: string; path: string },
+): ActiveMemoryPathChangedDetail | null => {
+  const sameUserId = previousState.userId === nextState.userId;
+  const samePath = previousState.path !== null && isSamePath(previousState.path, nextState.path);
+
+  if (sameUserId && samePath) {
+    return null;
+  }
+
+  return {
+    previousPath: previousState.path,
+    nextPath: nextState.path,
+    previousUserId: previousState.userId,
+    nextUserId: nextState.userId,
+  };
+};
+
+export const emitActiveMemoryPathChanged = (detail: ActiveMemoryPathChangedDetail): void => {
+  for (const listener of activeMemoryPathListeners) {
     listener(detail);
   }
 };
@@ -306,5 +344,14 @@ export const subscribeMemoryPathChanged = (
   memoryPathListeners.add(listener);
   return () => {
     memoryPathListeners.delete(listener);
+  };
+};
+
+export const subscribeActiveMemoryPathChanged = (
+  listener: (detail: ActiveMemoryPathChangedDetail) => void,
+): (() => void) => {
+  activeMemoryPathListeners.add(listener);
+  return () => {
+    activeMemoryPathListeners.delete(listener);
   };
 };

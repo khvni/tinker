@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { homeDir, join } from '@tauri-apps/api/path';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
@@ -10,10 +10,14 @@ import {
   createScheduledJobStore,
   createSkillStore,
   createVaultService,
+  emitActiveMemoryPathChanged,
   getActiveMemoryPath,
   getMemoryRoot,
   indexVault,
+  resolveActiveMemoryPathChange,
+  subscribeMemoryPathChanged,
   upsertUser,
+  type ActiveMemoryPathState,
   type MemoryRunState,
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
@@ -297,6 +301,8 @@ export const App = (): JSX.Element => {
   const [memorySweepState, setMemorySweepState] = useState<MemoryRunState | null>(null);
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
+  const activeMemoryPathRef = useRef<ActiveMemoryPathState>({ userId: null, path: null });
+  const currentUserId = state.status === 'ready' ? pickCurrentUserId(state.sessions) : DEFAULT_USER_ID;
 
   const requireNativeRuntime = (action: string): void => {
     if (!nativeRuntime) {
@@ -322,6 +328,27 @@ export const App = (): JSX.Element => {
   const setProviderMessage = (provider: AuthProvider, message: string | null): void => {
     setProviderMessages((current) => ({ ...current, [provider]: message }));
   };
+
+  const syncActiveMemoryPath = useCallback(async (userId: string): Promise<void> => {
+    const normalizedUserId = userId.trim();
+    const nextPath = await getActiveMemoryPath(normalizedUserId);
+    const previousState = activeMemoryPathRef.current;
+    const nextState = { userId: normalizedUserId, path: nextPath };
+
+    activeMemoryPathRef.current = nextState;
+
+    if (previousState.userId === null && previousState.path === null) {
+      return;
+    }
+    if (previousState.path === null && previousState.userId === normalizedUserId) {
+      return;
+    }
+
+    const detail = resolveActiveMemoryPathChange(previousState, nextState);
+    if (detail) {
+      emitActiveMemoryPathChanged(detail);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -355,6 +382,10 @@ export const App = (): JSX.Element => {
         const [opencode, sessions] = await Promise.all([invoke<OpencodeConnection>('get_opencode_connection'), readAuthStatus()]);
         await upsertUser(createLocalUser());
         await ensureConnectedMemoryPaths(sessions);
+        activeMemoryPathRef.current = {
+          userId: pickCurrentUserId(sessions),
+          path: null,
+        };
         const vaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         let vaultRevision = 0;
@@ -408,6 +439,45 @@ export const App = (): JSX.Element => {
       active = false;
     };
   }, [layoutStore, memoryStore, nativeRuntime, schedulerStore, skillStore, vaultService]);
+
+  useEffect(() => {
+    if (!nativeRuntime || state.status !== 'ready') {
+      return;
+    }
+
+    let active = true;
+
+    void syncActiveMemoryPath(currentUserId).catch((error) => {
+      if (active) {
+        console.warn('Failed to resolve active memory path for current user.', error);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [currentUserId, nativeRuntime, state.status, syncActiveMemoryPath]);
+
+  useEffect(() => {
+    if (!nativeRuntime || state.status !== 'ready') {
+      return;
+    }
+
+    let active = true;
+
+    const unsubscribe = subscribeMemoryPathChanged(() => {
+      void syncActiveMemoryPath(currentUserId).catch((error) => {
+        if (active) {
+          console.warn('Failed to refresh active memory path after memory-root change.', error);
+        }
+      });
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [currentUserId, nativeRuntime, state.status, syncActiveMemoryPath]);
 
   useEffect(() => {
     if (!nativeRuntime || state.status !== 'ready' || !state.vaultPath) {
@@ -948,7 +1018,6 @@ export const App = (): JSX.Element => {
     state.sessions.microsoft !== null;
   const signInGateVisible = nativeRuntime && !hasSignedIn;
   const workspaceAvailable = nativeRuntime && state.onboarded && hasSignedIn;
-  const currentUserId = pickCurrentUserId(state.sessions);
 
   if (signInGateVisible) {
     return (
