@@ -270,6 +270,10 @@ export const Chat = ({
   const draftBlocksRef = useRef<Block[]>([]);
   const shouldStickToBottomRef = useRef(true);
   const lastTailSignatureRef = useRef('empty');
+  // Tracks which (sessionID, activeSkillsRevision) pair we last injected
+  // skill context for, so toggling / installing a skill triggers a fresh
+  // inject on the next prompt without wiping the live session.
+  const injectedSkillsSignatureRef = useRef<string | null>(null);
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
 
   const saveAsSkillDefaultBody = useMemo(() => {
@@ -373,6 +377,7 @@ export const Chat = ({
     abortRequestedRef.current = false;
     shouldStickToBottomRef.current = true;
     lastTailSignatureRef.current = 'empty';
+    injectedSkillsSignatureRef.current = null;
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
@@ -462,7 +467,11 @@ export const Chat = ({
     return () => {
       cancelled = true;
     };
-  }, [activateSession, activeSkillsRevision, client, currentUserId, readyStatus, sessionFolderPath]);
+    // NOTE: intentionally NOT depending on `activeSkillsRevision`. Toggling or
+    // installing a skill used to force this effect — which aborts the live
+    // OpenCode session, wipes messages, and rehydrates from disk. Re-injection
+    // now happens lazily in `injectActiveSkillsIfStale` before each prompt.
+  }, [activateSession, client, currentUserId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     draftBlocksRef.current = draftBlocks;
@@ -715,16 +724,28 @@ export const Chat = ({
       }
     }
 
+    return session.id;
+  };
+
+  // Injects active skills into the session if we haven't already injected
+  // this (sessionID, activeSkillsRevision) combination. This runs before each
+  // prompt so toggling / installing a skill mid-session takes effect on the
+  // next user message without tearing down the live session.
+  const injectActiveSkillsIfStale = async (sessionID: string): Promise<void> => {
+    const signature = `${sessionID}:${activeSkillsRevision}`;
+    if (injectedSkillsSignatureRef.current === signature) {
+      return;
+    }
+
     try {
       const activeSkills = await skillStore.getActive();
       if (activeSkills.length > 0) {
-        await injectActiveSkills(client, session.id, activeSkills);
+        await injectActiveSkills(client, sessionID, activeSkills);
       }
+      injectedSkillsSignatureRef.current = signature;
     } catch (error) {
       console.warn('Failed to inject active skills into the session.', error);
     }
-
-    return session.id;
   };
 
   const abortActiveStream = async (): Promise<void> => {
@@ -796,6 +817,12 @@ export const Chat = ({
 
     try {
       const activeSessionID = await ensureSession();
+      if (abortRequestedRef.current) {
+        setStatus(readyStatus);
+        return;
+      }
+
+      await injectActiveSkillsIfStale(activeSessionID);
       if (abortRequestedRef.current) {
         setStatus(readyStatus);
         return;
