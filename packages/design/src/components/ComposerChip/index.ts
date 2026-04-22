@@ -1,1 +1,1 @@
-export { ComposerChip, type ComposerChipProps } from './ComposerChip.js';
+export { ComposerChip, type ComposerChipProps, type ComposerChipVariant } from './ComposerChip.js';

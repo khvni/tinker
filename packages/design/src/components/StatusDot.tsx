@@ -10,7 +10,8 @@ export type StatusDotState =
   | 'info'
   | 'claude'
   | 'skill'
-  | 'pulse';
+  | 'pulse'
+  | 'halo';
 
 export type StatusDotProps = Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
   state?: StatusDotState;
