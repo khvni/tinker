@@ -35,6 +35,20 @@ describe('<Titlebar>', () => {
     expect(markup).toContain('>baz<');
   });
 
+  it('sets the full sessionFolderPath as the crumb title attribute', () => {
+    const markup = renderToStaticMarkup(
+      <Titlebar
+        sessionFolderPath="/Users/foo/projects/very-long-folder-name-here"
+        onNewSession={() => undefined}
+        onOpenMemory={() => undefined}
+        onOpenSettings={() => undefined}
+      />,
+    );
+    expect(markup).toMatch(
+      /<span[^>]*class="tinker-titlebar__crumb"[^>]*title="\/Users\/foo\/projects\/very-long-folder-name-here"/,
+    );
+  });
+
   it('shows only the brand when sessionFolderPath is null', () => {
     const markup = renderToStaticMarkup(
       <Titlebar
@@ -83,6 +97,21 @@ describe('<Titlebar>', () => {
     );
     expect(markup).toMatch(
       /<div[^>]*class="tinker-titlebar__actions"[^>]*data-tauri-drag-region="false"/,
+    );
+  });
+
+  it('leaves the traffic-light spacer free to inherit drag-region from the header', () => {
+    const markup = renderToStaticMarkup(
+      <Titlebar
+        sessionFolderPath={null}
+        onNewSession={() => undefined}
+        onOpenMemory={() => undefined}
+        onOpenSettings={() => undefined}
+      />,
+    );
+    expect(markup).toMatch(/<div[^>]*class="tinker-titlebar__spacer"[^>]*>/);
+    expect(markup).not.toMatch(
+      /<div[^>]*class="tinker-titlebar__spacer"[^>]*data-tauri-drag-region="false"/,
     );
   });
 
@@ -147,6 +176,25 @@ describe('<Titlebar>', () => {
       renderTitlebar({ onOpenSettings: spy });
       clickByLabel('Settings');
       expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not dispatch any internal handler when the titlebar is double-clicked', () => {
+      const newSession = vi.fn();
+      const openMemory = vi.fn();
+      const openSettings = vi.fn();
+      renderTitlebar({
+        onNewSession: newSession,
+        onOpenMemory: openMemory,
+        onOpenSettings: openSettings,
+      });
+      const header = container.querySelector<HTMLElement>('header.tinker-titlebar');
+      expect(header).not.toBeNull();
+      act(() => {
+        header?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+      });
+      expect(newSession).not.toHaveBeenCalled();
+      expect(openMemory).not.toHaveBeenCalled();
+      expect(openSettings).not.toHaveBeenCalled();
     });
   });
 });
