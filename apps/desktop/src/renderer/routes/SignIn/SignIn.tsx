@@ -8,12 +8,18 @@ export type SignInProps = {
   readonly nativeRuntimeAvailable: boolean;
   readonly providerMessages: Partial<Record<AuthProvider, string | null>>;
   readonly onSignIn: (provider: AuthProvider) => Promise<void>;
+  readonly onContinueAsGuest: () => Promise<void> | void;
+  readonly guestBusy?: boolean;
+  readonly guestMessage?: string | null;
 };
 
 export const SignIn = ({
   nativeRuntimeAvailable,
   providerMessages,
   onSignIn,
+  onContinueAsGuest,
+  guestBusy = false,
+  guestMessage = null,
 }: SignInProps) => {
   const { state, pendingProvider, showRetry, start, cancel } = useAuthSignIn(onSignIn);
 
@@ -26,6 +32,11 @@ export const SignIn = ({
           <ProviderPicker
             disabled={!nativeRuntimeAvailable}
             providerMessages={providerMessages}
+            onContinueAsGuest={() => {
+              void onContinueAsGuest();
+            }}
+            guestBusy={guestBusy}
+            guestMessage={guestMessage}
             onPick={(provider) => {
               void start(provider);
             }}

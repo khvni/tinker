@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { homeDir, join } from '@tauri-apps/api/path';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
@@ -11,21 +11,21 @@ import {
   createVaultService,
   getActiveMemoryPath,
   indexVault,
+  migrateLocalUserIdentity,
+  subscribeMemoryPathChanged,
   syncActiveMemoryPath,
   upsertUser,
   type MemoryRunState,
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
 import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User, VaultConfig } from '@tinker/shared-types';
-import { DEFAULT_USER_ID, openFolderPicker, type AuthProvider, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
+import { DEFAULT_USER_ID, GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
   BUILTIN_MCP_NAMES,
   checkTrackedMcpBootHealth,
   EXA_CHECKING_STATUS,
   EXA_MCP_NAME,
-  GITHUB_MCP_NAME,
-  LINEAR_MCP_NAME,
   type MCPStatus,
 } from './integrations.js';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
@@ -61,6 +61,13 @@ type AppState =
 
 type ProviderBusyState = Record<AuthProvider, boolean>;
 type ProviderMessageState = Record<AuthProvider, string | null>;
+type CurrentUserState = {
+  id: string;
+  provider: User['provider'];
+  displayName: string;
+  email: string | null;
+  avatarUrl: string | null;
+};
 
 type RestartOpencodeOptions = {
   folderPath?: string;
@@ -93,11 +100,69 @@ const providerNeedsRefreshToken = (provider: AuthProvider): boolean => {
   return provider === 'google' || provider === 'microsoft';
 };
 
+const providerNeedsWorkspaceRefresh = (provider: AuthProvider): boolean => {
+  return provider === 'github';
+};
+
+const createGuestUser = (): User => {
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: GUEST_USER_ID,
+    provider: 'local',
+    providerUserId: GUEST_USER_ID,
+    displayName: 'Guest',
+    createdAt: timestamp,
+    lastSeenAt: timestamp,
+  };
+};
+
 const pickCurrentUserId = (sessions: SSOStatus): User['id'] => {
   const activeSession = sessions.google ?? sessions.github ?? sessions.microsoft;
   return activeSession
     ? buildStoredUserId(activeSession.provider, activeSession.userId)
-    : DEFAULT_USER_ID;
+    : GUEST_USER_ID;
+};
+
+const resolveCurrentUser = (sessions: SSOStatus): CurrentUserState => {
+  const activeSession = sessions.google ?? sessions.github ?? sessions.microsoft;
+  if (!activeSession) {
+    return {
+      id: GUEST_USER_ID,
+      provider: 'local',
+      displayName: 'Guest',
+      email: null,
+      avatarUrl: null,
+    };
+  }
+
+  return {
+    id: buildStoredUserId(activeSession.provider, activeSession.userId),
+    provider: activeSession.provider,
+    displayName: activeSession.displayName,
+    email: activeSession.email,
+    avatarUrl: activeSession.avatarUrl ?? null,
+  };
+};
+
+const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSOStatus => {
+  return {
+    google: status?.google ?? null,
+    github: status?.github ?? null,
+    microsoft: status?.microsoft ?? null,
+  };
+};
+
+const readAuthStatus = async (): Promise<SSOStatus> => {
+  return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
+};
+
+const syncStoredUsers = async (sessions: SSOStatus): Promise<void> => {
+  const connectedSessions = Object.values(sessions).filter((session): session is SSOSession => session !== null);
+  await Promise.all([
+    upsertUser(createGuestUser()),
+    ...connectedSessions.map((session) => upsertUser(toStoredUser(session))),
+  ]);
 };
 
 const syncCurrentUserMemoryPath = async (
@@ -272,11 +337,19 @@ export const App = (): JSX.Element => {
   const [modelAuthMessage, setModelAuthMessage] = useState<string | null>(null);
   const [providerBusy, setProviderBusy] = useState<ProviderBusyState>(EMPTY_PROVIDER_BUSY);
   const [providerMessages, setProviderMessages] = useState<ProviderMessageState>(EMPTY_PROVIDER_MESSAGES);
+  const [guestBusy, setGuestBusy] = useState(false);
+  const [guestMessage, setGuestMessage] = useState<string | null>(null);
   const [memorySweepState, setMemorySweepState] = useState<MemoryRunState | null>(null);
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
   const [sessionFolderBusy, setSessionFolderBusy] = useState(false);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
+  const initialAuthSyncRef = useRef<boolean>(true);
   const { state: currentUserState, refresh: refreshCurrentUser } = useCurrentUser(nativeRuntime);
+
+  useEffect(() => {
+    const ready = state.status === 'ready' && currentUserState.status === 'ready';
+    document.documentElement.dataset['appReady'] = ready ? 'true' : 'false';
+  }, [state.status, currentUserState.status]);
 
   const requireNativeRuntime = (action: string): void => {
     if (!nativeRuntime) {
@@ -302,6 +375,55 @@ export const App = (): JSX.Element => {
   const setProviderMessage = (provider: AuthProvider, message: string | null): void => {
     setProviderMessages((current) => ({ ...current, [provider]: message }));
   };
+
+  const refreshWorkspaceConnection = useCallback(async (sessions: SSOStatus): Promise<void> => {
+    if (!nativeRuntime || state.status !== 'ready') {
+      return;
+    }
+
+    requireNativeRuntime('Restarting OpenCode');
+    const nextState = await restartWorkspaceOpencode(state.vaultPath, sessions);
+    await syncCurrentUserMemoryPath(sessions, { emit: false });
+
+    setState((current) =>
+      current.status !== 'ready'
+        ? current
+        : {
+            ...current,
+            opencode: nextState.opencode,
+            mcpStatus: {
+              ...current.mcpStatus,
+              [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
+              ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
+            },
+            modelConnected: nextState.modelConnected,
+          },
+    );
+  }, [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null]);
+
+  useEffect(() => {
+    if (!nativeRuntime || state.status !== 'ready' || currentUserState.status !== 'ready') {
+      return;
+    }
+
+    const sessions = currentUserState.sessions;
+
+    return subscribeMemoryPathChanged((detail) => {
+      if (detail.reason !== 'root-changed') {
+        return;
+      }
+
+      void refreshWorkspaceConnection(sessions).catch((error) => {
+        console.warn('Failed to refresh OpenCode after a memory path change.', error);
+      });
+    });
+  }, [
+    nativeRuntime,
+    refreshWorkspaceConnection,
+    state.status,
+    currentUserState.status,
+    currentUserState.status === 'ready' ? currentUserState.sessions : null,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -331,7 +453,10 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const opencode = await invoke<OpencodeConnection>('get_opencode_connection');
+        const sessions = await readAuthStatus();
+        await migrateLocalUserIdentity('local-user', GUEST_USER_ID);
+        await syncStoredUsers(sessions);
+        await syncCurrentUserMemoryPath(sessions, { emit: false });
         const storedVaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         // Skills live per-user at `<memory_root>/<user-id>/.tinker/skills/`, so
@@ -352,6 +477,10 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
+        const opencode = await restartOpencode(
+          await resolveRestartOpencodeOptions(sessions, storedVaultPath),
+        );
+        await syncConnectorState(opencode, storedVaultPath, sessions);
         const modelConnected = await probeModelConnection(opencode, storedVaultPath);
 
         if (!active) {
@@ -451,6 +580,10 @@ export const App = (): JSX.Element => {
     const activeBaseUrl = state.opencode.baseUrl;
 
     void (async () => {
+      if (initialAuthSyncRef.current) {
+        initialAuthSyncRef.current = false;
+        return;
+      }
       await syncCurrentUserMemoryPath(activeSessions);
       try {
         const nextState = await restartWorkspaceOpencode(activeVaultPath, activeSessions);
@@ -480,7 +613,6 @@ export const App = (): JSX.Element => {
     currentUserState.status === 'ready' ? currentUserState.sessions : EMPTY_AUTH_STATUS,
     nativeRuntime,
     state.status,
-    state.status === 'ready' ? state.opencode.baseUrl : null,
     state.status === 'ready' ? state.vaultPath : null,
   ]);
 
@@ -705,8 +837,6 @@ export const App = (): JSX.Element => {
             mcpStatus: {
               ...current.mcpStatus,
               [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
-              [GITHUB_MCP_NAME]: EXA_CHECKING_STATUS,
-              [LINEAR_MCP_NAME]: EXA_CHECKING_STATUS,
               ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
             },
           },
@@ -791,25 +921,15 @@ export const App = (): JSX.Element => {
 
   const currentSessions = currentUserState.sessions;
 
-  const refreshWorkspaceConnection = async (sessions: SSOStatus): Promise<void> => {
-    requireNativeRuntime('Restarting OpenCode');
-    const nextState = await restartWorkspaceOpencode(state.vaultPath, sessions);
-    await syncCurrentUserMemoryPath(sessions);
+  const reloadConnectionState = async (
+    connection: OpencodeConnection,
+    vaultPath: string | null,
+  ): Promise<{ sessions: SSOStatus; modelConnected: boolean }> => {
+    const sessions = await readAuthStatus();
+    await syncConnectorState(connection, vaultPath, sessions);
+    const modelConnected = await probeModelConnection(connection, vaultPath);
 
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            opencode: nextState.opencode,
-            modelConnected: nextState.modelConnected,
-            mcpStatus: {
-              ...current.mcpStatus,
-              [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
-              ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
-            },
-          },
-    );
+    return { sessions, modelConnected };
   };
 
   const setSessionFolder = async (config: VaultConfig): Promise<void> => {
@@ -941,9 +1061,23 @@ export const App = (): JSX.Element => {
       await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
 
       const nextState = await refreshCurrentUser();
-      await refreshWorkspaceConnection(nextState.sessions);
+      if (providerNeedsWorkspaceRefresh(provider)) {
+        await refreshWorkspaceConnection(nextState.sessions);
+      } else {
+        const reloaded = await reloadConnectionState(state.opencode, state.vaultPath);
+        await syncCurrentUserMemoryPath(reloaded.sessions);
+        setState((current) =>
+          current.status !== 'ready'
+            ? current
+            : {
+                ...current,
+                modelConnected: reloaded.modelConnected,
+              },
+        );
+      }
 
       setProviderMessage(provider, `${providerDisplayName(provider)} connected as ${session.email}.`);
+      setGuestMessage(null);
     } catch (error) {
       setProviderMessage(provider, error instanceof Error ? error.message : String(error));
     } finally {
@@ -958,14 +1092,71 @@ export const App = (): JSX.Element => {
     try {
       requireNativeRuntime(`Disconnecting ${providerDisplayName(provider)}`);
       await invoke('auth_sign_out', { provider });
+
       const nextState = await refreshCurrentUser();
-      await refreshWorkspaceConnection(nextState.sessions);
+      if (providerNeedsWorkspaceRefresh(provider)) {
+        await refreshWorkspaceConnection(nextState.sessions);
+      } else {
+        const reloaded = await reloadConnectionState(state.opencode, state.vaultPath);
+        await syncCurrentUserMemoryPath(reloaded.sessions);
+        setState((current) =>
+          current.status !== 'ready'
+            ? current
+            : {
+                ...current,
+                modelConnected: reloaded.modelConnected,
+              },
+        );
+      }
 
       setProviderMessage(provider, `${providerDisplayName(provider)} disconnected.`);
+      setGuestMessage(null);
     } catch (error) {
       setProviderMessage(provider, error instanceof Error ? error.message : String(error));
     } finally {
       setProviderBusyValue(provider, false);
+    }
+  };
+
+  const handleContinueAsGuest = async (): Promise<void> => {
+    setGuestBusy(true);
+    setGuestMessage('Switching to guest mode…');
+
+    try {
+      requireNativeRuntime('Continuing as guest');
+
+      const providersToClear = (['google', 'github', 'microsoft'] as const).filter(
+        (provider) => currentSessions[provider] !== null,
+      );
+
+      if (providersToClear.length > 0) {
+        await Promise.all(providersToClear.map((provider) => invoke('auth_sign_out', { provider })));
+      }
+
+      await upsertUser(createGuestUser());
+      const nextUserState = await refreshCurrentUser();
+
+      if (providersToClear.includes('github')) {
+        await refreshWorkspaceConnection(nextUserState.sessions);
+      } else {
+        const reloaded = await reloadConnectionState(state.opencode, state.vaultPath);
+        await syncCurrentUserMemoryPath(reloaded.sessions);
+        setState((current) =>
+          current.status !== 'ready'
+            ? current
+            : {
+                ...current,
+                modelConnected: reloaded.modelConnected,
+              },
+        );
+      }
+
+      setProviderMessages(EMPTY_PROVIDER_MESSAGES);
+      setGuestMessage('Guest mode active.');
+    } catch (error) {
+      setGuestMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGuestBusy(false);
     }
   };
 
@@ -999,6 +1190,7 @@ export const App = (): JSX.Element => {
     await engine.runNow(jobId);
   };
 
+  const currentUser = resolveCurrentUser(currentSessions);
   const currentUserId =
     currentUserState.authState === 'authenticated'
       ? currentUserState.user.id
@@ -1009,6 +1201,11 @@ export const App = (): JSX.Element => {
       <Workspace
         key={currentUserId}
         currentUserId={currentUserId}
+        currentUserName={currentUser.displayName}
+        currentUserProvider={currentUser.provider}
+        currentUserEmail={currentUser.email}
+        currentUserAvatarUrl={currentUser.avatarUrl}
+        nativeRuntimeAvailable={nativeRuntime}
         layoutStore={state.layoutStore}
         memoryStore={state.memoryStore}
         schedulerStore={state.schedulerStore}
@@ -1017,6 +1214,8 @@ export const App = (): JSX.Element => {
         modelConnected={state.modelConnected}
         modelAuthBusy={modelAuthBusy}
         modelAuthMessage={modelAuthMessage}
+        guestBusy={guestBusy}
+        guestMessage={guestMessage}
         googleAuthBusy={providerBusy.google}
         googleAuthMessage={providerMessages.google}
         githubAuthBusy={providerBusy.github}
@@ -1032,6 +1231,7 @@ export const App = (): JSX.Element => {
         skillsRootPath={state.skillsRootPath}
         memorySweepState={memorySweepState}
         memorySweepBusy={memorySweepBusy}
+        onContinueAsGuest={handleContinueAsGuest}
         sessionFolderBusy={sessionFolderBusy}
         onSelectSessionFolder={handleSelectSessionFolder}
         onCreateVault={handleCreateDefaultVault}

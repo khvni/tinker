@@ -1,40 +1,131 @@
 import type { OpencodeClient } from '@opencode-ai/sdk/v2/client';
-import type { Entity } from '@tinker/shared-types';
+import { readDir, readTextFile, stat } from '@tauri-apps/plugin-fs';
 
-const entitySummary = (entity: Entity): string => {
-  const { attributes } = entity;
-  const aliases = entity.aliases.length > 0 ? ` aliases=${entity.aliases.join(', ')}` : '';
-  const sources = entity.sources.map((source) => `${source.service}:${source.ref}`).join(', ');
-  const relativePath =
-    typeof attributes.relativePath === 'string' && attributes.relativePath.length > 0
-      ? ` path=${attributes.relativePath}`
-      : '';
-  const excerpt =
-    typeof attributes.excerpt === 'string' && attributes.excerpt.length > 0
-      ? `\n  excerpt: ${attributes.excerpt}`
-      : '';
-  const links = Array.isArray(attributes.links)
-    ? attributes.links.filter((item): item is string => typeof item === 'string')
-    : [];
-  const linkSummary = links.length > 0 ? `\n  links: ${links.map((link) => `[[${link}]]`).join(', ')}` : '';
+const MAX_MEMORY_FILE_COUNT = 5;
+const MAX_MEMORY_FILE_BYTES = 100 * 1024;
 
-  return `- ${entity.name} [${entity.kind}]${aliases}${relativePath}${sources ? ` sources=${sources}` : ''}${excerpt}${linkSummary}`;
+type MemoryInjectorLogger = (message: string) => void;
+
+export type InjectMemoryContextOptions = {
+  memoryDirectory: string;
+  logger?: MemoryInjectorLogger;
 };
 
-export const buildMemoryContext = (entities: Entity[]): string | null => {
-  if (entities.length === 0) {
+type MemoryFile = {
+  name: string;
+  path: string;
+  modifiedAt: number;
+  text: string;
+};
+
+const defaultLogger: MemoryInjectorLogger = (message) => {
+  console.warn(message);
+};
+
+const isMarkdownFileName = (name: string | undefined): name is string => {
+  return typeof name === 'string' && name.toLowerCase().endsWith('.md');
+};
+
+const joinPath = (base: string, leaf: string): string => {
+  if (base.endsWith('/')) {
+    return `${base}${leaf}`;
+  }
+  if (base.endsWith('\\')) {
+    return `${base}${leaf}`;
+  }
+
+  return base.includes('\\') && !base.includes('/') ? `${base}\\${leaf}` : `${base}/${leaf}`;
+};
+
+export const readRecentMemoryFiles = async (
+  memoryDirectory: string,
+  logger: MemoryInjectorLogger = defaultLogger,
+): Promise<MemoryFile[]> => {
+  const entries = await readDir(memoryDirectory);
+  const candidates = await Promise.all(
+    entries
+      .filter((entry) => entry.isFile && isMarkdownFileName(entry.name))
+      .map(async (entry) => {
+        const name = entry.name;
+        if (!name) {
+          return null;
+        }
+
+        try {
+          const path = joinPath(memoryDirectory, name);
+          const info = await stat(path);
+
+          return {
+            name,
+            path,
+            modifiedAt: info.mtime?.getTime() ?? 0,
+            size: typeof info.size === 'number' ? info.size : 0,
+          };
+        } catch (error) {
+          logger(`Skipping memory file metadata read for "${joinPath(memoryDirectory, name)}": ${String(error)}`);
+          return null;
+        }
+      }),
+  );
+
+  const recentFiles: MemoryFile[] = [];
+  const sortedCandidates = candidates
+    .filter(
+      (
+        candidate,
+      ): candidate is {
+        name: string;
+        path: string;
+        modifiedAt: number;
+        size: number;
+      } => candidate !== null,
+    )
+    .sort((left, right) => right.modifiedAt - left.modifiedAt || left.name.localeCompare(right.name));
+
+  for (const candidate of sortedCandidates) {
+    if (recentFiles.length >= MAX_MEMORY_FILE_COUNT) {
+      break;
+    }
+
+    if (candidate.size > MAX_MEMORY_FILE_BYTES) {
+      logger(`Skipping memory file "${candidate.path}" because it exceeds 100KB.`);
+      continue;
+    }
+
+    try {
+      const text = await readTextFile(candidate.path);
+      recentFiles.push({
+        name: candidate.name,
+        path: candidate.path,
+        modifiedAt: candidate.modifiedAt,
+        text,
+      });
+    } catch (error) {
+      logger(`Skipping unreadable memory file "${candidate.path}": ${String(error)}`);
+    }
+  }
+
+  return recentFiles;
+};
+
+export const buildMemoryContext = (files: readonly MemoryFile[]): string | null => {
+  if (files.length === 0) {
     return null;
   }
 
-  return ['Relevant local memory:', ...entities.map(entitySummary)].join('\n');
+  return [
+    'Relevant local memory:',
+    '',
+    ...files.flatMap((file) => [`## ${file.name}`, file.text.trimEnd(), '']),
+  ].join('\n').trimEnd();
 };
 
 export const injectMemoryContext = async (
   client: Pick<OpencodeClient, 'session'>,
   sessionID: string,
-  entities: Entity[],
+  options: InjectMemoryContextOptions,
 ): Promise<void> => {
-  const text = buildMemoryContext(entities);
+  const text = buildMemoryContext(await readRecentMemoryFiles(options.memoryDirectory, options.logger));
 
   if (!text) {
     return;

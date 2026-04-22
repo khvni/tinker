@@ -69,10 +69,22 @@ fn list_manifests(manifests_dir: &Path) -> Result<Vec<(PathBuf, OpencodeManifest
 
   let mut manifests = Vec::new();
 
+  // Other sidecars (auth-sidecar, etc.) share this manifest directory with
+  // their own schemas. Skip their files by name rather than attempting to
+  // parse them as OpencodeManifest.
+  const FOREIGN_MANIFESTS: &[&str] = &["auth-sidecar.json"];
+
   for entry in entries {
     let entry = entry.map_err(|error| format!("iter {manifests_dir:?}: {error}"))?;
     let path = entry.path();
     if path.extension().and_then(|value| value.to_str()) != Some("json") {
+      continue;
+    }
+    if path
+      .file_name()
+      .and_then(|value| value.to_str())
+      .is_some_and(|name| FOREIGN_MANIFESTS.contains(&name))
+    {
       continue;
     }
 
@@ -87,8 +99,10 @@ fn list_manifests(manifests_dir: &Path) -> Result<Vec<(PathBuf, OpencodeManifest
     match serde_json::from_str::<OpencodeManifest>(&content) {
       Ok(manifest) => manifests.push((path, manifest)),
       Err(error) => {
-        eprintln!("[opencode] removing malformed manifest {path:?}: {error}");
-        let _ = remove_manifest(&path);
+        // Don't delete — the file might belong to a schema we don't recognize
+        // yet (newer/older app version). Log and skip; stale opencode
+        // manifests are pruned by reconcile when their pid no longer exists.
+        eprintln!("[opencode] skipping unrecognised manifest {path:?}: {error}");
       }
     }
   }
@@ -185,15 +199,10 @@ pub async fn start_opencode(
     .shell()
     .sidecar("opencode")
     .map_err(|e| e.to_string())?
-    .args([
-      "serve",
-      "--hostname",
-      "127.0.0.1",
-      "--port",
-      "0",
-      "--cwd",
-      &folder_path,
-    ])
+    // `opencode serve` no longer accepts `--cwd` (removed upstream). The
+    // working directory is set via `.current_dir(&folder_path)` below, which
+    // is the supported path.
+    .args(["serve", "--hostname", "127.0.0.1", "--port", "0"])
     .envs([
       ("OPENCODE_SERVER_USERNAME", username.clone()),
       ("OPENCODE_SERVER_PASSWORD", secret.clone()),
@@ -608,7 +617,7 @@ mod tests {
   }
 
   #[test]
-  fn remove_manifest_for_pid_cleans_malformed_files() {
+  fn remove_manifest_for_pid_skips_malformed_files() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let bogus = tmp.path().join("bogus.json");
     fs::write(&bogus, "{not json").unwrap();
@@ -616,8 +625,22 @@ mod tests {
 
     remove_manifest_for_pid(tmp.path(), 7).expect("remove");
 
-    assert!(!bogus.exists(), "malformed file removed during scan");
+    assert!(bogus.exists(), "unrecognised files are left in place, not deleted");
     assert!(!target.exists());
+  }
+
+  #[test]
+  fn list_manifests_skips_foreign_sidecar_files() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let auth_manifest = tmp.path().join("auth-sidecar.json");
+    fs::write(&auth_manifest, r#"{"pid":1,"port":3147,"secret":"s","baseUrl":"http://127.0.0.1:3147"}"#).unwrap();
+    let opencode_manifest = write_manifest(tmp.path(), "sess", 11);
+
+    let manifests = list_manifests(tmp.path()).expect("list");
+
+    assert_eq!(manifests.len(), 1, "only opencode manifests returned");
+    assert!(auth_manifest.exists(), "foreign sidecar file is preserved");
+    assert!(opencode_manifest.exists());
   }
 
   #[cfg(unix)]

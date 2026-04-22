@@ -8,9 +8,11 @@ type ReasoningPickerProps = {
 };
 
 const REASONING_OPTIONS = [
+  { value: 'default', label: 'Default' },
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },
+  { value: 'xhigh', label: 'X-High' },
 ] as const;
 
 export const ReasoningPicker = ({

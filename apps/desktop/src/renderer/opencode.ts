@@ -63,9 +63,11 @@ const buildStoredModelId = (providerId: string, modelId: string): string => {
 };
 
 const REASONING_VARIANT_ALIASES: Readonly<Record<ReasoningLevel, ReadonlyArray<string>>> = {
+  default: ['default', 'standard', 'normal', 'balanced'],
   low: ['low', 'minimal', 'light'],
-  medium: ['medium', 'balanced', 'default', 'standard', 'normal'],
-  high: ['high', 'max', 'deep', 'extended'],
+  medium: ['medium'],
+  high: ['high', 'deep', 'extended'],
+  xhigh: ['xhigh', 'x-high', 'max', 'highest'],
 };
 
 const normalizeVariantName = (value: string): string => {

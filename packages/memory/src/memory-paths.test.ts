@@ -263,6 +263,7 @@ describe('default memory root resolution', () => {
       }),
     );
     expect(listener).toHaveBeenCalledWith({
+      reason: 'root-changed',
       previousRoot: '/old-memory',
       nextRoot: '/new-memory',
       previousPath: null,
@@ -380,6 +381,7 @@ describe('default memory root resolution', () => {
 
     expect(listener).toHaveBeenCalledTimes(2);
     expect(listener).toHaveBeenNthCalledWith(1, {
+      reason: 'user-changed',
       previousRoot: '/memory-root',
       nextRoot: '/memory-root',
       previousPath: null,
@@ -388,6 +390,7 @@ describe('default memory root resolution', () => {
       nextUserId: 'user-1',
     });
     expect(listener).toHaveBeenNthCalledWith(2, {
+      reason: 'user-changed',
       previousRoot: '/memory-root',
       nextRoot: '/memory-root',
       previousPath: '/memory-root/user-1',

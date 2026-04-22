@@ -11,7 +11,8 @@
   user-select: none;
 }
 
-/* macOS traffic-light reservation. OS draws stoplights over this. 68px matches Paper 9L-0. */
+/* macOS traffic-light reservation. OS draws stoplights over this. 68px matches Paper 9L-0.
+   Inherits `data-tauri-drag-region` from the header so dragging from the top-left works. */
 .tinker-titlebar__spacer {
   width: 68px;
   flex-shrink: 0;
@@ -46,8 +47,10 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+  max-width: 40vw;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tinker-titlebar__actions {

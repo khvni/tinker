@@ -6,6 +6,7 @@ import {
   getUserByProvider,
   hydrateUserRow,
   listUsersByLastSeen,
+  migrateLocalUserIdentity,
   updateLastSeen,
   upsertUser,
   type UserRow,
@@ -239,5 +240,120 @@ describe('user-store helpers', () => {
     await upsertUser(BASE_USER);
 
     await expect(listUsersByLastSeen()).resolves.toEqual([newerUser, BASE_USER, olderUser]);
+  });
+});
+
+describe('migrateLocalUserIdentity', () => {
+  const getDatabaseMock = vi.mocked(getDatabase);
+
+  type MigrationTables = {
+    users: Map<string, { id: string; providerUserId: string }>;
+    layouts: Set<string>;
+    sessions: Map<string, string>;
+  };
+
+  const createMigrationDatabase = (initial: MigrationTables) => {
+    const executes: Array<{ query: string; bind: unknown[] }> = [];
+    return {
+      executes,
+      db: {
+        async execute(query: string, bindValues?: unknown[]): Promise<void> {
+          const bind = bindValues ?? [];
+          executes.push({ query, bind });
+
+          if (query.startsWith('UPDATE users SET id')) {
+            const [newId, legacyId] = bind as [string, string];
+            const existing = initial.users.get(legacyId);
+            if (!existing) return;
+            initial.users.delete(legacyId);
+            initial.users.set(newId, { id: newId, providerUserId: newId });
+            return;
+          }
+
+          if (query.startsWith('UPDATE layouts')) {
+            const [newId, legacyId] = bind as [string, string];
+            if (initial.layouts.delete(legacyId)) {
+              initial.layouts.add(newId);
+            }
+            return;
+          }
+
+          if (query.startsWith('UPDATE sessions')) {
+            const [newId, legacyId] = bind as [string, string];
+            for (const [sessionId, userId] of initial.sessions) {
+              if (userId === legacyId) {
+                initial.sessions.set(sessionId, newId);
+              }
+            }
+            return;
+          }
+
+          throw new Error(`Unexpected migration execute: ${query}`);
+        },
+
+        async select<TRow>(query: string, bindValues?: unknown[]): Promise<TRow> {
+          if (query.includes('SELECT id FROM users')) {
+            const [id] = (bindValues ?? []) as [string];
+            const existing = initial.users.get(id);
+            return (existing ? [{ id: existing.id }] : []) as TRow;
+          }
+          throw new Error(`Unexpected migration select: ${query}`);
+        },
+      },
+    };
+  };
+
+  beforeEach(() => {
+    getDatabaseMock.mockReset();
+  });
+
+  it('renames legacy local user and its layouts + sessions to new id', async () => {
+    const tables: MigrationTables = {
+      users: new Map([['local-user', { id: 'local-user', providerUserId: 'local-user' }]]),
+      layouts: new Set(['local-user']),
+      sessions: new Map([['sess-1', 'local-user']]),
+    };
+    const { db } = createMigrationDatabase(tables);
+    getDatabaseMock.mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDatabase>>);
+
+    await migrateLocalUserIdentity('local-user', 'guest');
+
+    expect(tables.users.has('local-user')).toBe(false);
+    expect(tables.users.get('guest')).toEqual({ id: 'guest', providerUserId: 'guest' });
+    expect(tables.layouts.has('guest')).toBe(true);
+    expect(tables.sessions.get('sess-1')).toBe('guest');
+  });
+
+  it('no-ops when new id already exists', async () => {
+    const tables: MigrationTables = {
+      users: new Map([
+        ['local-user', { id: 'local-user', providerUserId: 'local-user' }],
+        ['guest', { id: 'guest', providerUserId: 'guest' }],
+      ]),
+      layouts: new Set(['local-user', 'guest']),
+      sessions: new Map(),
+    };
+    const { db, executes } = createMigrationDatabase(tables);
+    getDatabaseMock.mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDatabase>>);
+
+    await migrateLocalUserIdentity('local-user', 'guest');
+
+    expect(executes).toHaveLength(0);
+    expect(tables.users.has('local-user')).toBe(true);
+    expect(tables.users.has('guest')).toBe(true);
+  });
+
+  it('no-ops when legacy id is missing', async () => {
+    const tables: MigrationTables = {
+      users: new Map(),
+      layouts: new Set(),
+      sessions: new Map(),
+    };
+    const { db, executes } = createMigrationDatabase(tables);
+    getDatabaseMock.mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDatabase>>);
+
+    await migrateLocalUserIdentity('local-user', 'guest');
+
+    expect(executes).toHaveLength(0);
   });
 });

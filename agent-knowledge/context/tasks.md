@@ -58,6 +58,10 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 | 1.9 | Remove `dockview-react` from `apps/desktop/package.json`. Run `pnpm install`. Verify `pnpm typecheck` passes. | S | 1.8 | review | TIN-10 · PR #62. |
 | 1.10 | Layout snapshot migration: detect old Dockview-shaped JSON in SQLite `layouts` table → delete + re-seed default. Log once. | S | 1.9 | review | TIN-11 · PR #62. One-shot schema migration drops incompatible pre-v1 snapshots. |
 | 1.11 | Workspace sidebar metadata API contract: `GET /workspace.cards` for reads + `POST /workspace.metadata` for contributor pushes. Ship local stub now; keep host-service transport deferred per D25/D17. | S | 1.7 | review | TIN-150 · PR #84. Typed local stub lives in `@tinker/workspace-sidebar` and supports create/update/remove/sort/subscribe flows. |
+| 1.12 | Port workspace shell per Paper `9I-0` + anomalyco architectural shape: mount `WorkspaceSidebar` rail next to `@tinker/panes` content, extract `WorkspaceShell` grid wrapper (D21), reference + spec docs. No `dockview-react`. Panes-only multiplicity preserved; one-pane-per-tab invariant documented. | M | 1.7 | review | TIN-190 · branch `khvni/tin-190`. |
+| 1.13 | Sidebar active-state follows focused pane kind (chat / memory / settings) + avatar renders provider photo with initial fallback + hover tooltips + `aria-current` moves. | S | 1.12 | review | TIN-200 · branch `khvni/sidebar-active-avatar`. |
+| 1.14 | Titlebar polish per Paper `9K-0`: crumb ellipsises at `max-width: 40vw` instead of pushing the brand off-centre; `title={sessionFolderPath}` exposes the full path on hover; `__spacer` documented as drag-region-inheriting so the traffic-light corner stays draggable; double-click on the header asserted to dispatch no internal handler. | S | 1.12 | review | TIN-202 · PR #112 · branch `khvni/tin-202`. |
+| 1.15 | Auto-split workspace on first file open: `openFileInWorkspace()` detects default Chat-only layout, splits vertically, opens file in new pane. Deduplicates by focusing existing file panes. | S | 1.4, 1.7 | review | TIN-197 · PR #114 |
 
 ### M2 — Folder-scoped session (every chat starts in a local directory, per-user)
 Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to current user from M8.
@@ -76,6 +80,7 @@ Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to cur
 | 2.10 | On app quit, stop all running OpenCode instances (best-effort; survive kill -9 via manifest). | S | 2.5 | review | TIN-24 · PR #60 · `khvni/tin-24-ask-user` |
 | 2.11 | Chat history JSONL writer: every OpenCode SSE event from the active session appends one line to `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Buffered + flushed per event. Create dirs on first write. | M | 2.2, 4.2 | review | TIN-25 + TIN-26 · PR #77. Bridge writer reuses Chat SSE subscription, queues per-file appends, and restores session rows from history when SQLite is missing. |
 | 2.12 | Chat history hydration: on session open, read JSONL (if exists) and seed Chat pane with prior messages before the SSE subscription resumes. | M | 2.11 | review | TIN-25 + TIN-26 · PR #77. Hydration replays stored OpenCode events through the same Chat markdown/render path before composer unlock. |
+| 2.13 | Dedupe opencode boot spawn: delete Rust `setup()` warm-start, renderer loading effect drives first `restart_opencode` with full options, auth-change effect skips redundant first fire via ref. Narrow slice of TIN-192 umbrella. | S | 2.4 | review | TIN-191 · PR #110 · `fix/m2/opencode-boot-dedupe`. Umbrella TIN-192 extends this with multi-pane sessions + `$HOME` default + no-op respawn invariant + anomalyco research doc. |
 
 ### M3 — In-line document renderer
 Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
@@ -138,9 +143,9 @@ Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5, M8.3 (current user resol
 | 6.4 | Memory pane (register in M1.5): list `.md` files in the current user's subdir. Click → opens as FilePane tab w/ Markdown renderer (3.9). | M | 6.3, 3.9 | review | TIN-60 · PR #85. Lists current-user markdown files newest-first, opens them in FilePane, and reloads on `memory.path-changed`. |
 | 6.5 | Settings pane: "Memory folder" row with current root path + `<Button>Change location…</Button>`. Opens Tauri folder picker → validates writable → updates setting. | M | 6.3 | review | TIN-61 · PR #69. Active Settings pane shows current root, tooltip-truncated path, picker, and toast-style errors. |
 | 6.6 | On memory-root change: move folder contents (including all `<user-id>/` subdirs) to new location via Tauri fs plugin. Show `<Progress>` modal. On completion, reload memory pane + emit path-changed event. | M | 6.5 | review | TIN-62 · PR #69. Empty-destination move flow adds progress modal, rollback, and `memory.path-changed` pub/sub. |
-| 6.7 | Simple memory injection (MVP): before `session.prompt()`, read up to N most recent `.md` files (default N=5) from `<memory_root>/<current-user-id>/`, prepend as `noReply` system context. Existing `bridge/memory-injector.ts` scaffold extended. | M | 6.3, 4.2 | not started | Recency-only. No semantic ranking. |
-| 6.8 | Simple memory append (MVP, toggleable): after assistant response finishes streaming, write `<memory_root>/<user-id>/sessions/YYYY-MM-DD-HHMM-<session-id>.md` with the user prompt + final assistant message. Setting `app_settings.memory_auto_append` default `true`. | M | 6.3, 4.4 | not started | Append-only. No summarization yet. |
-| 6.9 | Path-change / user-switch propagation: 6.6 AND M8.8 both trigger 6.7/6.8 to re-resolve path + trigger M7.7 (MCP env var refresh). | S | 6.6, 6.7, 6.8, 7.7, 8.8 | not started | Cross-pillar hook. |
+| 6.7 | Simple memory injection (MVP): before `session.prompt()`, read up to N most recent `.md` files (default N=5) from `<memory_root>/<current-user-id>/`, prepend as `noReply` system context. Existing `bridge/memory-injector.ts` scaffold extended. | M | 6.3, 4.2 | review | TIN-63 · PR #97. Top-5 recency only; skips files over 100KB. |
+| 6.8 | Simple memory append (MVP, toggleable): after assistant response finishes streaming, write `<memory_root>/<user-id>/sessions/YYYY-MM-DD-HHMM-<session-id>.md` with the user prompt + final assistant message. Setting `app_settings.memory_auto_append` default `true`. | M | 6.3, 4.4 | review | TIN-64 · PR #97. Append-only; toggle now lives in the Settings pane. |
+| 6.9 | Path-change / user-switch propagation: 6.6 AND M8.8 both trigger 6.7/6.8 to re-resolve path + trigger M7.7 (MCP env var refresh). | S | 6.6, 6.7, 6.8, 7.7, 8.8 | review | TIN-65 · PR #97. Shared `memory.path-changed` event invalidates chat caches + restarts OpenCode on switch/root move. |
 
 ### M7 — Built-in MCP servers (qmd, smart-connections, exa)
 Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
@@ -174,6 +179,7 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | 8.10 | Current-user context: renderer `useCurrentUser()` hook reads session + hydrates from `users` table. App boot blocks on this until resolved or unauthenticated. | M | 8.9 | review | TIN-83 · PR #99. Single source of truth for `user_id` everywhere. |
 | 8.11 | Settings pane: "Account" section shows current user's name + avatar + provider + `<Button>Sign out</Button>`. Sign-out clears keychain + returns to sign-in screen. | M | 8.10 | review | TIN-84 · `AccountPanel` + `settings-pane-runtime` wired through `SettingsPane` → `SettingsShell`. Sign-out routes through existing `auth_sign_out` → `clear_refresh_token`. Legacy `panes/Settings/Settings.*` deleted as part of DELETE step. |
 | 8.12 | Auto-sign-in on cold launch: Rust checks keychain for any refresh token → if found, Better Auth sidecar validates → `useCurrentUser` resolves without showing sign-in screen. If invalid, fall through to sign-in. | M | 8.8, 8.10 | review | TIN-85 · PR #99. Silent sign-in. |
+| 8.16 | Guest-first boot path: cold launch opens Workspace as local `guest`; Better Auth sidecar stays lazy until Settings → Account starts a provider flow; Account adds `Continue as guest` + provider actions. | M | 8.9, 8.13 | review | TIN-188 · PR #104. Seeds guest/provider users on boot, keys layout persistence by active user, and removes boot-time auth-sidecar warm-start. |
 | 8.13 | Per-user memory subdir creation: on successful sign-in, ensure `<memory_root>/<user-id>/` exists. On user-switch, re-resolve. Triggers M6.9. | S | 8.3, 6.3 | review | TIN-86 · PR #86. Active memory-path tracker emits on auth-driven user changes; same-user re-sign-in stays no-op. |
 | 8.14 | Chat-history JSONL file format doc: one line per OpenCode SSE event, `{ ts, event, data }`. Deliverable: short `agent-knowledge/reference/chat-history-format.md`. | S | — | done | TIN-87 · PR #31 merged 2026-04-22. Schema reference for M2.11 + M2.12. |
 | 8.15 | Integration test: sign in as User A → pick folder F → send message → sign out → sign in as User B → folder F session NOT visible in switcher → User B picks folder F → new JSONL created under `.tinker/chats/<user-b-id>/`. Doc result in `docs/mvp-verification.md`. | S | 8.11, 2.7, 2.11 | not started | End-to-end identity-scoping proof. |
@@ -185,6 +191,12 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | X.1 | Repo-wide: add `.cursor/rules` or `.github/copilot-instructions.md` pointing async agents at this file + D25 + claim rules. | S | — | done | TIN-89 · PR #28 merged 2026-04-22. Both `.github/copilot-instructions.md` + `.cursor/rules/tinker.mdc` landed. |
 | X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | done | TIN-90 · PR #29 merged 2026-04-22. |
 | X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | review | TIN-91 · PR #88 · documented with repo-root `pnpm dev:desktop` because `pnpm tauri dev` is not wired in this workspace. |
+
+### Testing infra
+
+| ID | Task | Size | Depends on | Status | Notes |
+|----|------|------|------------|--------|-------|
+| TIN-201 | Visual parity CI gate: Playwright + pixelmatch baselines for Workspace / Memory / Settings panes. | M | X.2 | review | PR #115. Code-baseline approach (not Paper-PNG diff). `dev:web` not `dev:desktop`. |
 
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
 

@@ -9,9 +9,11 @@ describe('SignIn (idle state)', () => {
         nativeRuntimeAvailable
         providerMessages={{}}
         onSignIn={async () => {}}
+        onContinueAsGuest={() => {}}
       />,
     );
     expect(markup).toContain('Sign in to Tinker');
+    expect(markup).toContain('Continue as guest');
     expect(markup).toContain('data-provider="google"');
     expect(markup).toContain('data-state="idle"');
   });
@@ -22,10 +24,11 @@ describe('SignIn (idle state)', () => {
         nativeRuntimeAvailable={false}
         providerMessages={{}}
         onSignIn={async () => {}}
+        onContinueAsGuest={() => {}}
       />,
     );
     const disabledCount = markup.match(/disabled=""/g)?.length ?? 0;
-    expect(disabledCount).toBeGreaterThanOrEqual(3);
+    expect(disabledCount).toBeGreaterThanOrEqual(4);
   });
 
   it('does not render the waiting view in the initial render', () => {
@@ -34,6 +37,7 @@ describe('SignIn (idle state)', () => {
         nativeRuntimeAvailable
         providerMessages={{}}
         onSignIn={async () => {}}
+        onContinueAsGuest={() => {}}
       />,
     );
     expect(markup).not.toContain('data-pending-provider');
@@ -46,6 +50,7 @@ describe('SignIn (idle state)', () => {
         nativeRuntimeAvailable
         providerMessages={{ google: 'Could not reach Google.' }}
         onSignIn={async () => {}}
+        onContinueAsGuest={() => {}}
       />,
     );
     expect(markup).toContain('data-provider-error="google"');

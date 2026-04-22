@@ -41,7 +41,7 @@ Tinker is a per-user app. Each user signs in once with Google, GitHub, or Micros
 
 ### Silent sign-in
 
-- On cold launch: Rust checks keychain for any refresh token → Better Auth sidecar validates it → renderer resolves current user without showing the sign-in screen. Invalid/expired token falls through to the sign-in screen.
+- On cold launch: renderer restores any stored provider session metadata from keychain. If none exist, the app falls back to the local `guest` user and opens Workspace directly. Better Auth sidecar stays lazy until the user explicitly starts provider sign-in from Settings → Account.
 
 ## Out of scope
 
@@ -58,7 +58,7 @@ Tinker is a per-user app. Each user signs in once with Google, GitHub, or Micros
 - Three provider sign-in flows complete successfully (research doc `reference/better-auth-config.md` lists exact redirect URIs + app registrations per provider).
 - Refresh tokens found only in OS keychain. `grep`ing SQLite dumps or files for token strings finds nothing.
 - Sign-in → `users` row upserted → session switcher shows that user's sessions only.
-- Sign-out → keychain cleared → app returns to sign-in screen.
+- Sign-out → keychain cleared → app returns to guest workspace mode.
 - Sign-in as different provider on the same machine → different user row → different session list → different memory subdir.
 - Silent sign-in works on cold launch with a valid refresh token.
 - Every streamed message appended to `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`.

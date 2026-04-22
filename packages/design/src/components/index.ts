@@ -55,3 +55,6 @@ export {
   SelectFolderButton,
   type SelectFolderButtonProps,
 } from './SelectFolderButton/index.js';
+export { ComposerChip, type ComposerChipProps } from './ComposerChip/index.js';
+export { Menu, type MenuItem, type MenuProps } from './Menu/index.js';
+export { PromptComposer, type PromptComposerProps } from './PromptComposer/index.js';

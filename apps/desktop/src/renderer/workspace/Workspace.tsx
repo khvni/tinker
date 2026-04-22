@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { createAttentionStore, type FlashReason } from '@tinker/attention';
 import {
   createWorkspaceStore,
   findActiveTab,
   selectWorkspaceSnapshot,
+  useWorkspaceSelector,
   type PaneRegistry,
   type WorkspaceStore,
   Workspace as PanesWorkspace,
@@ -20,6 +21,7 @@ import {
   type SSOStatus,
   type TinkerPaneData,
   type TinkerPaneKind,
+  type User,
   type WorkspacePreferences,
 } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../bindings.js';
@@ -30,6 +32,8 @@ import { isAbsolutePath, getPanelTitleForPath } from '../renderers/file-utils.js
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
 import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
 import { Titlebar } from './components/Titlebar/index.js';
+import { WorkspaceShell } from './components/WorkspaceShell/index.js';
+import { WorkspaceSidebar } from './components/WorkspaceSidebar/index.js';
 import { openNewChatPanel } from './chat-panels.js';
 import { openWorkspaceFile } from './file-open.js';
 import { createDefaultWorkspaceState } from './layout.default.js';
@@ -47,6 +51,11 @@ const DESKTOP_WORKSPACE_ATTENTION_ID = 'desktop-workspace';
 
 type WorkspaceProps = {
   currentUserId: string;
+  currentUserName: string;
+  currentUserProvider: User['provider'];
+  currentUserEmail: string | null;
+  currentUserAvatarUrl: string | null;
+  nativeRuntimeAvailable: boolean;
   layoutStore: LayoutStore;
   memoryStore: MemoryStore;
   schedulerStore: ScheduledJobStore;
@@ -55,6 +64,8 @@ type WorkspaceProps = {
   modelConnected: boolean;
   modelAuthBusy: boolean;
   modelAuthMessage: string | null;
+  guestBusy: boolean;
+  guestMessage: string | null;
   googleAuthBusy: boolean;
   googleAuthMessage: string | null;
   githubAuthBusy: boolean;
@@ -74,6 +85,7 @@ type WorkspaceProps = {
   skillsRootPath: string | null;
   memorySweepState: MemoryRunState | null;
   memorySweepBusy: boolean;
+  onContinueAsGuest(): Promise<void>;
   sessionFolderBusy: boolean;
   onSelectSessionFolder(): Promise<void>;
   onConnectModel(): Promise<void>;
@@ -133,16 +145,18 @@ const requirePaneData = <K extends TinkerPaneKind>(
 
 export const Workspace = ({
   currentUserId,
+  currentUserName,
+  currentUserProvider,
+  currentUserEmail,
+  currentUserAvatarUrl,
+  nativeRuntimeAvailable,
   layoutStore,
   skillStore,
   modelConnected,
-  opencode,
-  sessions,
-  vaultPath,
-  vaultRevision,
-  activeSkillsRevision,
-  skillsRootPath,
-  onActiveSkillsChanged,
+  modelAuthBusy,
+  modelAuthMessage,
+  guestBusy,
+  guestMessage,
   sessionFolderBusy,
   onSelectSessionFolder,
   googleAuthBusy,
@@ -151,6 +165,19 @@ export const Workspace = ({
   githubAuthMessage,
   microsoftAuthBusy,
   microsoftAuthMessage,
+  opencode,
+  sessions,
+  vaultPath,
+  vaultRevision,
+  activeSkillsRevision,
+  skillsRootPath,
+  onActiveSkillsChanged,
+  onContinueAsGuest,
+  onConnectModel,
+  onDisconnectModel,
+  onConnectGoogle,
+  onConnectGithub,
+  onConnectMicrosoft,
   onDisconnectGoogle,
   onDisconnectGithub,
   onDisconnectMicrosoft,
@@ -170,10 +197,27 @@ export const Workspace = ({
   const saveTimerRef = useRef<number | null>(null);
   const vaultPathRef = useRef<string | null>(vaultPath);
   const workspacePreferencesRef = useRef<WorkspacePreferences>(createDefaultWorkspacePreferences());
+  const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(
+    createDefaultWorkspacePreferences(),
+  );
+
+  const activeRailItem = useWorkspaceSelector<TinkerPaneData, TinkerPaneKind | null>(
+    workspaceStore,
+    (state) => {
+      if (!state.activeTabId) return null;
+      const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
+      if (!tab || !tab.activePaneId) return null;
+      return tab.panes[tab.activePaneId]?.data.kind ?? null;
+    },
+  );
 
   useEffect(() => {
     vaultPathRef.current = vaultPath;
   }, [vaultPath]);
+
+  useEffect(() => {
+    workspacePreferencesRef.current = workspacePreferences;
+  }, [workspacePreferences]);
 
   const resolveAgentPath = useCallback((reportedPath: string): string | null => {
     const resolvedPath = resolveWorkspaceFilePath(reportedPath, vaultPathRef.current);
@@ -259,6 +303,12 @@ export const Workspace = ({
     }, LAYOUT_SAVE_DEBOUNCE_MS);
   }, [saveLayoutNow]);
 
+  const handleWorkspacePreferencesChange = useCallback((nextPreferences: WorkspacePreferences): void => {
+    workspacePreferencesRef.current = nextPreferences;
+    setWorkspacePreferences(nextPreferences);
+    scheduleLayoutSave();
+  }, [scheduleLayoutSave]);
+
   useEffect(() => {
     let active = true;
     const unsubscribe = workspaceStore.subscribe(() => {
@@ -272,7 +322,9 @@ export const Workspace = ({
           return;
         }
 
-        workspacePreferencesRef.current = savedLayout?.preferences ?? createDefaultWorkspacePreferences();
+        const nextPreferences = savedLayout?.preferences ?? createDefaultWorkspacePreferences();
+        workspacePreferencesRef.current = nextPreferences;
+        setWorkspacePreferences(nextPreferences);
 
         if (savedLayout) {
           try {
@@ -458,19 +510,52 @@ export const Workspace = ({
     }
 
     return {
+      nativeRuntimeAvailable,
+      currentUserName,
+      currentUserProvider,
+      currentUserEmail,
+      currentUserAvatarUrl,
       sessions,
       activeSession,
       signOutBusy: activeSession ? busyByProvider[activeSession.provider] : false,
       signOutMessage: activeSession ? messageByProvider[activeSession.provider] : null,
-      onSignOut: async (session: SSOSession) => {
-        await disconnectByProvider[session.provider]();
+      guestBusy,
+      guestMessage,
+      providerBusy: {
+        google: googleAuthBusy,
+        github: githubAuthBusy,
+        microsoft: microsoftAuthBusy,
       },
+      providerMessages: {
+        google: googleAuthMessage,
+        github: githubAuthMessage,
+        microsoft: microsoftAuthMessage,
+      },
+      modelConnected,
+      modelAuthBusy,
+      modelAuthMessage,
+      workspacePreferences,
       opencode,
       vaultPath,
       mcpSeedStatuses,
+      onSignOut: async (session: SSOSession) => {
+        await disconnectByProvider[session.provider]();
+      },
+      onContinueAsGuest,
+      onConnectGoogle,
+      onConnectGithub,
+      onConnectMicrosoft,
+      onConnectModel,
+      onDisconnectModel,
+      onWorkspacePreferencesChange: handleWorkspacePreferencesChange,
       onRequestRespawn: onRequestMcpRespawn,
     };
   }, [
+    nativeRuntimeAvailable,
+    currentUserName,
+    currentUserProvider,
+    currentUserEmail,
+    currentUserAvatarUrl,
     sessions,
     googleAuthBusy,
     googleAuthMessage,
@@ -478,25 +563,58 @@ export const Workspace = ({
     githubAuthMessage,
     microsoftAuthBusy,
     microsoftAuthMessage,
+    guestBusy,
+    guestMessage,
+    modelConnected,
+    modelAuthBusy,
+    modelAuthMessage,
+    onContinueAsGuest,
+    onConnectGoogle,
+    onConnectGithub,
+    onConnectMicrosoft,
+    onConnectModel,
     onDisconnectGoogle,
     onDisconnectGithub,
     onDisconnectMicrosoft,
+    onDisconnectModel,
+    workspacePreferences,
+    handleWorkspacePreferencesChange,
     opencode,
     vaultPath,
     mcpStatus,
     onRequestMcpRespawn,
   ]);
 
-  return (
-    <main className="tinker-workspace-shell">
-      <Titlebar
-        sessionFolderPath={vaultPath}
-        onNewSession={openNewChatPane}
-        onOpenMemory={openMemoryPane}
-        onOpenPlaybook={openPlaybookPane}
-        onOpenSettings={openSettingsPane}
-      />
+  const userInitial = (currentUserId.trim()[0] ?? 'T').toUpperCase();
+  const isGuest = currentUserProvider === 'local';
+  const accountLabel = isGuest
+    ? 'Account · Guest'
+    : `Account · ${currentUserEmail ?? currentUserName}`;
 
+  return (
+    <WorkspaceShell
+      titlebar={
+        <Titlebar
+          sessionFolderPath={vaultPath}
+          onNewSession={openNewChatPane}
+          onOpenMemory={openMemoryPane}
+          onOpenPlaybook={openPlaybookPane}
+          onOpenSettings={openSettingsPane}
+        />
+      }
+      sidebar={
+        <WorkspaceSidebar
+          userInitial={userInitial}
+          avatarUrl={currentUserAvatarUrl}
+          accountLabel={accountLabel}
+          activeRailItem={activeRailItem}
+          onOpenChat={openNewChatPane}
+          onOpenMemory={openMemoryPane}
+          onOpenSettings={openSettingsPane}
+          onOpenAccount={openSettingsPane}
+        />
+      }
+    >
       <ChatPaneRuntimeContext.Provider value={chatPaneRuntime}>
         <SettingsPaneRuntimeContext.Provider value={settingsPaneRuntime}>
           <MemoryPaneRuntimeContext.Provider value={{ currentUserId }}>
@@ -516,6 +634,6 @@ export const Workspace = ({
           </MemoryPaneRuntimeContext.Provider>
         </SettingsPaneRuntimeContext.Provider>
       </ChatPaneRuntimeContext.Provider>
-    </main>
+    </WorkspaceShell>
   );
 };

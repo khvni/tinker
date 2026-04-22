@@ -318,10 +318,11 @@ async fn bootstrap_opencode(
         .and_then(|session| bearer_authorization(session.access_token()));
     let linear_authorization = env_token_authorization(&LINEAR_API_TOKEN_ENV_NAMES);
 
-    let mut sidecar_args = vec!["serve", "--hostname", "127.0.0.1", "--port", "0"];
-    if let Some(folder) = folder_arg {
-        sidecar_args.extend(["--cwd", folder]);
-    }
+    // `opencode serve` no longer accepts `--cwd` (removed upstream). The
+    // working directory is already handed over via `.current_dir(working_dir)`
+    // below, which is the supported path.
+    let _ = folder_arg;
+    let sidecar_args = ["serve", "--hostname", "127.0.0.1", "--port", "0"];
 
     let mut sidecar = app
         .shell()
@@ -445,17 +446,11 @@ pub fn run() {
         ])
         .setup(|app| {
             tauri::async_runtime::block_on(async {
-                if let Err(error) = commands::auth::start_auth_sidecar(app.handle().clone()).await {
-                    eprintln!(
-                        "[better-auth] sidecar warm-start failed (will retry on demand): {error}"
-                    );
-                }
                 if let Err(error) =
                     commands::opencode::reconcile_opencode_manifests(&app.handle()).await
                 {
                     eprintln!("[opencode] orphan manifest cleanup failed: {error}");
                 }
-                bootstrap_opencode(&app.handle(), RestartOpencodeOptions::default()).await?;
                 ensure_main_window(&app.handle())?;
                 Ok::<(), String>(())
             })

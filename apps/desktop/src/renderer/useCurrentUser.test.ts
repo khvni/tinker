@@ -87,9 +87,9 @@ describe('resolveCurrentUser', () => {
     expect(restoreAuthSession).not.toHaveBeenCalled();
     expect(upsertUser).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'local-user',
+        id: 'guest',
         provider: 'local',
-        providerUserId: 'local-user',
+        providerUserId: 'guest',
       }),
     );
   });

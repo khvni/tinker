@@ -1,4 +1,4 @@
-import { StrictMode, Suspense, lazy, type JSX } from 'react';
+import { StrictMode, Suspense, lazy, useEffect, type JSX, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/host-grotesk';
 import '@tinker/panes/styles.css';
@@ -24,18 +24,31 @@ const route = new URLSearchParams(window.location.search).get('route');
 const DesignSystem = lazy(() => import('./routes/design-system.js').then((m) => ({ default: m.DesignSystem })));
 const PanesDemo = lazy(() => import('./routes/panes-demo.js').then((m) => ({ default: m.PanesDemo })));
 
+// `App` owns its own appReady flag; lazy dev routes don't, so we mark them
+// ready once the Suspense boundary resolves (for the visual-test harness).
+const DevRouteReadyMarker = ({ children }: { children: ReactNode }): JSX.Element => {
+  useEffect(() => {
+    document.documentElement.dataset['appReady'] = 'true';
+  }, []);
+  return <>{children}</>;
+};
+
 const renderRoute = (): JSX.Element => {
   if (route === 'design-system') {
     return (
       <Suspense fallback={null}>
-        <DesignSystem />
+        <DevRouteReadyMarker>
+          <DesignSystem />
+        </DevRouteReadyMarker>
       </Suspense>
     );
   }
   if (route === 'panes-demo') {
     return (
       <Suspense fallback={null}>
-        <PanesDemo />
+        <DevRouteReadyMarker>
+          <PanesDemo />
+        </DevRouteReadyMarker>
       </Suspense>
     );
   }
