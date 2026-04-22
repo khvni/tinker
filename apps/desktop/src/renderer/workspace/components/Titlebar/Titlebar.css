@@ -1,0 +1,60 @@
+/* Paper 9K-0 shell: 36h pad 0/16 gap 12 bg bg-panel border subtle. */
+.tinker-titlebar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  flex-shrink: 0;
+  padding: 0 var(--space-4);
+  gap: var(--space-3);
+  background: var(--color-bg-panel);
+  border-bottom: 1px solid var(--color-border-subtle);
+  user-select: none;
+}
+
+/* macOS traffic-light reservation. OS draws stoplights over this. 68px matches Paper 9L-0. */
+.tinker-titlebar__spacer {
+  width: 68px;
+  flex-shrink: 0;
+}
+
+.tinker-titlebar__center {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tinker-titlebar__brand {
+  color: var(--color-text-primary);
+}
+
+.tinker-titlebar__sep {
+  color: var(--color-text-muted);
+}
+
+.tinker-titlebar__crumb {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tinker-titlebar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  min-width: 68px;
+}
