@@ -1,0 +1,55 @@
+.tk-connection-gate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  min-width: 280px;
+  max-width: 420px;
+}
+
+.tk-connection-gate__title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.tk-connection-gate__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tk-connection-gate__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.tk-connection-gate__label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.tk-connection-gate__status {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.tk-connection-gate__row--error .tk-connection-gate__status {
+  color: var(--color-error);
+}
+
+.tk-connection-gate__row--connected .tk-connection-gate__status {
+  color: var(--color-success);
+}
