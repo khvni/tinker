@@ -1,14 +1,18 @@
-import { useState } from "react";
-import type { ToolCall } from "../../seed/types";
+import { useMemo, useState } from "react";
+import type { DemoKey, ToolCall } from "../../seed/types";
+import * as demo1 from "../../seed/demo1-whitespace";
+import * as demo2 from "../../seed/demo2-enrichment";
+import * as demo3 from "../../seed/demo3-meeting";
 
 type Props = {
   open: boolean;
-  calls: ReadonlyArray<ToolCall>;
+  demo: DemoKey;
   onClose: () => void;
 };
 
-export function AuditRail({ open, calls, onClose }: Props) {
+export function AuditRail({ open, demo, onClose }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const calls = useMemo(() => extractCalls(demo), [demo]);
   const totalMs = calls.reduce((s, c) => s + c.durationMs, 0);
 
   return (
@@ -16,13 +20,12 @@ export function AuditRail({ open, calls, onClose }: Props) {
       <header className="audit__head">
         <span className="caps audit__caps">Tool calls · reasoning audit</span>
         <span className="mono audit__summary">
-          <span className="audit__dot" /> {calls.length} call{calls.length === 1 ? "" : "s"} ·
-          {" "}
-          {(totalMs / 1000).toFixed(2)}s total · all grounded
+          <span className="audit__dot" /> {calls.length} call{calls.length === 1 ? "" : "s"} ·{" "}
+          {(totalMs / 1000).toFixed(2)}s · grounded
         </span>
         <div className="audit__spacer" />
-        <button className="audit__close mono" onClick={onClose} aria-label="Hide audit">
-          hide · ⌘ J
+        <button className="audit__close mono" onClick={onClose} aria-label="Hide">
+          hide
         </button>
       </header>
       <ol className="audit__list">
@@ -38,7 +41,7 @@ export function AuditRail({ open, calls, onClose }: Props) {
                 <span className="mono audit__args">{c.args}</span>
                 <span className="audit__spacer" />
                 <span className="mono audit__ms">{c.durationMs}ms</span>
-                <span className="mono audit__result">{c.result}</span>
+                <span className="audit__result">{c.result}</span>
                 <span className="audit__chev" aria-hidden>
                   {isOpen ? "▾" : "▸"}
                 </span>
@@ -59,4 +62,14 @@ export function AuditRail({ open, calls, onClose }: Props) {
       </ol>
     </div>
   );
+}
+
+function extractCalls(demo: DemoKey): ReadonlyArray<ToolCall> {
+  const transcript =
+    demo === "whitespace" ? demo1.transcript : demo === "enrichment" ? demo2.transcript : demo3.transcript;
+  const out: ToolCall[] = [];
+  for (const t of transcript) {
+    if (t.kind === "assistant" && t.toolCalls) out.push(...t.toolCalls);
+  }
+  return out;
 }
