@@ -19,8 +19,21 @@ This PR also patches one blocker discovered during the audit: Chat now reads and
 - Tinker current picker: `docs/assets/model-picker-parity/tinker-model-picker.png`
 - OpenCode reference reconstruction: `docs/assets/model-picker-parity/opencode-reference.png`
 - Side-by-side pair: `docs/assets/model-picker-parity/model-picker-pair.png`
+- Tinker workspace design reference (Paper MCP, light mode): `Tinker Workspace — Light` → `StatusDock` (`D1-0`) → `ModelPill` (`DZ-0`)
 
 Note: the OpenCode image is a static reconstruction from the pinned source + M4.1 anatomy notes. M4.1 captured code-level behavior, not a shipped binary screenshot artifact.
+
+## Paper Reference Check
+
+After the PR was opened, Paper MCP was used against the canonical `Tinker Workspace` file to confirm the current Tinker workspace design intent for the dock-level model pill. In the light artboard, `ModelPill` (`DZ-0`) is:
+
+- white fill with a subtle `#1A16121A` border
+- full-pill radius
+- padding `5px 9px 5px 8px` with `6px` internal gap
+- muted 12/16 provider label (`Default`) plus stronger 12/16 medium-weight model label (`Opus 4.6`)
+- neutral ring glyph at the leading edge, not a provider-branded icon
+
+This matters for the audit because it confirms Tinker's current workspace design language is already intentionally different from OpenCode Desktop's branded trigger pill. TIN-47 still stays a verification task: it documents those deltas, fixes the missing `sessions.model_id` prerequisite, and leaves any deliberate Tinker-vs-OpenCode visual reconciliation to follow-up work.
 
 ## Checklist
 
@@ -52,6 +65,7 @@ Note: the OpenCode image is a static reconstruction from the pinned source + M4.
 - TIN-47 stays a verification task. This PR only patches missing `sessions.model_id` persistence because it blocks a truthful audit.
 - The remaining gaps are documented rather than bundled here to keep the PR atomic and reviewable.
 - Tinker keeps the stronger accessibility baseline already present in `@tinker/design`; parity work should preserve that rather than regress to OpenCode's looser ARIA story.
+- Paper MCP confirms the Tinker workspace's own light-theme `ModelPill` is a neutral dock pill, so provider-branded parity changes need an explicit product decision, not a drive-by style swap inside this review PR.
 
 ## Follow-up
 

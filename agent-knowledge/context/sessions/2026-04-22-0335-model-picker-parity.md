@@ -56,3 +56,14 @@ All commands passed on this branch. No Rust files changed, so `cargo test --lib`
 ## Follow-up
 
 - `TIN-189` tracks the remaining OpenCode parity gaps identified in `docs/model-picker-parity.md`.
+
+## Post-PR Paper validation
+
+Paper MCP became available after the PR was already open, so a second-pass visual audit was run against the canonical `Tinker Workspace` file:
+
+- `get_basic_info` confirmed the light workspace artboard `9I-0`
+- `get_tree_summary` narrowed the target to `StatusDock` (`D1-0`) and `ModelPill` (`DZ-0`)
+- `get_screenshot`, `get_jsx`, and `get_computed_styles` captured the exact light-mode pill values
+- `get_font_family_info` confirmed `Host Grotesk` + `JetBrains Mono` availability
+
+Result: the Paper source-of-truth also uses a neutral dock pill (`Default · Opus 4.6`) rather than OpenCode's provider-branded trigger. That validates the audit's choice to document the OpenCode parity gaps instead of smuggling a broader Tinker design rewrite into `TIN-47`.
