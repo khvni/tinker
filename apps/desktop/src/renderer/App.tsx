@@ -378,7 +378,7 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        let opencode = await invoke<OpencodeConnection>('get_opencode_connection');
+        const opencode = await invoke<OpencodeConnection>('get_opencode_connection');
         const storedVaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         let vaultRevision = 0;
