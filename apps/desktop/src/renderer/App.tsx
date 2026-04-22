@@ -22,9 +22,10 @@ import { DEFAULT_USER_ID, ONBOARDING_KEY, type AuthProvider, type AuthStatus, ty
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
   BUILTIN_MCP_NAMES,
-  checkExaBootHealth,
-  EXA_CHECKING_STATUS,
+  EXA_HEALTH_TIMEOUT_MS,
   EXA_MCP_NAME,
+  formatErrorMessage,
+  normalizeExaBootStatus,
   normalizeMcpRowStatus,
   type MCPStatus,
 } from './integrations.js';
@@ -616,7 +617,8 @@ export const App = (): JSX.Element => {
     }
 
     const connection = state.opencode;
-    const directory = getOpencodeDirectory(state.vaultPath);
+    const vaultPath = state.vaultPath;
+    const directory = getOpencodeDirectory(vaultPath);
     let active = true;
 
     setState((current) => {
@@ -632,63 +634,69 @@ export const App = (): JSX.Element => {
 
     void (async () => {
       const client = createWorkspaceClient(connection, directory);
-      const exaStatus = await checkExaBootHealth(() => client.mcp.status());
+      const timeoutMessage = `MCP status request timed out after ${EXA_HEALTH_TIMEOUT_MS / 1_000}s.`;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      // One status call for all three rows — exa + qmd + smart-connections.
+      // The previous shape fired mcp.status() twice per boot; this collapses
+      // to a single sidecar round-trip and one finalizing setState.
+      const resolvedStatuses: Record<string, MCPStatus> = {};
+      let requestError: string | null = null;
+      try {
+        const response = await new Promise<Awaited<ReturnType<typeof client.mcp.status>>>(
+          (resolve, reject) => {
+            timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), EXA_HEALTH_TIMEOUT_MS);
+            client.mcp.status().then(resolve, reject);
+          },
+        );
+        if (response.data === undefined) {
+          requestError = response.error !== undefined
+            ? formatErrorMessage(response.error)
+            : 'MCP status request returned no data.';
+        } else {
+          resolvedStatuses[EXA_MCP_NAME] = normalizeExaBootStatus(response.data[EXA_MCP_NAME]);
+          for (const name of BUILTIN_MCP_NAMES) {
+            if (name === EXA_MCP_NAME) continue;
+            resolvedStatuses[name] = normalizeMcpRowStatus({
+              name,
+              raw: response.data[name],
+              memoryPath: vaultPath,
+            });
+          }
+        }
+      } catch (error) {
+        requestError = formatErrorMessage(error);
+      } finally {
+        if (timeoutId !== null) {
+          clearTimeout(timeoutId);
+        }
+      }
 
       if (!active) {
         return;
       }
 
-      setState((current) =>
-        current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl
-          ? current
-          : {
-              ...current,
-              mcpStatus: {
-                ...current.mcpStatus,
-                [EXA_MCP_NAME]: exaStatus,
-              },
-            },
-      );
-
-      try {
-        const response = (await client.mcp.status()) as {
-          data?: Record<string, { status?: string; error?: string } | undefined>;
-        };
-        if (!active) {
-          return;
+      setState((current) => {
+        if (current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl) {
+          return current;
         }
-        setState((current) => {
-          if (current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl) {
-            return current;
-          }
-          const nextMcpStatus: Record<string, MCPStatus> = { ...current.mcpStatus };
+        const nextMcpStatus: Record<string, MCPStatus> = { ...current.mcpStatus };
+        if (requestError !== null) {
+          nextMcpStatus[EXA_MCP_NAME] = { status: 'error', error: requestError };
           for (const name of BUILTIN_MCP_NAMES) {
-            nextMcpStatus[name] = normalizeMcpRowStatus({
-              name,
-              raw: response.data?.[name],
-              memoryPath: current.vaultPath,
-            });
+            if (name === EXA_MCP_NAME) continue;
+            nextMcpStatus[name] = { status: 'failed', error: requestError };
           }
-          return { ...current, mcpStatus: nextMcpStatus };
-        });
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        const message = error instanceof Error ? error.message : 'MCP status request failed.';
-        setState((current) => {
-          if (current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl) {
-            return current;
-          }
-          const nextMcpStatus: Record<string, MCPStatus> = { ...current.mcpStatus };
+        } else {
           for (const name of BUILTIN_MCP_NAMES) {
-            if (nextMcpStatus[name]?.status !== 'connected') {
-              nextMcpStatus[name] = { status: 'failed', error: message };
+            const next = resolvedStatuses[name];
+            if (next !== undefined) {
+              nextMcpStatus[name] = next;
             }
           }
-          return { ...current, mcpStatus: nextMcpStatus };
-        });
-      }
+        }
+        return { ...current, mcpStatus: nextMcpStatus };
+      });
     })();
 
     return () => {
@@ -749,7 +757,7 @@ export const App = (): JSX.Element => {
       }
       const nextMcpStatus: Record<string, MCPStatus> = { ...current.mcpStatus };
       for (const name of BUILTIN_MCP_NAMES) {
-        nextMcpStatus[name] = EXA_CHECKING_STATUS;
+        nextMcpStatus[name] = { status: 'checking' };
       }
       return {
         ...current,

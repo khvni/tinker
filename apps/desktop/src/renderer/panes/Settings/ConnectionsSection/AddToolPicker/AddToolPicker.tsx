@@ -1,6 +1,10 @@
 import type { JSX } from 'react';
 import { Modal } from '@tinker/design';
-import { AVAILABLE_MCPS, type AvailableMcp } from './available-mcps.js';
+import {
+  AVAILABLE_MCPS,
+  DEFAULT_UNAVAILABLE_BLURB,
+  type AvailableMcp,
+} from './available-mcps.js';
 import './AddToolPicker.css';
 
 export type AddToolPickerProps = {
@@ -43,7 +47,9 @@ const AddToolPickerCard = ({ mcp }: AddToolPickerCardProps): JSX.Element => {
     >
       <div className="tinker-add-tool-picker__card-body">
         <p className="tinker-add-tool-picker__card-title">{mcp.label}</p>
-        <p className="tinker-add-tool-picker__card-blurb">{mcp.blurb}</p>
+        <p className="tinker-add-tool-picker__card-blurb">
+          {mcp.available ? null : DEFAULT_UNAVAILABLE_BLURB}
+        </p>
       </div>
       <a
         className="tinker-add-tool-picker__ticket"

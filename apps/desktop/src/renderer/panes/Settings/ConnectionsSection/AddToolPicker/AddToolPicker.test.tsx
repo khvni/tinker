@@ -1,7 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AddToolPicker } from './AddToolPicker.js';
-import { AVAILABLE_MCPS } from './available-mcps.js';
+import { AVAILABLE_MCPS, DEFAULT_UNAVAILABLE_BLURB } from './available-mcps.js';
+
+const countOccurrences = (haystack: string, needle: string): number => {
+  if (needle.length === 0) return 0;
+  let count = 0;
+  let index = haystack.indexOf(needle);
+  while (index !== -1) {
+    count += 1;
+    index = haystack.indexOf(needle, index + needle.length);
+  }
+  return count;
+};
 
 describe('AddToolPicker', () => {
   it('renders nothing when closed', () => {
@@ -22,8 +33,11 @@ describe('AddToolPicker', () => {
     expect(disabledCount).toBeGreaterThanOrEqual(AVAILABLE_MCPS.length);
   });
 
-  it('announces placeholder copy', () => {
+  it('renders the shared "coming soon" blurb once per unavailable row', () => {
     const markup = renderToStaticMarkup(<AddToolPicker open onClose={vi.fn()} />);
-    expect(markup).toContain('Coming soon — needs sign-in');
+
+    const unavailableCount = AVAILABLE_MCPS.filter((mcp) => !mcp.available).length;
+    expect(unavailableCount).toBeGreaterThanOrEqual(6);
+    expect(countOccurrences(markup, DEFAULT_UNAVAILABLE_BLURB)).toBe(unavailableCount);
   });
 });

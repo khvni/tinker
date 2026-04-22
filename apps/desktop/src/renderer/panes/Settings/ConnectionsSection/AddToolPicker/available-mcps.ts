@@ -8,17 +8,22 @@
 export type AvailableMcp = {
   readonly id: string;
   readonly label: string;
-  readonly blurb: string;
   readonly ticket: string;
   readonly ticketUrl: string;
   readonly available: boolean;
 };
 
+/**
+ * Blurb rendered on every unavailable MCP card. Lives next to the list so
+ * future "partially available" rows can special-case by reading `available`
+ * directly from the row and swapping this constant for a bespoke copy string.
+ */
+export const DEFAULT_UNAVAILABLE_BLURB = 'Coming soon — needs sign-in';
+
 export const AVAILABLE_MCPS: ReadonlyArray<AvailableMcp> = [
   {
     id: 'github',
     label: 'GitHub',
-    blurb: 'Coming soon — needs sign-in',
     ticket: 'TIN-158',
     ticketUrl: 'https://linear.app/tinker/issue/TIN-158',
     available: false,
@@ -26,7 +31,6 @@ export const AVAILABLE_MCPS: ReadonlyArray<AvailableMcp> = [
   {
     id: 'linear',
     label: 'Linear',
-    blurb: 'Coming soon — needs sign-in',
     ticket: 'TIN-159',
     ticketUrl: 'https://linear.app/tinker/issue/TIN-159',
     available: false,
@@ -34,7 +38,6 @@ export const AVAILABLE_MCPS: ReadonlyArray<AvailableMcp> = [
   {
     id: 'gmail',
     label: 'Gmail',
-    blurb: 'Coming soon — needs sign-in',
     ticket: 'TIN-160',
     ticketUrl: 'https://linear.app/tinker/issue/TIN-160',
     available: false,
@@ -42,7 +45,6 @@ export const AVAILABLE_MCPS: ReadonlyArray<AvailableMcp> = [
   {
     id: 'calendar',
     label: 'Calendar',
-    blurb: 'Coming soon — needs sign-in',
     ticket: 'TIN-161',
     ticketUrl: 'https://linear.app/tinker/issue/TIN-161',
     available: false,
@@ -50,7 +52,6 @@ export const AVAILABLE_MCPS: ReadonlyArray<AvailableMcp> = [
   {
     id: 'drive',
     label: 'Drive',
-    blurb: 'Coming soon — needs sign-in',
     ticket: 'TIN-162',
     ticketUrl: 'https://linear.app/tinker/issue/TIN-162',
     available: false,
@@ -58,7 +59,6 @@ export const AVAILABLE_MCPS: ReadonlyArray<AvailableMcp> = [
   {
     id: 'slack',
     label: 'Slack',
-    blurb: 'Coming soon — needs sign-in',
     ticket: 'TIN-163',
     ticketUrl: 'https://linear.app/tinker/issue/TIN-163',
     available: false,

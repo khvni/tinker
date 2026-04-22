@@ -101,9 +101,8 @@ type MCPStatusResponse = {
 export const EXA_MCP_NAME = 'exa';
 export const EXA_HEALTH_TIMEOUT_MS = 5_000;
 export const EXA_HEALTH_TIMEOUT_MESSAGE = `Exa health check timed out after ${EXA_HEALTH_TIMEOUT_MS / 1_000}s.`;
-export const EXA_CHECKING_STATUS: MCPStatus = { status: 'checking' };
 
-const formatErrorMessage = (error: unknown): string => {
+export const formatErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
   }

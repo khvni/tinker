@@ -8,14 +8,22 @@ import {
 } from '../../integrations.js';
 import { createWorkspaceClient, getOpencodeDirectory } from '../../opencode.js';
 
-const DEFAULT_POLL_INTERVAL_MS = 4_000;
+// Poll 1.5s matches TIN-70 "live status within 1s" intent against a localhost
+// sidecar. MCP status is not on the SSE stream, so polling is the only path.
+const DEFAULT_POLL_INTERVAL_MS = 1_500;
 
 type McpStatusLike = {
   status?: string;
   error?: string;
 };
 
-type McpStatusApiResponse = {
+/**
+ * Structural shape of the parsed SDK response. We narrow `client.mcp.status()`
+ * against this without a double-cast — `data` is optional here so it covers
+ * both the success (`{data, error: undefined}`) and failure
+ * (`{data: undefined, error}`) branches the SDK union produces.
+ */
+type McpStatusApiShape = {
   data?: Record<string, McpStatusLike | undefined> | undefined;
   error?: unknown;
 };
@@ -24,7 +32,7 @@ type McpStatusApiResponse = {
  * Calling shape kept tiny so tests can stub it without pulling in the whole
  * OpenCode SDK. Real callers pass `client.mcp.status`.
  */
-export type LoadMcpStatus = () => Promise<McpStatusApiResponse>;
+export type LoadMcpStatus = () => Promise<McpStatusApiShape>;
 
 export type UseMcpStatusPollingOptions = {
   connection: OpencodeConnection | null;
@@ -83,14 +91,18 @@ export const useMcpStatusPolling = (
     const directory = getOpencodeDirectory(vaultPath);
     return () => {
       const client = createWorkspaceClient(connection, directory);
-      return client.mcp.status() as unknown as Promise<McpStatusApiResponse>;
+      // The generated SDK return type is a discriminated union of
+      // `{data, error: undefined}` and `{data: undefined, error}`.
+      // McpStatusApiShape is a structural supertype; assigning the union to
+      // it is safe and keeps the narrowing work centralized here.
+      return client.mcp.status();
     };
   }, [connection, connectionKey, vaultPath]);
 
   const loader = loadStatus ?? defaultLoader;
 
   const mergeStatuses = useCallback(
-    (response: McpStatusApiResponse) => {
+    (response: McpStatusApiShape) => {
       setStatuses((current) => {
         const next = { ...current };
         if (response.data === undefined) {

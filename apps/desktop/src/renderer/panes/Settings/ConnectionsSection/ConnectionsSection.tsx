@@ -91,25 +91,35 @@ export const ConnectionsSection = ({
 
   const handleRetry = useCallback(
     async (name: BuiltinMcpName): Promise<void> => {
+      // Retry requires a live OpenCode connection — without one we cannot
+      // call `mcp.connect` nor meaningfully respawn the sidecar. Surface the
+      // blocker on the row instead of silently flipping through reconnecting
+      // and back. Caller can sign-in / wait for the boot effect to resolve.
+      if (opencode === null) {
+        setRowStatus(name, {
+          status: 'failed',
+          error: 'OpenCode is not connected yet.',
+        });
+        return;
+      }
+
       setRowStatus(name, { status: 'reconnecting' });
 
       let sdkHandled = false;
-      if (opencode !== null) {
-        try {
-          const directory = getOpencodeDirectory(vaultPath);
-          const client = createWorkspaceClient(opencode, directory);
-          // `client.mcp.connect` may be undefined against an older sidecar
-          // build — fall through to respawn when that happens.
-          const connect = client.mcp?.connect?.bind(client.mcp);
-          if (typeof connect === 'function') {
-            await connect({ name });
-            sdkHandled = true;
-          }
-        } catch (error) {
-          // Fall back to full respawn — see onRequestRespawn prop comment.
-          console.warn(`mcp.connect(${name}) failed, falling back to respawn.`, error);
-          sdkHandled = false;
+      try {
+        const directory = getOpencodeDirectory(vaultPath);
+        const client = createWorkspaceClient(opencode, directory);
+        // `client.mcp.connect` may be undefined against an older sidecar
+        // build — fall through to respawn when that happens.
+        const connect = client.mcp?.connect?.bind(client.mcp);
+        if (typeof connect === 'function') {
+          await connect({ name });
+          sdkHandled = true;
         }
+      } catch (error) {
+        // Fall back to full respawn — see onRequestRespawn prop comment.
+        console.warn(`mcp.connect(${name}) failed, falling back to respawn.`, error);
+        sdkHandled = false;
       }
 
       if (!sdkHandled) {
@@ -144,6 +154,10 @@ export const ConnectionsSection = ({
           const status = statuses[name];
           const rowState = getDotState(status.status);
           const showRetry = status.status !== 'connected' && status.status !== 'checking';
+          const subtitle =
+            status.status === 'connected'
+              ? MCP_SUBTITLES[name]
+              : (status.error ?? getStatusLabel(status.status));
 
           return (
             <li key={name} className="tinker-connections-section__row">
@@ -154,10 +168,7 @@ export const ConnectionsSection = ({
                 />
                 <div className="tinker-connections-section__row-text">
                   <p className="tinker-connections-section__row-title">{MCP_LABELS[name]}</p>
-                  <p className="tinker-muted tinker-connections-section__row-subtitle">
-                    {status.status === 'connected' ? MCP_SUBTITLES[name] : null}
-                    {status.status !== 'connected' ? (status.error ?? getStatusLabel(status.status)) : null}
-                  </p>
+                  <p className="tinker-muted tinker-connections-section__row-subtitle">{subtitle}</p>
                 </div>
               </div>
 
