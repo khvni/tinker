@@ -19,25 +19,25 @@
 .tk-avatar--xs {
   width: 20px;
   height: 20px;
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
 }
 
 .tk-avatar--sm {
   width: 24px;
   height: 24px;
-  font-size: 11px;
+  font-size: var(--font-size-label);
 }
 
 .tk-avatar--md {
   width: 32px;
   height: 32px;
-  font-size: 13px;
+  font-size: var(--font-size-secondary);
 }
 
 .tk-avatar--lg {
   width: 40px;
   height: 40px;
-  font-size: 16px;
+  font-size: var(--font-size-h3);
 }
 
 .tk-avatar--p0 { background: var(--color-accent-soft); }

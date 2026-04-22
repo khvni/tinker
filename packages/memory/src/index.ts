@@ -3,6 +3,7 @@ export * from './entity-extractor.js';
 export * from './events.js';
 export * from './layout-store.js';
 export * from './memory-capture.js';
+export * from './memory-categories.js';
 export * from './memory-files.js';
 export * from './memory-pipeline.js';
 export * from './memory-paths.js';

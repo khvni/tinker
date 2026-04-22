@@ -18,7 +18,7 @@ import {
   type MemoryRunState,
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
-import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User, VaultConfig } from '@tinker/shared-types';
+import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
 import { GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
@@ -32,7 +32,6 @@ import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } f
 import { isTauriRuntime } from './runtime.js';
 import {
   buildStoredUserId,
-  EMPTY_AUTH_STATUS,
   toStoredUser,
   useCurrentUser,
 } from './useCurrentUser.js';
@@ -43,8 +42,9 @@ type BindingKey = string;
 const bindingKey = (folderPath: string, memorySubdir: string, userId: string): BindingKey =>
   `${folderPath}\0${memorySubdir}\0${userId}`;
 
-const defaultConnection = (state: ReadyAppState): OpencodeConnection =>
-  defaultConnection(state)!;
+const defaultConnection = (state: ReadyAppState): OpencodeConnection => {
+  return state.opencodes[state.defaultBindingKey] ?? Object.values(state.opencodes)[0] ?? WEB_PREVIEW_CONNECTION;
+};
 
 const connectionFor = (state: ReadyAppState, key: BindingKey): OpencodeConnection =>
   state.opencodes[key] ?? defaultConnection(state);
@@ -328,6 +328,11 @@ export const App = (): JSX.Element => {
   const refcountsRef = useRef<Record<BindingKey, number>>({});
   const { state: currentUserState, refresh: refreshCurrentUser } = useCurrentUser(nativeRuntime);
 
+  useEffect(() => {
+    const ready = state.status === 'ready' && currentUserState.status === 'ready';
+    document.documentElement.dataset['appReady'] = ready ? 'true' : 'false';
+  }, [state.status, currentUserState.status]);
+
   const requireNativeRuntime = (action: string): void => {
     if (!nativeRuntime) {
       throw new Error(`${action} is unavailable in browser preview. Use pnpm dev:desktop for native app flows.`);
@@ -393,7 +398,7 @@ export const App = (): JSX.Element => {
         return { ...current, opencodes: rest };
       });
     },
-    [nativeRuntime, state.status, state.status === 'ready' ? state.defaultBindingKey : ''],
+    [nativeRuntime, state],
   );
 
   const refreshAllConnectorState = useCallback(
@@ -420,7 +425,7 @@ export const App = (): JSX.Element => {
             },
       );
     },
-    [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null],
+    [nativeRuntime, state],
   );
 
   useEffect(() => {
@@ -500,6 +505,7 @@ export const App = (): JSX.Element => {
           userId: GUEST_USER_ID,
           memorySubdir: guestMemoryPath,
         });
+        await syncConnectorState(opencode, storedVaultPath, sessions);
         const modelConnected = await probeModelConnection(opencode, storedVaultPath);
 
         if (!active) {
@@ -861,7 +867,8 @@ export const App = (): JSX.Element => {
 
     try {
       const memorySubdir = await getActiveMemoryPath(currentUserId);
-      await acquireOpencode(folderPath, memorySubdir, currentUserId);
+      const connection = await acquireOpencode(folderPath, memorySubdir, currentUserId);
+      await syncConnectorState(connection, folderPath, currentSessions);
       await vaultService.init({ path: folderPath, isNew });
       await indexVault({ path: folderPath, isNew });
       await skillStore.init(folderPath);

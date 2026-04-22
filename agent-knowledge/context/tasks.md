@@ -58,6 +58,10 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 | 1.9 | Remove `dockview-react` from `apps/desktop/package.json`. Run `pnpm install`. Verify `pnpm typecheck` passes. | S | 1.8 | review | TIN-10 · PR #62. |
 | 1.10 | Layout snapshot migration: detect old Dockview-shaped JSON in SQLite `layouts` table → delete + re-seed default. Log once. | S | 1.9 | review | TIN-11 · PR #62. One-shot schema migration drops incompatible pre-v1 snapshots. |
 | 1.11 | Workspace sidebar metadata API contract: `GET /workspace.cards` for reads + `POST /workspace.metadata` for contributor pushes. Ship local stub now; keep host-service transport deferred per D25/D17. | S | 1.7 | review | TIN-150 · PR #84. Typed local stub lives in `@tinker/workspace-sidebar` and supports create/update/remove/sort/subscribe flows. |
+| 1.12 | Port workspace shell per Paper `9I-0` + anomalyco architectural shape: mount `WorkspaceSidebar` rail next to `@tinker/panes` content, extract `WorkspaceShell` grid wrapper (D21), reference + spec docs. No `dockview-react`. Panes-only multiplicity preserved; one-pane-per-tab invariant documented. | M | 1.7 | review | TIN-190 · branch `khvni/tin-190`. |
+| 1.13 | Sidebar active-state follows focused pane kind (chat / memory / settings) + avatar renders provider photo with initial fallback + hover tooltips + `aria-current` moves. | S | 1.12 | review | TIN-200 · branch `khvni/sidebar-active-avatar`. |
+| 1.14 | Titlebar polish per Paper `9K-0`: crumb ellipsises at `max-width: 40vw` instead of pushing the brand off-centre; `title={sessionFolderPath}` exposes the full path on hover; `__spacer` documented as drag-region-inheriting so the traffic-light corner stays draggable; double-click on the header asserted to dispatch no internal handler. | S | 1.12 | review | TIN-202 · PR #112 · branch `khvni/tin-202`. |
+| 1.15 | Auto-split workspace on first file open: `openFileInWorkspace()` detects default Chat-only layout, splits vertically, opens file in new pane. Deduplicates by focusing existing file panes. | S | 1.4, 1.7 | review | TIN-197 · PR #114 |
 
 ### M2 — Folder-scoped session (every chat starts in a local directory, per-user)
 Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to current user from M8.
@@ -76,6 +80,7 @@ Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to cur
 | 2.10 | On app quit, stop all running OpenCode instances (best-effort; survive kill -9 via manifest). | S | 2.5 | review | TIN-24 · PR #60 · `khvni/tin-24-ask-user` |
 | 2.11 | Chat history JSONL writer: every OpenCode SSE event from the active session appends one line to `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Buffered + flushed per event. Create dirs on first write. | M | 2.2, 4.2 | review | TIN-25 + TIN-26 · PR #77. Bridge writer reuses Chat SSE subscription, queues per-file appends, and restores session rows from history when SQLite is missing. |
 | 2.12 | Chat history hydration: on session open, read JSONL (if exists) and seed Chat pane with prior messages before the SSE subscription resumes. | M | 2.11 | review | TIN-25 + TIN-26 · PR #77. Hydration replays stored OpenCode events through the same Chat markdown/render path before composer unlock. |
+| 2.13 | Dedupe opencode boot spawn: delete Rust `setup()` warm-start, renderer loading effect drives first `restart_opencode` with full options, auth-change effect skips redundant first fire via ref. Narrow slice of TIN-192 umbrella. | S | 2.4 | review | TIN-191 · PR #110 · `fix/m2/opencode-boot-dedupe`. Umbrella TIN-192 extends this with multi-pane sessions + `$HOME` default + no-op respawn invariant + anomalyco research doc. |
 
 ### M3 — In-line document renderer
 Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
@@ -141,6 +146,7 @@ Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5, M8.3 (current user resol
 | 6.7 | Simple memory injection (MVP): before `session.prompt()`, read up to N most recent `.md` files (default N=5) from `<memory_root>/<current-user-id>/`, prepend as `noReply` system context. Existing `bridge/memory-injector.ts` scaffold extended. | M | 6.3, 4.2 | review | TIN-63 · PR #97. Top-5 recency only; skips files over 100KB. |
 | 6.8 | Simple memory append (MVP, toggleable): after assistant response finishes streaming, write `<memory_root>/<user-id>/sessions/YYYY-MM-DD-HHMM-<session-id>.md` with the user prompt + final assistant message. Setting `app_settings.memory_auto_append` default `true`. | M | 6.3, 4.4 | review | TIN-64 · PR #97. Append-only; toggle now lives in the Settings pane. |
 | 6.9 | Path-change / user-switch propagation: 6.6 AND M8.8 both trigger 6.7/6.8 to re-resolve path + trigger M7.7 (MCP env var refresh). | S | 6.6, 6.7, 6.8, 7.7, 8.8 | review | TIN-65 · PR #97. Shared `memory.path-changed` event invalidates chat caches + restarts OpenCode on switch/root move. |
+| 6.10 | Categorised memory view per Paper IQ-0: `MemorySidebar` (search + filter + Pending/People/Active Work/Capabilities/Preferences/Organization accordion with counts + unread dots) + `MemoryDetail` (header + CONTENT/CHANGES sections + Approve/Dismiss). Rust `memory_approve` / `memory_dismiss` / `memory_diff` commands, frontmatter `kind:` → folder lookup, tombstone log. | L | 6.4 | review | TIN-196 · PR #116. |
 
 ### M7 — Built-in MCP servers (qmd, smart-connections, exa)
 Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
@@ -186,6 +192,12 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | X.1 | Repo-wide: add `.cursor/rules` or `.github/copilot-instructions.md` pointing async agents at this file + D25 + claim rules. | S | — | done | TIN-89 · PR #28 merged 2026-04-22. Both `.github/copilot-instructions.md` + `.cursor/rules/tinker.mdc` landed. |
 | X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | done | TIN-90 · PR #29 merged 2026-04-22. |
 | X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | review | TIN-91 · PR #88 · documented with repo-root `pnpm dev:desktop` because `pnpm tauri dev` is not wired in this workspace. |
+
+### Testing infra
+
+| ID | Task | Size | Depends on | Status | Notes |
+|----|------|------|------------|--------|-------|
+| TIN-201 | Visual parity CI gate: Playwright + pixelmatch baselines for Workspace / Memory / Settings panes. | M | X.2 | review | PR #115. Code-baseline approach (not Paper-PNG diff). `dev:web` not `dev:desktop`. |
 
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
 
@@ -237,6 +249,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
 | TIN-167 | release | Cross-platform tag-triggered GitHub Release pipeline + updater manifest | review | PR #49. Supersedes TIN-164 scope on `v*` tag trigger; reconcile before merge. |
 | TIN-176 | UI.1 | Paper design source audit + tokens.css parity report | review | `agent-knowledge/reference/paper-design-audit.md`. Dark tokens 1:1 match; light surface tokens drift (D23 layer reversal inverted in code). Blocks downstream UI cleanup chain. |
+| TIN-198 | UI.1 | Typography role tokens + Paper 9J-0 parity playground | review | PR #117. Adds `--font-size-*` / `--font-weight-*` / `--line-height-*` role tokens, dark display-weight override, tokenizes remaining literal px values, adds `check-typography-tokens.sh` guard. |
 | TIN-177 + TIN-178 + TIN-181 | 09 | UI trio: `<Modal>` + `<Toast>` provider + `<EmptyState>` primitives in `@tinker/design`; `EmptyState` adopted by Chat / Today / IntegrationsStrip | review | Branch `khvni/ui-design-trio`. One bundled PR. Session: [[2026-04-21-2146-ui-trio]]. Folder-per-component (D21), tokens-only (D14/D23), dual-theme verified. 31 new tests. |
 | TIN-172 | 15 / M7.8 | `<ConnectionGate>` primitive (minimal MCP variant) | review | PR #50. Ships the atom TIN-155 generalizes. |
 | TIN-155 | 15 | `<ConnectionSplash>` full-window splash (generalizes TIN-172) | review | PR stacks on #50. Composes ConnectionGate + Tinker wordmark + spinner + 4 service categories. |

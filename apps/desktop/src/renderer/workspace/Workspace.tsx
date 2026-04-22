@@ -4,6 +4,7 @@ import {
   createWorkspaceStore,
   findActiveTab,
   selectWorkspaceSnapshot,
+  useWorkspaceSelector,
   type PaneRegistry,
   type WorkspaceStore,
   Workspace as PanesWorkspace,
@@ -31,6 +32,8 @@ import { isAbsolutePath, getPanelTitleForPath } from '../renderers/file-utils.js
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
 import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
 import { Titlebar } from './components/Titlebar/index.js';
+import { WorkspaceShell } from './components/WorkspaceShell/index.js';
+import { WorkspaceSidebar } from './components/WorkspaceSidebar/index.js';
 import { openNewChatPanel } from './chat-panels.js';
 import { openWorkspaceFile } from './file-open.js';
 import { createDefaultWorkspaceState } from './layout.default.js';
@@ -180,6 +183,16 @@ export const Workspace = ({
   const workspacePreferencesRef = useRef<WorkspacePreferences>(createDefaultWorkspacePreferences());
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(
     createDefaultWorkspacePreferences(),
+  );
+
+  const activeRailItem = useWorkspaceSelector<TinkerPaneData, TinkerPaneKind | null>(
+    workspaceStore,
+    (state) => {
+      if (!state.activeTabId) return null;
+      const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
+      if (!tab || !tab.activePaneId) return null;
+      return tab.panes[tab.activePaneId]?.data.kind ?? null;
+    },
   );
 
   useEffect(() => {
@@ -553,15 +566,35 @@ export const Workspace = ({
     onRequestMcpRespawn,
   ]);
 
-  return (
-    <main className="tinker-workspace-shell">
-      <Titlebar
-        sessionFolderPath={vaultPath}
-        onNewSession={openNewChatPane}
-        onOpenMemory={openMemoryPane}
-        onOpenSettings={openSettingsPane}
-      />
+  const userInitial = (currentUserId.trim()[0] ?? 'T').toUpperCase();
+  const isGuest = currentUserProvider === 'local';
+  const accountLabel = isGuest
+    ? 'Account · Guest'
+    : `Account · ${currentUserEmail ?? currentUserName}`;
 
+  return (
+    <WorkspaceShell
+      titlebar={
+        <Titlebar
+          sessionFolderPath={vaultPath}
+          onNewSession={openNewChatPane}
+          onOpenMemory={openMemoryPane}
+          onOpenSettings={openSettingsPane}
+        />
+      }
+      sidebar={
+        <WorkspaceSidebar
+          userInitial={userInitial}
+          avatarUrl={currentUserAvatarUrl}
+          accountLabel={accountLabel}
+          activeRailItem={activeRailItem}
+          onOpenChat={openNewChatPane}
+          onOpenMemory={openMemoryPane}
+          onOpenSettings={openSettingsPane}
+          onOpenAccount={openSettingsPane}
+        />
+      }
+    >
       <ChatPaneRuntimeContext.Provider value={chatPaneRuntime}>
         <SettingsPaneRuntimeContext.Provider value={settingsPaneRuntime}>
           <MemoryPaneRuntimeContext.Provider value={{ currentUserId }}>
@@ -579,6 +612,6 @@ export const Workspace = ({
           </MemoryPaneRuntimeContext.Provider>
         </SettingsPaneRuntimeContext.Provider>
       </ChatPaneRuntimeContext.Provider>
-    </main>
+    </WorkspaceShell>
   );
 };

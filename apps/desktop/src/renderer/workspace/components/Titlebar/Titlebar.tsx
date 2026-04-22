@@ -51,7 +51,9 @@ export const Titlebar = ({
             <span className="tinker-titlebar__sep" aria-hidden="true">
               ·
             </span>
-            <span className="tinker-titlebar__crumb">{crumb}</span>
+            <span className="tinker-titlebar__crumb" title={sessionFolderPath ?? undefined}>
+              {crumb}
+            </span>
           </>
         ) : null}
       </div>

@@ -70,8 +70,8 @@ describe('registerWorkspacePaneRenderers', () => {
     expect(settingsMarkup).toContain('Model');
     expect(settingsMarkup).toContain('Memory');
     expect(settingsMarkup).toContain('Connections');
-    expect(memoryMarkup).toContain('Memory files');
     expect(memoryMarkup).toContain('tinker-memory-pane');
-    expect(memoryMarkup).toContain('Loading…');
+    expect(memoryMarkup).toContain('tinker-memory-sidebar');
+    expect(memoryMarkup).toContain('Select a memory entry');
   });
 });

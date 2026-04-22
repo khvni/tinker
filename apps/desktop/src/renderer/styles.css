@@ -83,13 +83,6 @@ textarea {
   align-items: center;
 }
 
-.tinker-workspace-shell {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  width: 100%;
-  background: var(--color-bg-primary);
-}
-
 .tinker-pane {
   display: flex;
   flex-direction: column;
@@ -620,7 +613,7 @@ textarea {
   color: var(--color-text-primary);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  line-height: 1.65;
+  line-height: var(--line-height-relaxed);
   tab-size: 2;
   white-space: pre;
 }
@@ -1164,7 +1157,7 @@ textarea {
   color: var(--color-text-primary);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  line-height: 1.65;
+  line-height: var(--line-height-relaxed);
   tab-size: 2;
   white-space: pre;
 }

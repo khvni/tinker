@@ -1,0 +1,198 @@
+.tinker-memory-sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 280px;
+  min-height: 0;
+  background: var(--color-bg-sidebar);
+  border-right: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+.tinker-memory-sidebar__search-row {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-2);
+  padding: 14px 14px 10px;
+}
+
+.tinker-memory-sidebar__search-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tinker-memory-sidebar__sections {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-1) 6px var(--space-3);
+  overflow-y: auto;
+}
+
+.tinker-memory-sidebar__empty {
+  margin: var(--space-4) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-secondary);
+  line-height: calc(var(--line-height-body) * 1em);
+}
+
+.tinker-memory-sidebar__section {
+  display: flex;
+  flex-direction: column;
+}
+
+.tinker-memory-sidebar__section + .tinker-memory-sidebar__section {
+  margin-top: 6px;
+}
+
+.tinker-memory-sidebar__section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 10px;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tinker-memory-sidebar__section-header:hover {
+  color: var(--color-text-primary);
+}
+
+.tinker-memory-sidebar__section-header--pending {
+  cursor: default;
+}
+
+.tinker-memory-sidebar__section-header--pending:hover {
+  color: var(--color-text-secondary);
+}
+
+.tinker-memory-sidebar__section-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.tinker-memory-sidebar__section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--color-accent-strong);
+}
+
+.tinker-memory-sidebar__section-header--pending .tinker-memory-sidebar__section-icon {
+  color: var(--color-accent-strong);
+}
+
+.tinker-memory-sidebar__section-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  letter-spacing: 0.08em;
+}
+
+.tinker-memory-sidebar__section-count {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tinker-memory-sidebar__section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.tinker-memory-sidebar__section-empty {
+  margin: 6px 10px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-mono);
+  line-height: calc(var(--line-height-mono) * 1em);
+}
+
+.tinker-memory-sidebar__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) 10px;
+  margin: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tinker-memory-sidebar__row:hover {
+  background: var(--color-bg-hover);
+}
+
+.tinker-memory-sidebar__row--selected,
+.tinker-memory-sidebar__row--selected:hover {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.tinker-memory-sidebar__row-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tinker-memory-sidebar__row-title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-secondary);
+  font-weight: 500;
+  line-height: calc(var(--line-height-secondary) * 1em);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tinker-memory-sidebar__row-meta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-label);
+  font-weight: 400;
+  line-height: calc(var(--line-height-label) * 1em);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tinker-memory-sidebar__row-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}

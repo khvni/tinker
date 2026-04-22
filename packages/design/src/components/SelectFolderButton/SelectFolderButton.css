@@ -11,7 +11,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-regular);
-  line-height: 16px;
+  line-height: 16px; /* pixel-aligned for 24px pill — do not tokenize */
   color: var(--color-text-secondary);
   cursor: pointer;
   user-select: none;

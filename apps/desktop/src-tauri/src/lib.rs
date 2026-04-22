@@ -1,7 +1,5 @@
 mod commands;
 
-use std::path::PathBuf;
-
 use tauri::{Manager, RunEvent};
 use tauri_plugin_keyring::KeyringExt;
 
@@ -47,7 +45,10 @@ fn first_non_empty_scope<'a>(scopes: &'a [String], candidates: &[&'a str]) -> Op
             return None;
         }
 
-        candidates.iter().copied().find(|candidate| normalized == *candidate)
+        candidates
+            .iter()
+            .copied()
+            .find(|candidate| normalized == *candidate)
     })
 }
 
@@ -138,6 +139,9 @@ pub fn run() {
             commands::keychain::save_refresh_token,
             commands::keychain::load_refresh_token,
             commands::keychain::clear_refresh_token,
+            commands::memory::memory_approve,
+            commands::memory::memory_dismiss,
+            commands::memory::memory_diff,
             commands::opencode::start_opencode,
             commands::opencode::stop_opencode
         ])
@@ -179,13 +183,21 @@ mod tests {
 
     #[test]
     fn github_session_supports_repo_scopes() {
-        assert!(github_session_supports_mcp(&github_session(&["read:user", "repo"])));
-        assert!(github_session_supports_mcp(&github_session(&["public_repo"])));
+        assert!(github_session_supports_mcp(&github_session(&[
+            "read:user",
+            "repo"
+        ])));
+        assert!(github_session_supports_mcp(&github_session(&[
+            "public_repo"
+        ])));
     }
 
     #[test]
     fn github_session_rejects_identity_only_scopes() {
-        assert!(!github_session_supports_mcp(&github_session(&["read:user", "user:email"])));
+        assert!(!github_session_supports_mcp(&github_session(&[
+            "read:user",
+            "user:email"
+        ])));
     }
 
     #[test]
@@ -196,5 +208,4 @@ mod tests {
         );
         assert_eq!(bearer_authorization("   "), None);
     }
-
 }

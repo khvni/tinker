@@ -109,6 +109,7 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
+  overflow: hidden;
   border-radius: var(--radius-pill);
   background-color: var(--color-bg-hover);
   border: 1px solid var(--color-border-strong);
@@ -116,5 +117,13 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  line-height: 16px;
+  line-height: 16px; /* pixel-aligned for 26px avatar circle — do not tokenize */
+}
+
+.tinker-workspace-sidebar__avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-pill);
 }
