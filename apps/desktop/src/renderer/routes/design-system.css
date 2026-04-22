@@ -164,6 +164,23 @@
   font-size: var(--font-size-sm);
 }
 
+.ds-context-badge-demo {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.ds-context-badge-demo__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
 .ds-spin {
   animation: ds-spin 0.9s linear infinite;
   transform-origin: center;

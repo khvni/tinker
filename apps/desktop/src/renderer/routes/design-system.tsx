@@ -58,6 +58,25 @@ const STATUS_DOTS: ReadonlyArray<{ state: StatusDotState; label: string }> = [
   { state: 'pulse', label: 'Pulse' },
 ];
 
+const CONTEXT_BADGE_STATES: ReadonlyArray<{
+  label: string;
+  percent: number;
+  tokens: number;
+  windowSize: number;
+  model: string;
+}> = [
+  { label: 'Low', percent: 24, tokens: 48_320, windowSize: 200_000, model: 'claude-sonnet-4-6' },
+  { label: 'Mid', percent: 64, tokens: 128_000, windowSize: 200_000, model: 'claude-sonnet-4-6' },
+  { label: 'High', percent: 92, tokens: 184_320, windowSize: 200_000, model: 'claude-sonnet-4-6' },
+];
+
+const CONTEXT_BADGE_TOOLTIP_DEMO = {
+  percent: 64,
+  tokens: 128_000,
+  windowSize: 200_000,
+  model: 'claude-sonnet-4-6',
+} as const;
+
 const PlusIcon = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
     <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -224,10 +243,27 @@ const ComponentsTab = (): JSX.Element => {
 
       <Section label="ContextBadge">
         <Row>
-          <ContextBadge percent={24} tokens={48_320} windowSize={200_000} model="claude-sonnet-4-6" />
-          <ContextBadge percent={64} tokens={128_000} windowSize={200_000} model="claude-sonnet-4-6" />
-          <ContextBadge percent={92} tokens={184_320} windowSize={200_000} model="claude-sonnet-4-6" />
+          {CONTEXT_BADGE_STATES.map((item) => (
+            <span key={item.label} className="ds-status-item">
+              <ContextBadge
+                percent={item.percent}
+                tokens={item.tokens}
+                windowSize={item.windowSize}
+                model={item.model}
+              />
+              <span className="ds-status-item__label">{item.label}</span>
+            </span>
+          ))}
         </Row>
+        <div className="ds-context-badge-demo">
+          <ContextBadge
+            percent={CONTEXT_BADGE_TOOLTIP_DEMO.percent}
+            tokens={CONTEXT_BADGE_TOOLTIP_DEMO.tokens}
+            windowSize={CONTEXT_BADGE_TOOLTIP_DEMO.windowSize}
+            model={CONTEXT_BADGE_TOOLTIP_DEMO.model}
+          />
+          <p className="ds-context-badge-demo__hint">Hover badge to inspect native tooltip counts.</p>
+        </div>
       </Section>
 
       <Section label="SegmentedControl">
