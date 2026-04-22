@@ -53,10 +53,16 @@ vi.mock('@tinker/bridge', () => ({
     (async function* () {
       // no-op
     })(),
+  createChatHistoryWriter: () => ({ append: () => Promise.resolve(), close: () => Promise.resolve() }),
+  findLatestChatHistorySessionId: () => Promise.resolve(null),
+  readChatHistory: () => Promise.resolve([]),
 }));
 
 vi.mock('@tinker/memory', () => ({
   resolveRelevantEntities: () => Promise.resolve([]),
+  createSession: () => Promise.resolve(),
+  findLatestSessionForFolder: () => Promise.resolve(null),
+  updateLastActive: () => Promise.resolve(),
 }));
 
 vi.mock('../../memory.js', () => ({
@@ -89,12 +95,14 @@ const noopSkillStore: SkillStore = {
 
 const baseProps = {
   skillStore: noopSkillStore,
+  currentUserId: 'test-user',
   modelConnected: false,
   opencode: {
     baseUrl: 'http://localhost:0',
     username: 'test',
     password: 'test',
   },
+  sessionFolderPath: null,
   vaultPath: null,
   activeSkillsRevision: 0,
 };
