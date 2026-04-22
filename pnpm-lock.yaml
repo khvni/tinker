@@ -57,6 +57,9 @@ importers:
       '@tauri-apps/plugin-sql':
         specifier: ^2.4.0
         version: 2.4.0
+      '@tinker/attention':
+        specifier: workspace:*
+        version: link:../../packages/attention
       '@tinker/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
@@ -254,6 +257,9 @@ importers:
 
   packages/panes:
     dependencies:
+      '@tinker/attention':
+        specifier: workspace:*
+        version: link:../attention
       zustand:
         specifier: ^5.0.2
         version: 5.0.12(@types/react@19.2.14)(react@19.2.5)
