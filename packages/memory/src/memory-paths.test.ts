@@ -45,16 +45,14 @@ vi.mock('./settings-store.js', () => ({
 }));
 
 import {
-  emitActiveMemoryPathChanged,
   defaultMemoryRootSegments,
   detectMemoryRootPlatform,
   ensureDefaultMemoryRoot,
   getActiveMemoryPath,
   getMemoryRoot,
   moveMemoryRoot,
-  resolveActiveMemoryPathChange,
   resolveDefaultMemoryRoot,
-  subscribeActiveMemoryPathChanged,
+  syncActiveMemoryPath,
   subscribeMemoryPathChanged,
   validateMemoryRootWritable,
 } from './memory-paths.js';
@@ -267,6 +265,10 @@ describe('default memory root resolution', () => {
     expect(listener).toHaveBeenCalledWith({
       previousRoot: '/old-memory',
       nextRoot: '/new-memory',
+      previousPath: null,
+      nextPath: null,
+      previousUserId: null,
+      nextUserId: null,
     });
     expect(progress).toHaveBeenNthCalledWith(1, {
       copiedFiles: 0,
@@ -363,45 +365,35 @@ describe('default memory root resolution', () => {
     expect(mockRemove).not.toHaveBeenCalledWith('/old-memory', { recursive: true });
     expect(listener).not.toHaveBeenCalled();
   });
-});
 
-describe('active memory path change helpers', () => {
-  it('returns null when active user and path stay the same', () => {
-    expect(
-      resolveActiveMemoryPathChange(
-        { userId: 'google:user-1', path: '/tmp/memory/google:user-1' },
-        { userId: 'google:user-1', path: '/tmp/memory/google:user-1' },
-      ),
-    ).toBeNull();
-  });
+  it('emits only when the active user path changes', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/memory-root'));
 
-  it('describes the switch when the active user changes', () => {
-    expect(
-      resolveActiveMemoryPathChange(
-        { userId: 'google:user-1', path: '/tmp/memory/google:user-1' },
-        { userId: 'github:user-2', path: '/tmp/memory/github:user-2' },
-      ),
-    ).toEqual({
-      previousPath: '/tmp/memory/google:user-1',
-      nextPath: '/tmp/memory/github:user-2',
-      previousUserId: 'google:user-1',
-      nextUserId: 'github:user-2',
-    });
-  });
-
-  it('notifies active memory path subscribers when emitted', () => {
     const listener = vi.fn();
-    const unsubscribe = subscribeActiveMemoryPathChanged(listener);
-    const detail = {
-      previousPath: '/tmp/memory/google:user-1',
-      nextPath: '/tmp/memory/github:user-2',
-      previousUserId: 'google:user-1',
-      nextUserId: 'github:user-2',
-    };
+    const unsubscribe = subscribeMemoryPathChanged(listener);
 
-    emitActiveMemoryPathChanged(detail);
+    await expect(syncActiveMemoryPath('user-1', { runtimePlatform: 'linux' })).resolves.toBe('/memory-root/user-1');
+    await expect(syncActiveMemoryPath('user-1', { runtimePlatform: 'linux' })).resolves.toBe('/memory-root/user-1');
+    await expect(syncActiveMemoryPath('user-2', { runtimePlatform: 'linux' })).resolves.toBe('/memory-root/user-2');
+
     unsubscribe();
 
-    expect(listener).toHaveBeenCalledWith(detail);
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenNthCalledWith(1, {
+      previousRoot: '/memory-root',
+      nextRoot: '/memory-root',
+      previousPath: null,
+      nextPath: '/memory-root/user-1',
+      previousUserId: null,
+      nextUserId: 'user-1',
+    });
+    expect(listener).toHaveBeenNthCalledWith(2, {
+      previousRoot: '/memory-root',
+      nextRoot: '/memory-root',
+      previousPath: '/memory-root/user-1',
+      nextPath: '/memory-root/user-2',
+      previousUserId: 'user-1',
+      nextUserId: 'user-2',
+    });
   });
 });

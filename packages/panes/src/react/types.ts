@@ -1,3 +1,4 @@
+import type { AttentionStore } from '@tinker/attention';
 import type { ComponentType, ReactNode } from 'react';
 import type { DropTarget, Pane, StackId, Tab } from '../types.js';
 import type { WorkspaceStore } from '../core/store/store.js';
@@ -33,6 +34,11 @@ export type TabStripAction = {
   readonly disabled?: boolean;
 };
 
+export type WorkspaceAttentionConfig = {
+  readonly store: AttentionStore;
+  readonly workspaceId: string;
+};
+
 export type DropPaneEvent = {
   readonly tabId: string;
   readonly sourcePaneId: string;
@@ -43,6 +49,7 @@ export type DropPaneEvent = {
 export type WorkspaceProps<TData> = {
   readonly store: WorkspaceStore<TData>;
   readonly registry: PaneRegistry<TData>;
+  readonly attention?: WorkspaceAttentionConfig;
   /** Rendered on the right side of the workspace tab strip. Good spot for "+" or menu. */
   readonly tabStripActions?: ReadonlyArray<TabStripAction>;
   /** Intercept a pane drop. If supplied, the consumer drives movement themselves. */

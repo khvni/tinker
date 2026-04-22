@@ -76,6 +76,8 @@ type ChatProps = {
   onOpenFileLink?: (path: string) => void;
   onOpenNewChat?: () => void;
   onMemoryCommitted?: () => void;
+  paneIsActive?: boolean;
+  onAttentionSignal?: (reason: 'notification-arrival') => void;
   modeToggleSlot?: ReactNode;
   reasoningPickerSlot?: ReactNode;
 };
@@ -219,6 +221,8 @@ export const Chat = ({
   onOpenFileLink,
   onOpenNewChat,
   onMemoryCommitted,
+  paneIsActive = true,
+  onAttentionSignal,
   modeToggleSlot,
   reasoningPickerSlot,
 }: ChatProps): JSX.Element => {
@@ -252,6 +256,7 @@ export const Chat = ({
   const abortRequestedRef = useRef(false);
   const contextUsageSnapshotRef = useRef<ContextUsageSnapshot | null>(null);
   const draftBlocksRef = useRef<Block[]>([]);
+  const attentionRaisedForDraftRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const lastTailSignatureRef = useRef('empty');
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
@@ -447,6 +452,37 @@ export const Chat = ({
   useEffect(() => {
     draftBlocksRef.current = draftBlocks;
   }, [draftBlocks]);
+
+  useEffect(() => {
+    if (paneIsActive) {
+      attentionRaisedForDraftRef.current = false;
+      return;
+    }
+
+    if (attentionRaisedForDraftRef.current || !busy || draftBlocks.length === 0) {
+      return;
+    }
+
+    const hasAssistantActivity = draftBlocks.some((block) => {
+      if (block.kind === 'text') {
+        return block.text.trim().length > 0;
+      }
+
+      return true;
+    });
+    if (!hasAssistantActivity) {
+      return;
+    }
+
+    attentionRaisedForDraftRef.current = true;
+    onAttentionSignal?.('notification-arrival');
+  }, [busy, draftBlocks, onAttentionSignal, paneIsActive]);
+
+  useEffect(() => {
+    if (!busy && draftBlocks.length === 0) {
+      attentionRaisedForDraftRef.current = false;
+    }
+  }, [busy, draftBlocks.length]);
 
   useLayoutEffect(() => {
     syncComposerHeight(composerRef.current);
