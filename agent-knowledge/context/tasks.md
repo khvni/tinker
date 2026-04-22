@@ -149,8 +149,8 @@ Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
 |----|------|------|------------|--------|-------|
 | 7.1 | Strip `opencode.json` → only `qmd`, `smart-connections`, `exa`. Remove `github`, `linear` (additional MCP integrations deferred). Keep `better-auth` entry ONLY if the Better Auth sidecar needs it — otherwise remove (Better Auth in MVP is a local sidecar, not an MCP). | S | — | done | TIN-66 · PR #26 merged 2026-04-22. |
 | 7.2 | Ensure `exa` works zero-config: it's remote, no env needed. Add boot-time check that calls exa's health MCP. | S | 7.1 | review | TIN-67 · PR #42 opened 2026-04-21. |
-| 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` = `<memory_root>/<current-user-id>/` from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | not started | Env var injection at spawn. |
-| 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = same per-user subdir from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | not started | Mirror of 7.3. |
+| 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` = `<memory_root>/<current-user-id>/` from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | review | TIN-68 + TIN-69 · PR #91. Restart path now takes explicit `user_id` + `memory_subdir` and boot/auth flows use it. |
+| 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = same per-user subdir from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | review | TIN-68 + TIN-69 · PR #91. Shared restart flow reuses the same per-user memory subdir for both MCPs. |
 | 7.5 | Settings pane: "Integrations" section lists 3 MCPs with status (connected/error). Calls OpenCode SDK `mcp.list()` on mount. | M | 7.1, 6.5 | not started | Status only, no config. |
 | 7.6 | Per-MCP retry button in Settings: calls `mcp.reconnect(name)` SDK method (or restarts sidecar if SDK doesn't expose). | S | 7.5 | not started | Recovery. |
 | 7.7 | Memory-root change OR user-switch triggers MCP refresh: stop OpenCode → respawn with new env → MCPs reconnect. Triggered by 6.9 (path change) and 8.8 (sign-out/in). | M | 7.3, 7.4, 6.6, 8.8 | not started | Invalidation path. |
