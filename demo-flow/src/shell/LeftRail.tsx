@@ -57,7 +57,7 @@ export function LeftRail({ route, onNavigate }: Props) {
       </div>
       <div className="rail__divider" />
       <div className="rail__bottom">
-        <button className="rail__slot" aria-label="Playbook — new skills available">
+        <button className="rail__slot" aria-label="Wavelength — new skills available">
           <ShieldCheckIcon />
           <span className="rail__notify-dot" />
         </button>
