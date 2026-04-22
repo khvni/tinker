@@ -6,6 +6,11 @@ export { ContextBadge, type ContextBadgeProps } from './ContextBadge.js';
 export { StatusDot, type StatusDotState } from './StatusDot.js';
 export { SegmentedControl, type SegmentedControlOption } from './SegmentedControl.js';
 export { Toggle } from './Toggle.js';
+export {
+  Disclosure,
+  type DisclosureProps,
+  type DisclosureTone,
+} from './Disclosure/index.js';
 export { TextInput } from './TextInput.js';
 export { SearchInput } from './SearchInput.js';
 export { Textarea } from './Textarea.js';

@@ -1,11 +1,21 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent,
+} from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
 import { Badge, Button, ModelPicker, Textarea } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities } from '@tinker/memory';
 import type { SkillStore } from '@tinker/shared-types';
-import type { OpencodeConnection } from '../../bindings.js';
-import { captureConversationMemory } from '../memory.js';
+import type { OpencodeConnection } from '../../../bindings.js';
+import { captureConversationMemory } from '../../memory.js';
 import {
   buildModelPickerItems,
   createWorkspaceClient,
@@ -13,15 +23,21 @@ import {
   getOpencodeDirectory,
   pickDefaultModelOptionId,
   type WorkspaceModelOption,
-} from '../opencode.js';
-import { ChatMessage, useStreamingMarkdown } from './ChatMessage/index.js';
-import { calculateComposerHeight, shouldAbortComposerKey, shouldSubmitComposerKey } from './chat-composer.js';
-import { useSessionHistoryWindow } from './useSessionHistoryWindow.js';
+} from '../../opencode.js';
+import { ChatMessage } from '../ChatMessage/index.js';
+import {
+  calculateComposerHeight,
+  shouldAbortComposerKey,
+  shouldSubmitComposerKey,
+} from '../chat-composer.js';
+import { useSessionHistoryWindow } from '../useSessionHistoryWindow.js';
+import { messageTextFromBlocks, MessageBlock, partToBlock, type Block } from './Block.js';
+import { draftReducer } from './draftReducer.js';
 
 type ChatMessageRecord = {
   id: string;
   role: 'user' | 'assistant' | 'system';
-  text: string;
+  blocks: Block[];
 };
 
 type ChatProps = {
@@ -37,15 +53,24 @@ type ChatProps = {
 
 const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessageRecord[] => {
   return messages.map(({ info, parts }) => {
-    const text = parts
-      .filter((part): part is Extract<Part, { type: 'text' }> => part.type === 'text')
-      .map((part) => part.text)
-      .join('');
+    const blocks: Block[] = [];
+    for (const part of parts) {
+      const block = partToBlock(part);
+      if (block) {
+        blocks.push(block);
+      }
+    }
+
+    const hasText = blocks.some((block) => block.kind === 'text' && block.text.length > 0);
+    if (!hasText && (info.role !== 'assistant' || blocks.length === 0)) {
+      const placeholder = info.role === 'assistant' ? 'Response contained only non-text output.' : 'Message sent.';
+      blocks.push({ kind: 'text', partID: `placeholder-${info.id}`, text: placeholder });
+    }
 
     return {
       id: info.id,
       role: info.role,
-      text: text.length > 0 ? text : info.role === 'assistant' ? 'Response contained only non-text output.' : 'Message sent.',
+      blocks,
     };
   });
 };
@@ -112,18 +137,23 @@ export const Chat = ({
   const [messages, setMessages] = useState<ChatMessageRecord[]>([]);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const streaming = useStreamingMarkdown();
+  const [draftBlocks, dispatchDraft] = useReducer(draftReducer, []);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [modelOptions, setModelOptions] = useState<ReadonlyArray<WorkspaceModelOption>>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>();
   const [modelOptionsLoading, setModelOptionsLoading] = useState(true);
   const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
+  // Global default applied where no per-disclosure override exists. ⌥T flips this and clears overrides.
+  const [defaultDisclosureOpen, setDefaultDisclosureOpen] = useState(false);
+  const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
   const mountedRef = useRef(true);
   const sessionIDRef = useRef<string | null>(null);
   const memoryCommitRef = useRef<Promise<void>>(Promise.resolve());
+  const chatLogRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRequestedRef = useRef(false);
+  const draftBlocksRef = useRef<Block[]>([]);
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
 
   useEffect(() => {
@@ -196,16 +226,62 @@ export const Chat = ({
       void client.session.abort({ sessionID: existing });
     }
     setMessages([]);
-    streaming.reset();
+    dispatchDraft({ type: 'reset' });
     setHistoryCursor(null);
     setHistoryLoading(false);
-  }, [activeSkillsRevision, client, streaming]);
+    setDisclosureOverrides({});
+    setDefaultDisclosureOpen(false);
+  }, [activeSkillsRevision, client]);
+
+  useEffect(() => {
+    draftBlocksRef.current = draftBlocks;
+  }, [draftBlocks]);
 
   useLayoutEffect(() => {
     syncComposerHeight(composerRef.current);
   }, [input]);
 
-  const loadHistoryPage = async (sessionID: string, before?: string): Promise<{ messages: ChatMessageRecord[]; cursor: string | null }> => {
+  // ⌥T toggles the global disclosure default. Listener is scoped to the chat
+  // log container so it never fires while typing in inputs / textareas, never
+  // intercepts macOS Option+T (`†`) for other panes, and only one Chat pane
+  // (the focused one) reacts.
+  useEffect(() => {
+    const node = chatLogRef.current;
+    if (!node) {
+      return;
+    }
+    const handler = (event: globalThis.KeyboardEvent): void => {
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
+        return;
+      }
+      if (event.key !== 't' && event.key !== 'T' && event.key !== '†') {
+        return;
+      }
+      event.preventDefault();
+      setDefaultDisclosureOpen((current) => !current);
+      setDisclosureOverrides({});
+    };
+    node.addEventListener('keydown', handler);
+    return () => {
+      node.removeEventListener('keydown', handler);
+    };
+  }, []);
+
+  // Per-disclosure override wins over the global default; ⌥T clears overrides
+  // so the new global default takes over uniformly.
+  const isDisclosureOpen = (partID: string): boolean => {
+    const override = disclosureOverrides[partID];
+    return override === undefined ? defaultDisclosureOpen : override;
+  };
+
+  const handleDisclosureToggle = useCallback((partID: string, next: boolean): void => {
+    setDisclosureOverrides((current) => ({ ...current, [partID]: next }));
+  }, []);
+
+  const loadHistoryPage = async (
+    sessionID: string,
+    before?: string,
+  ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null }> => {
     const history = await client.session.messages({
       sessionID,
       limit: 100,
@@ -259,6 +335,11 @@ export const Chat = ({
     isLoading: historyLoading,
     loadMore: loadOlderHistory,
   });
+
+  const setLogScroller = useCallback((node: HTMLDivElement | null): void => {
+    chatLogRef.current = node;
+    historyWindow.setScroller(node);
+  }, [historyWindow]);
 
   const ensureSession = async (): Promise<string> => {
     if (sessionIDRef.current) {
@@ -341,9 +422,16 @@ export const Chat = ({
     abortRequestedRef.current = false;
     setBusy(true);
     setStatus('Waiting for OpenCode…');
-    setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', text }]);
+    setMessages((current) => [
+      ...current,
+      {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        blocks: [{ kind: 'text', partID: `user-${Date.now()}-text`, text }],
+      },
+    ]);
     setInput('');
-    streaming.reset();
+    dispatchDraft({ type: 'reset' });
 
     try {
       const activeSessionID = await ensureSession();
@@ -365,20 +453,20 @@ export const Chat = ({
       }
 
       const stream = streamSessionEvents(client, activeSessionID);
-      const toolResults: Array<{ name: string; output: string }> = [];
       const consumeStream = (async () => {
         for await (const event of stream) {
           if (!mountedRef.current) {
             return;
           }
 
-          if (event.type === 'token') {
-            streaming.append(event.text);
-          } else if (event.type === 'tool_call') {
-            setStatus(`Running ${event.name}…`);
-          } else if (event.type === 'tool_result') {
-            setStatus(`${event.name} finished.`);
-            toolResults.push({ name: event.name, output: event.output });
+          if (
+            event.type === 'token'
+            || event.type === 'reasoning'
+            || event.type === 'tool_call'
+            || event.type === 'tool_result'
+            || event.type === 'tool_error'
+          ) {
+            dispatchDraft({ type: 'event', event });
           } else if (event.type === 'file_written') {
             onFileWritten?.(event.path);
           } else if (event.type === 'error') {
@@ -404,17 +492,18 @@ export const Chat = ({
       await consumeStream;
 
       const aborted = abortRequestedRef.current;
-      const partialDraft = streaming.read().trim();
+      const partialBlocks = draftBlocksRef.current;
+      const partialText = messageTextFromBlocks(partialBlocks).trim();
       const historyPage = await refreshHistory(activeSessionID);
       if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
         return;
       }
 
-      streaming.reset();
-
-      if (aborted && partialDraft.length > 0) {
+      if (aborted && partialText.length > 0) {
         const historyAlreadyHasPartial = historyPage?.messages.some(
-          (message) => message.role === 'assistant' && message.text === partialDraft,
+          (message) =>
+            message.role === 'assistant'
+            && messageTextFromBlocks(message.blocks).trim() === partialText,
         );
 
         if (!historyAlreadyHasPartial) {
@@ -423,15 +512,25 @@ export const Chat = ({
             {
               id: `assistant-abort-${Date.now()}`,
               role: 'assistant',
-              text: partialDraft,
+              blocks: partialBlocks,
             },
           ]);
         }
       }
 
-      const assistantMessage = historyPage?.messages
+      dispatchDraft({ type: 'reset' });
+
+      const assistantMessageRecord = historyPage?.messages
         .filter((message) => message.role === 'assistant')
-        .at(-1)?.text;
+        .at(-1);
+      const assistantMessage = assistantMessageRecord
+        ? messageTextFromBlocks(assistantMessageRecord.blocks)
+        : undefined;
+      const toolResults = (assistantMessageRecord?.blocks ?? []).flatMap((block) =>
+        block.kind === 'tool' && block.state === 'completed' && typeof block.output === 'string'
+          ? [{ name: block.name, output: block.output }]
+          : [],
+      );
       if (!aborted && assistantMessage && vaultPath) {
         memoryCommitRef.current = memoryCommitRef.current.then(async () => {
           try {
@@ -460,7 +559,13 @@ export const Chat = ({
         {
           id: `system-${Date.now()}`,
           role: 'system',
-          text: error instanceof Error ? error.message : String(error),
+          blocks: [
+            {
+              kind: 'text',
+              partID: `system-${Date.now()}-text`,
+              text: error instanceof Error ? error.message : String(error),
+            },
+          ],
         },
       ]);
       setStatus('Chat hit an error.');
@@ -507,13 +612,21 @@ export const Chat = ({
               New chat tab
             </Button>
           ) : null}
+          <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
+            ⌥T thinking
+          </span>
           <Badge variant="default" size="small">
             {status}
           </Badge>
         </div>
       </header>
 
-      <div className="tinker-chat-log" ref={historyWindow.setScroller} onScroll={historyWindow.handleScroll}>
+      <div
+        className="tinker-chat-log"
+        ref={setLogScroller}
+        onScroll={historyWindow.handleScroll}
+        tabIndex={-1}
+      >
         {messages.length === 0 ? (
           <div className="tinker-message tinker-message--system">
             {modelConnected
@@ -522,17 +635,47 @@ export const Chat = ({
           </div>
         ) : null}
 
-        {historyWindow.renderedMessages.map((message) => (
-          <ChatMessage
-            key={message.id}
-            role={message.role}
-            text={message.text}
-          />
-        ))}
+        {historyWindow.renderedMessages.flatMap((message) =>
+          message.blocks.map((block) => {
+            if (block.kind === 'text') {
+              return (
+                <ChatMessage
+                  key={block.partID}
+                  role={message.role}
+                  text={block.text}
+                />
+              );
+            }
 
-        {streaming.text.length > 0 ? (
-          <ChatMessage role="assistant" text={streaming.text} streaming />
-        ) : null}
+            return (
+              <MessageBlock
+                key={block.partID}
+                block={block}
+                isOpen={isDisclosureOpen(block.partID)}
+                onToggle={(next) => handleDisclosureToggle(block.partID, next)}
+              />
+            );
+          }),
+        )}
+
+        {draftBlocks.length > 0
+          ? draftBlocks.map((block) => {
+              if (block.kind === 'text') {
+                return (
+                  <ChatMessage key={block.partID} role="assistant" text={block.text} streaming />
+                );
+              }
+
+              return (
+                <MessageBlock
+                  key={block.partID}
+                  block={block}
+                  isOpen={isDisclosureOpen(block.partID)}
+                  onToggle={(next) => handleDisclosureToggle(block.partID, next)}
+                />
+              );
+            })
+          : null}
       </div>
 
       <div className={`tinker-composer${busy ? ' tinker-composer--busy' : ''}`}>

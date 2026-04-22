@@ -874,10 +874,47 @@ textarea {
   white-space: pre-wrap;
 }
 
+.tinker-message > * + * {
+  margin-top: var(--space-2);
+}
+
 .tinker-message-actions {
   display: flex;
   justify-content: flex-end;
   margin-top: var(--space-1);
+}
+
+.tinker-chat-legend {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.tinker-tool-pre {
+  margin: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-bg-panel);
+  color: var(--color-text-primary);
+  /* tool output cap — 8 × --space-10 (40px) so dense outputs scroll instead of dominating the chat */
+  max-height: calc(var(--space-10) * 8);
+  overflow: auto;
+}
+
+.tinker-tool-pre + .tinker-tool-pre {
+  margin-top: var(--space-2);
+}
+
+.tinker-tool-pre[data-variant='error'] {
+  background: var(--color-error-soft);
+  color: var(--color-error);
 }
 
 .tinker-message--assistant {
