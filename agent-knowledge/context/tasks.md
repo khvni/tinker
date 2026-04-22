@@ -59,6 +59,9 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 | 1.10 | Layout snapshot migration: detect old Dockview-shaped JSON in SQLite `layouts` table → delete + re-seed default. Log once. | S | 1.9 | review | TIN-11 · PR #62. One-shot schema migration drops incompatible pre-v1 snapshots. |
 | 1.11 | Workspace sidebar metadata API contract: `GET /workspace.cards` for reads + `POST /workspace.metadata` for contributor pushes. Ship local stub now; keep host-service transport deferred per D25/D17. | S | 1.7 | review | TIN-150 · PR #84. Typed local stub lives in `@tinker/workspace-sidebar` and supports create/update/remove/sort/subscribe flows. |
 | 1.12 | Port workspace shell per Paper `9I-0` + anomalyco architectural shape: mount `WorkspaceSidebar` rail next to `@tinker/panes` content, extract `WorkspaceShell` grid wrapper (D21), reference + spec docs. No `dockview-react`. Panes-only multiplicity preserved; one-pane-per-tab invariant documented. | M | 1.7 | review | TIN-190 · branch `khvni/tin-190`. |
+| 1.13 | Sidebar active-state follows focused pane kind (chat / memory / settings) + avatar renders provider photo with initial fallback + hover tooltips + `aria-current` moves. | S | 1.12 | review | TIN-200 · branch `khvni/sidebar-active-avatar`. |
+| 1.14 | Titlebar polish per Paper `9K-0`: crumb ellipsises at `max-width: 40vw` instead of pushing the brand off-centre; `title={sessionFolderPath}` exposes the full path on hover; `__spacer` documented as drag-region-inheriting so the traffic-light corner stays draggable; double-click on the header asserted to dispatch no internal handler. | S | 1.12 | review | TIN-202 · PR #112 · branch `khvni/tin-202`. |
+| 1.15 | Auto-split workspace on first file open: `openFileInWorkspace()` detects default Chat-only layout, splits vertically, opens file in new pane. Deduplicates by focusing existing file panes. | S | 1.4, 1.7 | review | TIN-197 · PR #114 |
 
 ### M2 — Folder-scoped session (every chat starts in a local directory, per-user)
 Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to current user from M8.
@@ -188,6 +191,12 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | X.1 | Repo-wide: add `.cursor/rules` or `.github/copilot-instructions.md` pointing async agents at this file + D25 + claim rules. | S | — | done | TIN-89 · PR #28 merged 2026-04-22. Both `.github/copilot-instructions.md` + `.cursor/rules/tinker.mdc` landed. |
 | X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | done | TIN-90 · PR #29 merged 2026-04-22. |
 | X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | review | TIN-91 · PR #88 · documented with repo-root `pnpm dev:desktop` because `pnpm tauri dev` is not wired in this workspace. |
+
+### Testing infra
+
+| ID | Task | Size | Depends on | Status | Notes |
+|----|------|------|------------|--------|-------|
+| TIN-201 | Visual parity CI gate: Playwright + pixelmatch baselines for Workspace / Memory / Settings panes. | M | X.2 | review | PR #115. Code-baseline approach (not Paper-PNG diff). `dev:web` not `dev:desktop`. |
 
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
 

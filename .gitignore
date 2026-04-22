@@ -62,3 +62,9 @@ panes-demo-three-panes.png
 panes-v2-*.png
 design-system-*.png
 
+# Playwright runtime artifacts (baselines live in apps/desktop/test-assets/,
+# and test-output/ is self-managed via its own .gitignore).
+apps/desktop/playwright-report/
+apps/desktop/test-results/
+apps/desktop/test-output/
+

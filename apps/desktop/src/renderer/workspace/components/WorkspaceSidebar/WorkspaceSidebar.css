@@ -51,6 +51,10 @@
   outline-offset: -2px;
 }
 
+.tinker-workspace-sidebar__item[aria-current='page'] {
+  background-color: var(--color-accent-soft);
+}
+
 .tinker-workspace-sidebar__avatar-shell {
   display: flex;
   align-items: center;
@@ -81,6 +85,7 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
+  overflow: hidden;
   border-radius: var(--radius-pill);
   background-color: var(--color-bg-hover);
   border: 1px solid var(--color-border-strong);
@@ -89,4 +94,12 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   line-height: 16px;
+}
+
+.tinker-workspace-sidebar__avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-pill);
 }

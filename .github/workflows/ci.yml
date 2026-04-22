@@ -34,3 +34,44 @@ jobs:
 
       - name: Test
         run: pnpm -r test
+
+  visual:
+    name: Visual parity
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @tinker/desktop exec playwright install --with-deps chromium
+
+      - name: Run visual parity tests
+        run: pnpm --filter @tinker/desktop test:visual
+
+      - name: Upload visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs-${{ github.run_id }}
+          path: apps/desktop/test-output/
+          if-no-files-found: ignore
+          retention-days: 7

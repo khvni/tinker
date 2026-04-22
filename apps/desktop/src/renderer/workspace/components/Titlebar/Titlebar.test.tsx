@@ -4,9 +4,9 @@
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { Titlebar } from './Titlebar.js';
 
 describe('<Titlebar>', () => {
@@ -35,6 +35,21 @@ describe('<Titlebar>', () => {
     );
     expect(markup).toContain('tinker-titlebar__crumb');
     expect(markup).toContain('>baz<');
+  });
+
+  it('sets the full sessionFolderPath as the crumb title attribute', () => {
+    const markup = renderToStaticMarkup(
+      <Titlebar
+        sessionFolderPath="/Users/foo/projects/very-long-folder-name-here"
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
+      />,
+    );
+    expect(markup).toMatch(
+      /<span[^>]*class="tinker-titlebar__crumb"[^>]*title="\/Users\/foo\/projects\/very-long-folder-name-here"/,
+    );
   });
 
   it('shows only the brand when sessionFolderPath is null', () => {
@@ -102,12 +117,27 @@ describe('<Titlebar>', () => {
         onToggleRightInspector={() => undefined}
       />,
     );
-    // Left rail hidden → aria-pressed="true"; right visible → aria-pressed="false".
     expect(collapsed).toMatch(
       /<button[^>]*aria-label="Toggle left sidebar"[^>]*aria-pressed="true"/,
     );
     expect(collapsed).toMatch(
       /<button[^>]*aria-label="Toggle right inspector"[^>]*aria-pressed="false"/,
+    );
+  });
+
+  it('leaves the traffic-light spacer free to inherit drag-region from the header', () => {
+    const markup = renderToStaticMarkup(
+      <Titlebar
+        sessionFolderPath={null}
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
+      />,
+    );
+    expect(markup).toMatch(/<div[^>]*class="tinker-titlebar__spacer"[^>]*>/);
+    expect(markup).not.toMatch(
+      /<div[^>]*class="tinker-titlebar__spacer"[^>]*data-tauri-drag-region="false"/,
     );
   });
 
@@ -165,6 +195,22 @@ describe('<Titlebar>', () => {
       renderTitlebar({ onToggleRightInspector: spy });
       clickByLabel('Toggle right inspector');
       expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not dispatch any internal handler when the titlebar is double-clicked', () => {
+      const toggleLeftRail = vi.fn();
+      const toggleRightInspector = vi.fn();
+      renderTitlebar({
+        onToggleLeftRail: toggleLeftRail,
+        onToggleRightInspector: toggleRightInspector,
+      });
+      const header = container.querySelector<HTMLElement>('header.tinker-titlebar');
+      expect(header).not.toBeNull();
+      act(() => {
+        header?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+      });
+      expect(toggleLeftRail).not.toHaveBeenCalled();
+      expect(toggleRightInspector).not.toHaveBeenCalled();
     });
   });
 });

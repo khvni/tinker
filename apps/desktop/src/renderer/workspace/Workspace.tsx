@@ -4,6 +4,7 @@ import {
   createWorkspaceStore,
   findActiveTab,
   selectWorkspaceSnapshot,
+  useWorkspaceSelector,
   type PaneRegistry,
   type WorkspaceStore,
   Workspace as PanesWorkspace,
@@ -180,6 +181,16 @@ export const Workspace = ({
     createDefaultWorkspacePreferences(),
   );
   const [pendingSettingsSectionId, setPendingSettingsSectionId] = useState<string | null>(null);
+
+  const activeRailItem = useWorkspaceSelector<TinkerPaneData, TinkerPaneKind | null>(
+    workspaceStore,
+    (state) => {
+      if (!state.activeTabId) return null;
+      const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
+      if (!tab || !tab.activePaneId) return null;
+      return tab.panes[tab.activePaneId]?.data.kind ?? null;
+    },
+  );
 
   useEffect(() => {
     vaultPathRef.current = vaultPath;
@@ -612,6 +623,10 @@ export const Workspace = ({
   ]);
 
   const userInitial = (currentUserId.trim()[0] ?? 'T').toUpperCase();
+  const isGuest = currentUserProvider === 'local';
+  const accountLabel = isGuest
+    ? 'Account · Guest'
+    : `Account · ${currentUserEmail ?? currentUserName}`;
 
   return (
     <WorkspaceShell
@@ -629,6 +644,9 @@ export const Workspace = ({
       sidebar={
         <WorkspaceSidebar
           userInitial={userInitial}
+          avatarUrl={currentUserAvatarUrl}
+          accountLabel={accountLabel}
+          activeRailItem={activeRailItem}
           onOpenChat={openNewChatPane}
           onOpenMemory={openMemoryPane}
           onOpenSettings={openSettingsPane}
