@@ -42,6 +42,12 @@ type StartAuthRequest = {
   provider: DesktopProvider;
 };
 
+type RefreshAuthRequest = {
+  provider: DesktopProvider;
+  userId: string;
+  refreshToken: string;
+};
+
 const TRANSFER_TTL_MS = 5 * 60 * 1000;
 const SESSION_FALLBACK_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_BETTER_AUTH_PORT = 3147;
@@ -285,6 +291,26 @@ const parseStartAuthRequest = (value: unknown): StartAuthRequest | null => {
   return { provider: value.provider };
 };
 
+const parseRefreshAuthRequest = (value: unknown): RefreshAuthRequest | null => {
+  if (
+    !isRecord(value)
+    || typeof value.provider !== 'string'
+    || !isDesktopProvider(value.provider)
+    || typeof value.userId !== 'string'
+    || value.userId.trim().length === 0
+    || typeof value.refreshToken !== 'string'
+    || value.refreshToken.trim().length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    provider: value.provider,
+    userId: value.userId,
+    refreshToken: value.refreshToken,
+  };
+};
+
 const browserStartUrl = (ticket: string): string => {
   const url = new URL('/auth/start', baseURL);
   url.searchParams.set('ticket', ticket);
@@ -450,6 +476,137 @@ const readSessionPayload = async (request: Request, provider: DesktopProvider): 
   };
 };
 
+const parseScopeList = (value: unknown): string[] => {
+  if (typeof value !== 'string') {
+    return [];
+  }
+
+  return value.split(/[ ,]+/u).map((scope) => scope.trim()).filter((scope) => scope.length > 0);
+};
+
+const parseExpiresAt = (expiresIn: unknown): string => {
+  const value = typeof expiresIn === 'number' ? expiresIn : Number.parseInt(String(expiresIn), 10);
+  if (!Number.isFinite(value) || value <= 0) {
+    return new Date(Date.now() + SESSION_FALLBACK_TTL_MS).toISOString();
+  }
+
+  return new Date(Date.now() + value * 1000).toISOString();
+};
+
+const parseRefreshError = (value: unknown): string => {
+  if (!isRecord(value)) {
+    return 'refresh_failed';
+  }
+
+  if (typeof value.error === 'string' && value.error.trim().length > 0) {
+    return value.error;
+  }
+
+  if (typeof value.error_description === 'string' && value.error_description.trim().length > 0) {
+    return value.error_description;
+  }
+
+  return 'refresh_failed';
+};
+
+const parseRefreshedTokens = (
+  payload: unknown,
+  fallbackRefreshToken: string,
+): Pick<SessionPayload, 'accessToken' | 'refreshToken' | 'expiresAt' | 'scopes'> => {
+  if (!isRecord(payload) || typeof payload.access_token !== 'string' || payload.access_token.trim().length === 0) {
+    throw new Error('missing_access_token');
+  }
+
+  const refreshToken =
+    typeof payload.refresh_token === 'string' && payload.refresh_token.trim().length > 0
+      ? payload.refresh_token
+      : fallbackRefreshToken;
+
+  return {
+    accessToken: payload.access_token,
+    refreshToken,
+    expiresAt: parseExpiresAt(payload.expires_in),
+    scopes: parseScopeList(payload.scope),
+  };
+};
+
+const refreshGoogleTokens = async (
+  refreshToken: string,
+): Promise<Pick<SessionPayload, 'accessToken' | 'refreshToken' | 'expiresAt' | 'scopes'>> => {
+  if (!configuredGoogleClientId || !configuredGoogleClientSecret) {
+    throw new Error('google_not_configured');
+  }
+
+  const body = new URLSearchParams({
+    client_id: configuredGoogleClientId,
+    client_secret: configuredGoogleClientSecret,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  });
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  });
+  const payload = (await response.json().catch(() => null)) as unknown;
+
+  if (!response.ok) {
+    throw new Error(parseRefreshError(payload));
+  }
+
+  return parseRefreshedTokens(payload, refreshToken);
+};
+
+const refreshMicrosoftTokens = async (
+  refreshToken: string,
+): Promise<Pick<SessionPayload, 'accessToken' | 'refreshToken' | 'expiresAt' | 'scopes'>> => {
+  if (!configuredMicrosoftClientId) {
+    throw new Error('microsoft_not_configured');
+  }
+
+  const body = new URLSearchParams({
+    client_id: configuredMicrosoftClientId,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    scope: 'openid email profile offline_access',
+  });
+  if (configuredMicrosoftClientSecret) {
+    body.set('client_secret', configuredMicrosoftClientSecret);
+  }
+
+  const tenantId = configuredMicrosoftTenantId ?? 'common';
+  const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  });
+  const payload = (await response.json().catch(() => null)) as unknown;
+
+  if (!response.ok) {
+    throw new Error(parseRefreshError(payload));
+  }
+
+  return parseRefreshedTokens(payload, refreshToken);
+};
+
+const refreshAuthTokens = async (
+  provider: DesktopProvider,
+  refreshToken: string,
+): Promise<Pick<SessionPayload, 'accessToken' | 'refreshToken' | 'expiresAt' | 'scopes'>> => {
+  switch (provider) {
+    case 'google':
+      return refreshGoogleTokens(refreshToken);
+    case 'microsoft':
+      return refreshMicrosoftTokens(refreshToken);
+    case 'github':
+      throw new Error('invalid_grant');
+  }
+};
+
 const startAuthSession = async (request: Request): Promise<Response> => {
   if (!authorizedBridgeRequest(request)) {
     return errorResponse(401, 'Unauthorized.');
@@ -611,6 +768,53 @@ const readAuthSession = (request: Request): Response => {
   });
 };
 
+const refreshAuthSession = async (request: Request): Promise<Response> => {
+  if (!authorizedBridgeRequest(request)) {
+    return errorResponse(401, 'Unauthorized.');
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse(400, 'Invalid JSON body.');
+  }
+
+  const refreshRequest = parseRefreshAuthRequest(body);
+  if (!refreshRequest) {
+    return errorResponse(400, 'Missing or invalid refresh payload.');
+  }
+
+  if (!isConfiguredProvider(refreshRequest.provider)) {
+    return errorResponse(503, `${refreshRequest.provider} is not configured.`);
+  }
+
+  try {
+    const tokens = await refreshAuthTokens(refreshRequest.provider, refreshRequest.refreshToken);
+    return Response.json({
+      authenticated: true,
+      provider: refreshRequest.provider,
+      tokens: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken !== refreshRequest.refreshToken ? tokens.refreshToken : undefined,
+        expiresAt: tokens.expiresAt,
+        scopes: tokens.scopes,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'refresh_failed';
+    const unauthorized = message === 'invalid_grant';
+    return Response.json(
+      {
+        authenticated: false,
+        status: unauthorized ? 'expired' : 'error',
+        error: message,
+      },
+      { status: unauthorized ? 401 : 502 },
+    );
+  }
+};
+
 const logoutAuthSession = async (request: Request): Promise<Response> => {
   if (!authorizedBridgeRequest(request)) {
     return errorResponse(401, 'Unauthorized.');
@@ -655,6 +859,10 @@ const handleRequest = async (request: Request): Promise<Response> => {
 
   if (url.pathname === '/auth/session') {
     return readAuthSession(request);
+  }
+
+  if (url.pathname === '/auth/refresh' && request.method === 'POST') {
+    return refreshAuthSession(request);
   }
 
   if (url.pathname === '/auth/logout' && request.method === 'POST') {

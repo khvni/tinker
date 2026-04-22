@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { SSOProvider, SSOStatus } from '@tinker/shared-types';
+import type { SSOProvider, SSOSession, SSOStatus } from '@tinker/shared-types';
 
 export const GOOGLE_SCOPES = [
   'openid',
@@ -46,6 +46,10 @@ export function loadRefreshToken(provider: RefreshTokenProvider, userId: string)
 
 export function clearRefreshToken(provider: RefreshTokenProvider, userId: string): Promise<void> {
   return invoke('clear_refresh_token', { provider, userId });
+}
+
+export function restoreAuthSession(provider: RefreshTokenProvider, userId: string): Promise<SSOSession | null> {
+  return invoke<SSOSession | null>('restore_auth_session', { provider, userId });
 }
 
 export function stopOpencode(pid: number): Promise<void> {

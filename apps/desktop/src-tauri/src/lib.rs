@@ -433,6 +433,7 @@ pub fn run() {
             restart_opencode,
             commands::auth::start_auth_sidecar,
             commands::auth::auth_sign_in,
+            commands::auth::restore_auth_session,
             commands::auth::auth_sign_out,
             commands::auth::auth_status,
             commands::dialog::open_folder_picker,

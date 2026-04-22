@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@tinker/shared-types';
 import { getDatabase } from './database.js';
-import { getUser, getUserByProvider, hydrateUserRow, updateLastSeen, upsertUser, type UserRow } from './user-store.js';
+import {
+  getUser,
+  getUserByProvider,
+  hydrateUserRow,
+  listUsersByLastSeen,
+  updateLastSeen,
+  upsertUser,
+  type UserRow,
+} from './user-store.js';
 
 vi.mock('./database.js', () => ({
   getDatabase: vi.fn(),
@@ -37,6 +45,21 @@ const toRow = (user: User): UserRow => ({
 const createFakeDatabase = (): FakeDatabase => {
   const rows = new Map<string, UserRow>();
   const providerIndex = new Map<string, string>();
+  const sortedRows = (): UserRow[] => {
+    return Array.from(rows.values()).sort((left, right) => {
+      const byLastSeen = right.last_seen_at.localeCompare(left.last_seen_at);
+      if (byLastSeen !== 0) {
+        return byLastSeen;
+      }
+
+      const byCreatedAt = right.created_at.localeCompare(left.created_at);
+      if (byCreatedAt !== 0) {
+        return byCreatedAt;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+  };
 
   return {
     async execute(query: string, bindValues?: unknown[]): Promise<void> {
@@ -111,6 +134,10 @@ const createFakeDatabase = (): FakeDatabase => {
     },
 
     async select<TRow>(query: string, bindValues?: unknown[]): Promise<TRow> {
+      if (query.includes('ORDER BY last_seen_at DESC')) {
+        return sortedRows() as TRow;
+      }
+
       if (query.includes('WHERE id = $1')) {
         const [id] = (bindValues ?? []) as [string];
         const row = rows.get(id);
@@ -183,5 +210,34 @@ describe('user-store helpers', () => {
       ...BASE_USER,
       lastSeenAt: '2026-04-23T00:00:00.000Z',
     });
+  });
+
+  it('lists users by descending last_seen_at with stable tie-breaks', async () => {
+    const olderUser: User = {
+      ...BASE_USER,
+      id: 'github:user-456',
+      provider: 'github',
+      providerUserId: 'user-456',
+      createdAt: '2026-04-20T00:00:00.000Z',
+      lastSeenAt: '2026-04-20T00:00:00.000Z',
+      email: 'hopper@example.com',
+      displayName: 'Grace Hopper',
+    };
+    const newerUser: User = {
+      ...BASE_USER,
+      id: 'microsoft:user-789',
+      provider: 'microsoft',
+      providerUserId: 'user-789',
+      createdAt: '2026-04-22T00:00:00.000Z',
+      lastSeenAt: '2026-04-22T00:00:00.000Z',
+      email: 'lamarr@example.com',
+      displayName: 'Hedy Lamarr',
+    };
+
+    await upsertUser(olderUser);
+    await upsertUser(newerUser);
+    await upsertUser(BASE_USER);
+
+    await expect(listUsersByLastSeen()).resolves.toEqual([newerUser, BASE_USER, olderUser]);
   });
 });
