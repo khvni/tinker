@@ -33,6 +33,7 @@ export const DATABASE_SCHEMA = [
     object_id TEXT NOT NULL,
     confidence REAL NOT NULL,
     source TEXT NOT NULL,
+    sources_json TEXT NOT NULL DEFAULT '[]',
     PRIMARY KEY (subject_id, predicate, object_id)
   )`,
   `CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
@@ -158,6 +159,17 @@ export const ensureSessionTableColumns = async (
   }
 };
 
+export const ensureRelationshipTableColumns = async (
+  database: Pick<Database, 'execute' | 'select'>,
+): Promise<void> => {
+  const rows = await database.select<TableInfoRow[]>('PRAGMA table_info(relationships)');
+  const columns = new Set(rows.map((row) => row.name));
+
+  if (!columns.has('sources_json')) {
+    await database.execute("ALTER TABLE relationships ADD COLUMN sources_json TEXT NOT NULL DEFAULT '[]'");
+  }
+};
+
 const ensureLayoutTableShape = async (database: Database): Promise<void> => {
   const columns = await database.select<TableInfoRow[]>(`PRAGMA table_info(layouts)`);
   const hasWorkspaceColumn = columns.some((column) => column.name === LAYOUT_STATE_COLUMN);
@@ -198,6 +210,7 @@ export const getDatabase = async (sqlUrl = DEFAULT_SQL_URL): Promise<Database> =
         await database.execute(statement);
       }
       await ensureSessionTableColumns(database);
+      await ensureRelationshipTableColumns(database);
       await ensureLayoutTableShape(database);
       return database;
     });

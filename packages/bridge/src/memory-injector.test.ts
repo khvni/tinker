@@ -7,7 +7,7 @@ const makeEntity = (overrides: Partial<Entity>): Entity => ({
   kind: 'person',
   name: 'Jane Smith',
   aliases: [],
-  sources: [{ integration: 'vault', externalId: 'People/Jane Smith.md' }],
+  sources: [{ service: 'vault', ref: 'People/Jane Smith.md', lastSeen: '2026-04-15T00:00:00.000Z' }],
   attributes: {
     relativePath: 'People/Jane Smith.md',
     excerpt: 'Leads [[Q2 Launch]] and owns launch checklist.',

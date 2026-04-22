@@ -13,8 +13,9 @@ export type ExtractedMemoryEntity = {
   links?: string[];
   facts: ExtractedMemoryFact[];
   sources?: Array<{
-    integration: string;
-    externalId: string;
+    service: string;
+    ref: string;
+    lastSeen: string;
     url?: string;
   }>;
 };
@@ -85,10 +86,11 @@ const MEMORY_EXTRACTION_SCHEMA = {
             items: {
               type: 'object',
               additionalProperties: false,
-              required: ['integration', 'externalId'],
+              required: ['service', 'ref', 'lastSeen'],
               properties: {
-                integration: { type: 'string', minLength: 1 },
-                externalId: { type: 'string', minLength: 1 },
+                service: { type: 'string', minLength: 1 },
+                ref: { type: 'string', minLength: 1 },
+                lastSeen: { type: 'string', minLength: 10 },
                 url: { type: 'string' },
               },
             },
@@ -128,6 +130,7 @@ const buildConversationPrompt = ({ observedOn, userMessage, assistantMessage, to
     'Ignore task instructions, style guidance, speculative statements, and transient chatter.',
     'Resolve pronouns only when transcript makes referent clear. If unclear, skip.',
     'Preserve explicit [[Wikilink]] targets in fact text and links array.',
+    'When you include sources, each one must use {service, ref, lastSeen}.',
     'Return empty entities array when nothing durable exists.',
     '',
     `User:\n<<<USER\n${userMessage}\nUSER>>>`,
@@ -146,6 +149,7 @@ const buildDailySweepPrompt = (observedOn: string): string => {
     'Skip integrations that are unavailable, disabled, or unauthenticated.',
     'Extract only durable facts worth saving into local markdown memory.',
     'Resolve obvious links between entities with [[Wikilink]] names when possible.',
+    'When you include sources, each one must use {service, ref, lastSeen}.',
     'Return empty entities array if tools yield nothing useful.',
   ].join('\n');
 };

@@ -1,6 +1,7 @@
 export * from './database.js';
 export * from './entity-extractor.js';
 export * from './layout-store.js';
+export * from './memory-files.js';
 export * from './memory-pipeline.js';
 export * from './memory-paths.js';
 export * from './memory-store.js';

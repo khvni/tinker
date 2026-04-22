@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Model Picker Pair</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f3eb;
+        --card: rgba(255, 255, 255, 0.94);
+        --border: #d8d1c4;
+        --ink: #1f1a14;
+        --muted: #746b5f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px;
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.82), transparent 40%),
+          linear-gradient(180deg, #fbf8f2, var(--paper));
+        color: var(--ink);
+        font-family:
+          "Host Grotesk",
+          "Helvetica Neue",
+          sans-serif;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+      }
+
+      p {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+      }
+
+      figure {
+        margin: 0;
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: var(--card);
+      }
+
+      figcaption {
+        margin-bottom: 12px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      img {
+        display: block;
+        width: 100%;
+        border-radius: 16px;
+        border: 1px solid rgba(216, 209, 196, 0.72);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Model picker side-by-side</h1>
+    <p>Tinker current implementation against the pinned OpenCode Desktop reference reconstruction from M4.1.</p>
+    <section class="grid">
+      <figure>
+        <figcaption>Tinker current</figcaption>
+        <img src="./tinker-model-picker.png?v=20260422" alt="Tinker current model picker" />
+      </figure>
+      <figure>
+        <figcaption>OpenCode reference</figcaption>
+        <img src="./opencode-reference.png?v=20260422" alt="OpenCode reference model picker" />
+      </figure>
+    </section>
+  </body>
+</html>

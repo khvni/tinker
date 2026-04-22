@@ -1,0 +1,120 @@
+.tinker-workspace-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 52px;
+  padding-block: 14px;
+  gap: 2px;
+  background-color: var(--color-bg-panel);
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.tinker-workspace-sidebar__top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  gap: 2px;
+}
+
+.tinker-workspace-sidebar__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.tinker-workspace-sidebar__divider {
+  width: 20px;
+  height: 1px;
+  flex-shrink: 0;
+  margin-block: 6px;
+  background-color: var(--color-border-default);
+}
+
+.tinker-workspace-sidebar__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.tinker-workspace-sidebar__item:hover:not(:disabled) {
+  background-color: var(--color-bg-hover);
+}
+
+.tinker-workspace-sidebar__item:focus-visible {
+  outline: 2px solid var(--color-accent-ring);
+  outline-offset: -2px;
+}
+
+.tinker-workspace-sidebar__item[aria-current='page'] {
+  background-color: var(--color-accent-soft);
+}
+
+.tinker-workspace-sidebar__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.tinker-workspace-sidebar__item-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+  border: 1.5px solid var(--color-bg-panel);
+}
+
+.tinker-workspace-sidebar__avatar-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.tinker-workspace-sidebar__avatar-shell:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.tinker-workspace-sidebar__avatar-shell:focus-visible {
+  outline: 2px solid var(--color-accent-ring);
+  outline-offset: -2px;
+}
+
+.tinker-workspace-sidebar__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-bg-hover);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 16px;
+}

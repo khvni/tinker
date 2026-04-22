@@ -4,7 +4,7 @@ import type { Entity } from '@tinker/shared-types';
 const entitySummary = (entity: Entity): string => {
   const { attributes } = entity;
   const aliases = entity.aliases.length > 0 ? ` aliases=${entity.aliases.join(', ')}` : '';
-  const sources = entity.sources.map((source) => `${source.integration}:${source.externalId}`).join(', ');
+  const sources = entity.sources.map((source) => `${source.service}:${source.ref}`).join(', ');
   const relativePath =
     typeof attributes.relativePath === 'string' && attributes.relativePath.length > 0
       ? ` path=${attributes.relativePath}`
