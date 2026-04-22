@@ -120,7 +120,7 @@ Spec: [[25-mvp-context-badge]] · Depends on: M4.2
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | 5.1 | **Research**: locate OpenCode SDK field for per-session token usage + model context window. Deliverable: 1-page `agent-knowledge/reference/opencode-sdk-usage.md` with exact field paths + example payload. | S | — | done | TIN-53 · PR #16 merged 2026-04-21. |
-| 5.2 | `<ContextBadge percent={n} tokens={used} windowSize={max} model={name} />` primitive in `@tinker/design`. Pill w/ percent. Color: green <50%, amber 50–80%, red >80%. Tooltip w/ exact counts. | M | 5.1 | not started | Pure visual. |
+| 5.2 | `<ContextBadge percent={n} tokens={used} windowSize={max} model={name} />` primitive in `@tinker/design`. Pill w/ percent. Color: green <50%, amber 50–80%, red >80%. Tooltip w/ exact counts. | M | 5.1 | review | TIN-54 · PR #22. Pure visual + playground. |
 | 5.3 | Wire badge into Chat pane header. Subscribes to same SSE stream as chat; recomputes on each message. | S | 5.2, 4.4 | not started | One call site. |
 | 5.4 | Playground entry in `routes/design-system.tsx` with three states (low/mid/high). Per D14 canonical rule. | S | 5.2 | not started | Design-system hygiene. |
 

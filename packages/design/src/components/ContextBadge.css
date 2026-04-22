@@ -1,0 +1,35 @@
+.tk-context-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 22px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  user-select: none;
+}
+
+.tk-context-badge--ok {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.tk-context-badge--warn {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.tk-context-badge--hot {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
