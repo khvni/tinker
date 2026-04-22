@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ChatMessage } from './ChatMessage.js';
 
@@ -77,21 +77,19 @@ describe('ChatMessage', () => {
     expect(markup).not.toContain('target="_blank"');
   });
 
-  it('shows copy + save-as-skill actions only when assistant text is non-empty and not streaming', () => {
+  it('shows copy action only when assistant text is non-empty and not streaming', () => {
     const withContent = renderToStaticMarkup(
-      <ChatMessage role="assistant" text="hello" onSaveAsSkill={vi.fn()} />,
+      <ChatMessage role="assistant" text="hello" />,
     );
     expect(withContent).toContain('Copy');
-    expect(withContent).toContain('Save as skill');
 
     const empty = renderToStaticMarkup(<ChatMessage role="assistant" text="" />);
     expect(empty).not.toContain('Copy');
-    expect(empty).not.toContain('Save as skill');
 
     const streaming = renderToStaticMarkup(
-      <ChatMessage role="assistant" text="partial" streaming onSaveAsSkill={vi.fn()} />,
+      <ChatMessage role="assistant" text="partial" streaming />,
     );
     expect(streaming).toContain('tinker-message--streaming');
-    expect(streaming).not.toContain('Save as skill');
+    expect(streaming).not.toContain('tinker-chat-message-actions');
   });
 });
