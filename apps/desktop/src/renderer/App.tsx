@@ -18,7 +18,7 @@ import {
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
 import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, VaultConfig } from '@tinker/shared-types';
-import { ONBOARDING_KEY, type AuthProvider, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
+import { type AuthProvider, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
   checkExaBootHealth,
@@ -47,7 +47,6 @@ type ReadyAppState = {
   opencode: OpencodeConnection;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
-  onboarded: boolean;
   modelConnected: boolean;
   vaultRevision: number;
   activeSkillsRevision: number;
@@ -297,7 +296,6 @@ export const App = (): JSX.Element => {
             opencode: WEB_PREVIEW_CONNECTION,
             mcpStatus: {},
             vaultPath: null,
-            onboarded: false,
             modelConnected: false,
             vaultRevision: 0,
             activeSkillsRevision: 0,
@@ -334,7 +332,6 @@ export const App = (): JSX.Element => {
           opencode,
           mcpStatus: {},
           vaultPath,
-          onboarded: window.localStorage.getItem(ONBOARDING_KEY) === '1',
           modelConnected,
           vaultRevision,
           activeSkillsRevision: 0,
@@ -892,22 +889,6 @@ export const App = (): JSX.Element => {
     }
   };
 
-  const finishOnboarding = (): void => {
-    if (!nativeRuntime) {
-      return;
-    }
-
-    window.localStorage.setItem(ONBOARDING_KEY, '1');
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            onboarded: true,
-          },
-    );
-  };
-
   const handleRunScheduledJobNow = async (jobId: string): Promise<void> => {
     const engine = schedulerEngineRef.current;
     if (!engine) {
@@ -920,7 +901,6 @@ export const App = (): JSX.Element => {
   const currentSessions = currentUserState.sessions;
   const currentUserId = currentUserState.authState === 'authenticated' ? currentUserState.user.id : null;
   const signInGateVisible = nativeRuntime && currentUserState.authState === 'unauthenticated';
-  const workspaceAvailable = nativeRuntime && state.onboarded && currentUserState.authState === 'authenticated';
 
   if (signInGateVisible) {
     return (
@@ -936,7 +916,7 @@ export const App = (): JSX.Element => {
 
   return (
     <div className="tinker-app">
-      {!workspaceAvailable ? (
+      {!nativeRuntime ? (
         <FirstRun
           nativeRuntimeAvailable={nativeRuntime}
           runtimeNotice={nativeRuntime ? null : WEB_PREVIEW_NOTICE}
@@ -958,7 +938,7 @@ export const App = (): JSX.Element => {
           onConnectMicrosoft={() => handleProviderConnect('microsoft')}
           onCreateVault={handleCreateVault}
           onSelectVault={handlePickVault}
-          onContinue={finishOnboarding}
+          onContinue={() => {}}
         />
       ) : (
         <Workspace
