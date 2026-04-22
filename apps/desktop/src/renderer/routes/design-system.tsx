@@ -17,6 +17,10 @@ import {
   type StatusDotState,
 } from '@tinker/design';
 import '@tinker/design/styles/tokens.css';
+import {
+  SettingsShell,
+  type SettingsShellSection,
+} from '../workspace/components/SettingsShell/index.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -25,7 +29,8 @@ type PlaygroundTab =
   | 'spacing'
   | 'components'
   | 'modelpicker'
-  | 'chat';
+  | 'chat'
+  | 'settings-shell';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
@@ -34,6 +39,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'components', label: 'Components' },
   { value: 'modelpicker', label: 'Model Picker' },
   { value: 'chat', label: 'Chat' },
+  { value: 'settings-shell', label: 'Settings Shell' },
 ];
 
 const BADGE_VARIANTS: ReadonlyArray<{ variant: BadgeVariant; label: string }> = [
@@ -759,6 +765,143 @@ const ChatTab = (): JSX.Element => {
   );
 };
 
+/* -------------------- Settings Shell --------------------- */
+
+const UserIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+const MemoryIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 3h6" />
+    <path d="M9 21h6" />
+    <rect x="4" y="6" width="16" height="12" rx="2" />
+    <path d="M9 10h6M9 14h4" />
+  </svg>
+);
+
+const PlugIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 22v-5" />
+    <path d="M9 7V2" />
+    <path d="M15 7V2" />
+    <path d="M6 13V8h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z" />
+  </svg>
+);
+
+const DisplayIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="4" width="20" height="14" rx="2" />
+    <path d="M8 21h8" />
+    <path d="M12 18v3" />
+  </svg>
+);
+
+const SettingsSectionBody = ({
+  eyebrow,
+  title,
+  lede,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  lede: string;
+  children?: ReactNode;
+}): JSX.Element => (
+  <div className="ds-settings-body">
+    <p className="ds-settings-body__eyebrow">{eyebrow}</p>
+    <h2 className="ds-settings-body__title">{title}</h2>
+    <p className="ds-settings-body__lede">{lede}</p>
+    {children ? <div className="ds-settings-body__content">{children}</div> : null}
+  </div>
+);
+
+const SETTINGS_SECTIONS: ReadonlyArray<SettingsShellSection> = [
+  {
+    id: 'account',
+    label: 'Account',
+    icon: <UserIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Identity"
+        title="Account"
+        lede="Identity, providers, and sign-in handled by Better Auth."
+      >
+        <div className="ds-settings-card">
+          <p className="ds-settings-card__label">Signed in as</p>
+          <p className="ds-settings-card__value">khani@berkeley.edu</p>
+        </div>
+      </SettingsSectionBody>
+    ),
+  },
+  {
+    id: 'memory',
+    label: 'Memory',
+    icon: <MemoryIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Knowledge"
+        title="Memory"
+        lede="Vault index + entity graph live in the local SQLite store."
+      >
+        <div className="ds-settings-card">
+          <p className="ds-settings-card__label">Vault root</p>
+          <p className="ds-settings-card__value">~/Documents/tinker-vault</p>
+        </div>
+      </SettingsSectionBody>
+    ),
+  },
+  {
+    id: 'connections',
+    label: 'Connections',
+    icon: <PlugIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Integrations"
+        title="Connections"
+        lede="MCP servers configured in opencode.json surface here as toggles."
+      />
+    ),
+  },
+  {
+    id: 'display',
+    label: 'Display',
+    icon: <DisplayIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Appearance"
+        title="Display"
+        lede="Theme, density, and accent preview."
+      />
+    ),
+  },
+];
+
+const SettingsShellTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Default shell (Account · Memory · Connections · Display)">
+      <div className="ds-settings-frame">
+        <SettingsShell sections={SETTINGS_SECTIONS} />
+      </div>
+    </Section>
+
+    <Section label="Controlled — Memory active">
+      <div className="ds-settings-frame">
+        <SettingsShell sections={SETTINGS_SECTIONS} activeSectionId="memory" />
+      </div>
+    </Section>
+
+    <Section label="Empty — default EmptyPane">
+      <div className="ds-settings-frame">
+        <SettingsShell sections={[]} />
+      </div>
+    </Section>
+  </div>
+);
+
 /* ----------------------- Router ------------------------- */
 
 const renderTab = (tab: PlaygroundTab): JSX.Element => {
@@ -775,6 +918,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ModelPickerTab />;
     case 'chat':
       return <ChatTab />;
+    case 'settings-shell':
+      return <SettingsShellTab />;
   }
 };
 
