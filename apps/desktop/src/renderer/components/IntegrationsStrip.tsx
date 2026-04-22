@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { EmptyState } from '@tinker/design';
 import type { SSOStatus } from '@tinker/shared-types';
 import type { MCPStatus } from '../integrations.js';
 
@@ -62,6 +63,8 @@ const toneClass = (status: MCPStatus | undefined, providerConnected: boolean): s
 };
 
 export const IntegrationsStrip = ({ compact = false, mcpStatus, sessions }: IntegrationsStripProps): JSX.Element => {
+  const anyProviderConnected = sessions.google !== null || sessions.github !== null;
+
   return (
     <section className={`tinker-integrations-strip${compact ? ' tinker-integrations-strip--compact' : ''}`}>
       <div className="tinker-integrations-strip__header">
@@ -73,6 +76,33 @@ export const IntegrationsStrip = ({ compact = false, mcpStatus, sessions }: Inte
           <p className="tinker-muted">Google lights up Gmail, Calendar, Drive. GitHub lights up repo, issue, and PR tools.</p>
         ) : null}
       </div>
+
+      {!anyProviderConnected && !compact ? (
+        <EmptyState
+          title="No connections yet"
+          description="Sign in with Google or GitHub to light up your connected tools. Tinker still works as a local coding agent without them."
+          size="s"
+          align="start"
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M10 14a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 1 0-5.66-5.66L11 7.34"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M14 10a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 1 0 5.66 5.66L13 16.66"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+        />
+      ) : null}
 
       <div className="tinker-integrations-strip__grid">
         {INTEGRATIONS.map((integration) => {

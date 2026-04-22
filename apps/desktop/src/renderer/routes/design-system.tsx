@@ -5,8 +5,10 @@ import {
   Button,
   ClickableBadge,
   ContextBadge,
+  EmptyState,
   IconButton,
   KeyboardHint,
+  Modal,
   ModelPicker,
   Progress,
   SearchInput,
@@ -16,6 +18,8 @@ import {
   TextInput,
   Textarea,
   Toggle,
+  ToastProvider,
+  useToast,
   type AvatarSize,
   type BadgeVariant,
   type ModelPickerItem,
@@ -35,6 +39,9 @@ type PlaygroundTab =
   | 'spacing'
   | 'components'
   | 'modelpicker'
+  | 'modal'
+  | 'toast'
+  | 'empty'
   | 'chat'
   | 'settings-shell';
 
@@ -44,6 +51,9 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'spacing', label: 'Spacing' },
   { value: 'components', label: 'Components' },
   { value: 'modelpicker', label: 'Model Picker' },
+  { value: 'modal', label: 'Modal' },
+  { value: 'toast', label: 'Toast' },
+  { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
   { value: 'settings-shell', label: 'Settings Shell' },
 ];
@@ -847,6 +857,240 @@ const SpacingTab = (): JSX.Element => (
   </div>
 );
 
+/* ------------------------- Modal ------------------------- */
+
+const ModalTab = (): JSX.Element => {
+  const [basicOpen, setBasicOpen] = useState(false);
+  const [destructiveOpen, setDestructiveOpen] = useState(false);
+  const [longOpen, setLongOpen] = useState(false);
+
+  return (
+    <div className="ds-sections">
+      <Section label="Basic confirm">
+        <Row>
+          <Button variant="primary" onClick={() => setBasicOpen(true)}>
+            Open modal
+          </Button>
+        </Row>
+        <Modal
+          open={basicOpen}
+          onClose={() => setBasicOpen(false)}
+          title="Rename vault"
+          actions={
+            <>
+              <Button variant="ghost" onClick={() => setBasicOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={() => setBasicOpen(false)}>
+                Rename
+              </Button>
+            </>
+          }
+        >
+          <p>Enter a new label for this vault. It only affects how Tinker displays the vault in the sidebar.</p>
+          <div className="ds-input-wrap">
+            <TextInput placeholder="Vault name" defaultValue="Daily workspace" />
+          </div>
+        </Modal>
+      </Section>
+
+      <Section label="Destructive">
+        <Row>
+          <Button variant="danger" onClick={() => setDestructiveOpen(true)}>
+            Delete session
+          </Button>
+        </Row>
+        <Modal
+          open={destructiveOpen}
+          onClose={() => setDestructiveOpen(false)}
+          title="Delete this session"
+          actions={
+            <>
+              <Button variant="ghost" onClick={() => setDestructiveOpen(false)}>
+                Keep
+              </Button>
+              <Button variant="danger" onClick={() => setDestructiveOpen(false)}>
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <p>The transcript and any streamed tool output will be removed from local state. Vault memory is unaffected.</p>
+        </Modal>
+      </Section>
+
+      <Section label="Long content">
+        <Row>
+          <Button variant="secondary" onClick={() => setLongOpen(true)}>
+            Open long modal
+          </Button>
+        </Row>
+        <Modal
+          open={longOpen}
+          onClose={() => setLongOpen(false)}
+          title="About memory injection"
+          actions={<Button variant="primary" onClick={() => setLongOpen(false)}>Got it</Button>}
+        >
+          <p>Memory injection resolves the top relevant entities for the current prompt, then rewrites the session prelude before dispatching to OpenCode.</p>
+          <p>Only the top N entities are ever included, to keep token spend predictable on long histories.</p>
+          <p>Relevance scoring uses a cached embedding, and the injection path falls back to raw note titles if the embedding cache is unavailable.</p>
+          <p>Scroll to see how the body stays inside the card while header and footer remain anchored.</p>
+          <p>Scroll to see how the body stays inside the card while header and footer remain anchored.</p>
+          <p>Scroll to see how the body stays inside the card while header and footer remain anchored.</p>
+        </Modal>
+      </Section>
+    </div>
+  );
+};
+
+/* ------------------------- Toast ------------------------- */
+
+const ToastTabInner = (): JSX.Element => {
+  const { show } = useToast();
+  return (
+    <div className="ds-sections">
+      <Section label="Variants">
+        <Row>
+          <Button variant="secondary" onClick={() => show({ title: 'Note indexed', variant: 'info' })}>
+            Info
+          </Button>
+          <Button variant="secondary" onClick={() => show({ title: 'Vault synced', description: 'All 42 notes up to date.', variant: 'success' })}>
+            Success
+          </Button>
+          <Button variant="secondary" onClick={() => show({ title: 'Rate limit approaching', description: '80% of your model quota used today.', variant: 'warning' })}>
+            Warning
+          </Button>
+          <Button variant="secondary" onClick={() => show({ title: 'OpenCode disconnected', description: 'Sidecar exited unexpectedly.', variant: 'error' })}>
+            Error
+          </Button>
+        </Row>
+      </Section>
+
+      <Section label="With action">
+        <Row>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              show({
+                title: 'Skill added',
+                description: 'coach was pinned to this session.',
+                variant: 'success',
+                actionLabel: 'Undo',
+                onAction: () => show({ title: 'Skill removed', variant: 'info' }),
+              })
+            }
+          >
+            Trigger with undo
+          </Button>
+        </Row>
+      </Section>
+
+      <Section label="Persistent">
+        <Row>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              show({
+                title: 'Stuck until dismissed',
+                description: 'Pass durationMs: 0 to pin the toast.',
+                durationMs: 0,
+              })
+            }
+          >
+            Show persistent
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              show({ title: 'Note indexed', variant: 'info', durationMs: 0 });
+              show({ title: 'Vault synced', description: 'All 42 notes up to date.', variant: 'success', durationMs: 0 });
+              show({ title: 'Rate limit approaching', description: '80% of your model quota used today.', variant: 'warning', durationMs: 0 });
+              show({ title: 'OpenCode disconnected', description: 'Sidecar exited unexpectedly.', variant: 'error', durationMs: 0 });
+            }}
+          >
+            Show all (pinned)
+          </Button>
+        </Row>
+      </Section>
+    </div>
+  );
+};
+
+const ToastTab = (): JSX.Element => (
+  <ToastProvider>
+    <ToastTabInner />
+  </ToastProvider>
+);
+
+/* ---------------------- Empty State ---------------------- */
+
+const EmptyStateTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Chat — no messages">
+      <EmptyState
+        title="Start a conversation"
+        description="Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE."
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+        }
+      />
+    </Section>
+
+    <Section label="Memory — no notes yet">
+      <EmptyState
+        title="No indexed notes yet"
+        description="Connect a vault or create the default one. Tinker will surface recent notes and entities here."
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M6 4.5h9l3 3v12a1.5 1.5 0 0 1-1.5 1.5h-10.5A1.5 1.5 0 0 1 4.5 19.5v-13.5A1.5 1.5 0 0 1 6 4.5Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+            <path d="M8 12h8M8 15.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        }
+        action={<Button variant="secondary" size="s">Run memory sweep</Button>}
+      />
+    </Section>
+
+    <Section label="Connections — none connected">
+      <EmptyState
+        size="s"
+        align="start"
+        title="No connections yet"
+        description="Sign in with Google or GitHub to light up your connected tools. Tinker still works as a local coding agent without them."
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M10 14a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 1 0-5.66-5.66L11 7.34"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14 10a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 1 0 5.66 5.66L13 16.66"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        }
+      />
+    </Section>
+  </div>
+);
+
 /* -------------------------- Chat ------------------------- */
 
 const ChatTab = (): JSX.Element => {
@@ -1062,6 +1306,12 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ComponentsTab />;
     case 'modelpicker':
       return <ModelPickerTab />;
+    case 'modal':
+      return <ModalTab />;
+    case 'toast':
+      return <ToastTab />;
+    case 'empty':
+      return <EmptyStateTab />;
     case 'chat':
       return <ChatTab />;
     case 'settings-shell':

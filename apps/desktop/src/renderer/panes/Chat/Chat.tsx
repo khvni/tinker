@@ -10,7 +10,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { Badge, Button, ModelPicker, Textarea } from '@tinker/design';
+import { Badge, Button, EmptyState, ModelPicker, Textarea } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities } from '@tinker/memory';
 import type { SkillStore } from '@tinker/shared-types';
@@ -628,11 +628,24 @@ export const Chat = ({
         tabIndex={-1}
       >
         {messages.length === 0 ? (
-          <div className="tinker-message tinker-message--system">
-            {modelConnected
-              ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
-              : 'Connect an AI model in Settings before sending a message.'}
-          </div>
+          <EmptyState
+            title={modelConnected ? 'Start a conversation' : 'No model connected'}
+            description={
+              modelConnected
+                ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+                : 'Connect an AI model in Settings before sending a message.'
+            }
+            icon={
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            }
+          />
         ) : null}
 
         {historyWindow.renderedMessages.flatMap((message) =>
