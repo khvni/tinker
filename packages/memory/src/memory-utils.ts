@@ -1,4 +1,4 @@
-import type { Entity, EntityKind } from '@tinker/shared-types';
+import type { Entity, EntityKind, EntitySource } from '@tinker/shared-types';
 
 export const MANAGED_MEMORY_HEADING = '## Tinker Memory';
 
@@ -49,6 +49,10 @@ export const isEntityKind = (value: unknown): value is EntityKind => {
 
 export const directoryForEntityKind = (kind: EntityKind): string => {
   return ENTITY_DIRECTORY_BY_KIND[kind];
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 };
 
 export const inferEntityKindFromNote = (relativePath: string, frontmatter: Record<string, unknown>): EntityKind => {
@@ -107,6 +111,93 @@ export const sanitizeEntityFileName = (name: string): string => {
 
 export const normalizeFactText = (value: string): string => {
   return value.trim().replace(/\s+/gu, ' ');
+};
+
+export const normalizeEntitySource = (value: unknown, fallbackLastSeen: string): EntitySource | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const service = typeof value.service === 'string'
+    ? value.service.trim()
+    : typeof value.integration === 'string'
+      ? value.integration.trim()
+      : '';
+  const ref = typeof value.ref === 'string'
+    ? value.ref.trim()
+    : typeof value.externalId === 'string'
+      ? value.externalId.trim()
+      : '';
+  const lastSeen = typeof value.lastSeen === 'string' && value.lastSeen.trim().length > 0
+    ? value.lastSeen.trim()
+    : fallbackLastSeen;
+
+  if (service.length === 0 || ref.length === 0 || lastSeen.length === 0) {
+    return null;
+  }
+
+  return {
+    service,
+    ref,
+    lastSeen,
+    ...(typeof value.url === 'string' && value.url.trim().length > 0 ? { url: value.url.trim() } : {}),
+  };
+};
+
+export const normalizeEntitySources = (value: unknown, fallbackLastSeen: string): EntitySource[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const normalized: EntitySource[] = [];
+
+  for (const item of value) {
+    const source = normalizeEntitySource(item, fallbackLastSeen);
+    if (!source) {
+      continue;
+    }
+
+    const key = `${source.service}:${source.ref}`;
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    normalized.push(source);
+  }
+
+  return normalized;
+};
+
+export const mergeEntitySources = (
+  frontmatter: Record<string, unknown>,
+  nextSources: EntitySource[] | undefined,
+  fallbackLastSeen: string,
+): Record<string, unknown> => {
+  const currentSources = normalizeEntitySources(frontmatter.sources, fallbackLastSeen);
+  const mergedSources = Array.from(
+    new Map(
+      [...currentSources, ...(nextSources ?? [])].map((source) => [`${source.service}:${source.ref}`, source] as const),
+    ).values(),
+  );
+
+  const currentSignature = JSON.stringify(currentSources);
+  const mergedSignature = JSON.stringify(mergedSources);
+  if (currentSignature === mergedSignature) {
+    return frontmatter;
+  }
+
+  if (mergedSources.length === 0) {
+    if (!Object.prototype.hasOwnProperty.call(frontmatter, 'sources')) {
+      return frontmatter;
+    }
+
+    const { sources: _sources, ...rest } = frontmatter;
+    return rest;
+  }
+
+  return { ...frontmatter, sources: mergedSources };
 };
 
 export const readManagedFactTexts = (body: string): Set<string> => {
@@ -197,6 +288,18 @@ export const readEntityAliases = (frontmatter: Record<string, unknown>): string[
     .filter((item, index, values) => item.length > 0 && values.indexOf(item) === index);
 };
 
-export const createVaultEntitySource = (relativePath: string): Entity['sources'] => {
-  return [{ integration: 'vault', externalId: relativePath }];
+export const readEntitySources = (
+  frontmatter: Record<string, unknown>,
+  relativePath: string,
+  lastSeen: string,
+): Entity['sources'] => {
+  if (Object.prototype.hasOwnProperty.call(frontmatter, 'sources')) {
+    return normalizeEntitySources(frontmatter.sources, lastSeen);
+  }
+
+  return createVaultEntitySource(relativePath, lastSeen);
+};
+
+export const createVaultEntitySource = (relativePath: string, lastSeen = new Date().toISOString()): Entity['sources'] => {
+  return [{ service: 'vault', ref: relativePath, lastSeen }];
 };

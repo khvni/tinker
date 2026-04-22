@@ -1,7 +1,7 @@
 import type Database from '@tauri-apps/plugin-sql';
 import type { QueryResult } from '@tauri-apps/plugin-sql';
 import { describe, expect, it, vi } from 'vitest';
-import { DATABASE_SCHEMA, ensureSessionTableColumns } from './database.js';
+import { DATABASE_SCHEMA, ensureRelationshipTableColumns, ensureSessionTableColumns } from './database.js';
 
 describe('DATABASE_SCHEMA', () => {
   it('creates the users table with the shared-user columns', () => {
@@ -89,5 +89,35 @@ describe('DATABASE_SCHEMA', () => {
     } as unknown as Pick<Database, 'execute' | 'select'>);
 
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('creates relationships table with provenance json column', () => {
+    expect(
+      DATABASE_SCHEMA.some(
+        (statement) =>
+          statement.includes('CREATE TABLE IF NOT EXISTS relationships') &&
+          statement.includes("sources_json TEXT NOT NULL DEFAULT '[]'"),
+      ),
+    ).toBe(true);
+  });
+
+  it('adds missing relationship provenance column on older databases', async () => {
+    const execute = vi.fn<Database['execute']>().mockResolvedValue({
+      rowsAffected: 0,
+    } satisfies QueryResult);
+    const select = vi.fn().mockResolvedValue([
+      { name: 'subject_id' },
+      { name: 'predicate' },
+      { name: 'object_id' },
+      { name: 'confidence' },
+      { name: 'source' },
+    ]);
+
+    await ensureRelationshipTableColumns({
+      execute,
+      select,
+    } as unknown as Pick<Database, 'execute' | 'select'>);
+
+    expect(execute).toHaveBeenCalledWith("ALTER TABLE relationships ADD COLUMN sources_json TEXT NOT NULL DEFAULT '[]'");
   });
 });
