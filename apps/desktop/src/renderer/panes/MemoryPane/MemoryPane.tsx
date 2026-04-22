@@ -1,200 +1,296 @@
-import { useEffect, useMemo, useState, type JSX } from 'react';
-import { Badge, Button, EmptyState, Skeleton } from '@tinker/design';
+import { useCallback, useEffect, useState, type JSX } from 'react';
+import { readTextFile } from '@tauri-apps/plugin-fs';
+import { EmptyState, Button } from '@tinker/design';
 import {
-  listMemoryMarkdownFiles,
+  bucketForFrontmatter,
+  listCategorisedMemoryFiles,
+  MEMORY_CATEGORY_DIRECTORIES,
+  parseFrontmatter,
   subscribeMemoryPathChanged,
+  type CategorisedMemoryFiles,
+  type MemoryEntryBucket,
   type MemoryMarkdownFile,
 } from '@tinker/memory';
 import { useFilePaneRuntime } from '../FilePane/file-pane-runtime.js';
 import { useMemoryPaneRuntime } from '../../workspace/memory-pane-runtime.js';
+import { MemorySidebar } from './components/MemorySidebar/index.js';
+import { MemoryDetail } from './components/MemoryDetail/index.js';
+import {
+  approveMemoryEntry,
+  dismissMemoryEntry,
+  readMemoryDiff,
+} from './memory-commands.js';
+import { isTauriRuntime } from '../../runtime.js';
+import {
+  PREVIEW_MEMORY_BUCKETS,
+  PREVIEW_MEMORY_DIFF,
+  PREVIEW_MEMORY_MARKDOWN,
+  PREVIEW_MEMORY_REFERENCE_TIME_MS,
+  PREVIEW_MEMORY_SELECTION,
+} from './memory-preview.js';
 import './MemoryPane.css';
 
-type MemoryPaneState =
-  | {
-      status: 'loading';
-      files: MemoryMarkdownFile[];
-      errorMessage: null;
-    }
-  | {
-      status: 'ready';
-      files: MemoryMarkdownFile[];
-      errorMessage: null;
-    }
-  | {
-      status: 'error';
-      files: MemoryMarkdownFile[];
-      errorMessage: string;
-    };
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'ready' }
+  | { status: 'error'; message: string };
+
+const emptyBuckets = (): Record<MemoryEntryBucket, MemoryMarkdownFile[]> => ({
+  pending: [],
+  people: [],
+  'active-work': [],
+  capabilities: [],
+  preferences: [],
+  organization: [],
+});
 
 const toErrorMessage = (error: unknown): string => {
-  return error instanceof Error && error.message.trim().length > 0
-    ? error.message
-    : 'Memory files are unavailable right now.';
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return 'Memory is unavailable right now.';
 };
 
-const RELATIVE_THRESHOLDS: ReadonlyArray<{ seconds: number; unit: Intl.RelativeTimeFormatUnit }> = [
-  { seconds: 60, unit: 'second' },
-  { seconds: 3600, unit: 'minute' },
-  { seconds: 86400, unit: 'hour' },
-  { seconds: 2592000, unit: 'day' },
-  { seconds: 31536000, unit: 'month' },
-  { seconds: Number.POSITIVE_INFINITY, unit: 'year' },
-];
-
-const formatRelative = (value: string, formatter: Intl.RelativeTimeFormat, now: number): string => {
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) {
-    return 'Updated · unknown';
-  }
-
-  const deltaSeconds = Math.round((timestamp - now) / 1000);
-  const absoluteSeconds = Math.abs(deltaSeconds);
-  const index = RELATIVE_THRESHOLDS.findIndex(({ seconds }) => absoluteSeconds < seconds);
-  if (index === -1) {
-    return 'Updated · unknown';
-  }
-
-  const threshold = RELATIVE_THRESHOLDS[index]!;
-  const divisor = index === 0 ? 1 : RELATIVE_THRESHOLDS[index - 1]!.seconds;
-  return `Updated · ${formatter.format(Math.round(deltaSeconds / divisor), threshold.unit)}`;
+type Selection = {
+  file: MemoryMarkdownFile;
+  bucket: MemoryEntryBucket;
 };
 
 export const MemoryPane = (): JSX.Element => {
   const { currentUserId } = useMemoryPaneRuntime();
   const filePaneRuntime = useFilePaneRuntime();
+  const nativeRuntime = isTauriRuntime();
+  const browserPreview = !nativeRuntime && import.meta.env.VITE_E2E === '1';
+
   const [reloadToken, setReloadToken] = useState(0);
-  const [state, setState] = useState<MemoryPaneState>({
-    status: 'loading',
-    files: [],
-    errorMessage: null,
+  const [load, setLoad] = useState<LoadState>({ status: 'loading' });
+  const [categorised, setCategorised] = useState<CategorisedMemoryFiles>({
+    rootPath: '',
+    buckets: emptyBuckets(),
   });
-  const relativeFormatter = useMemo(() => {
-    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-  }, []);
-  const nowMs = useMemo(() => Date.now(), [reloadToken]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [seenPaths, setSeenPaths] = useState<ReadonlySet<string>>(new Set());
+  const [diffText, setDiffText] = useState('');
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setLoad({ status: 'loading' });
 
-    setState((currentState) => ({
-      status: 'loading',
-      files: currentState.files,
-      errorMessage: null,
-    }));
+    if (browserPreview) {
+      setCategorised({
+        rootPath: '/memory/demo',
+        buckets: PREVIEW_MEMORY_BUCKETS,
+      });
+      setSelection((current) => current ?? PREVIEW_MEMORY_SELECTION);
+      setLoad({ status: 'ready' });
+      return () => {
+        cancelled = true;
+      };
+    }
 
-    void listMemoryMarkdownFiles(currentUserId)
-      .then((files) => {
+    void listCategorisedMemoryFiles(currentUserId)
+      .then((result) => {
         if (cancelled) {
           return;
         }
+        setCategorised(result);
+        setLoad({ status: 'ready' });
 
-        setState({
-          status: 'ready',
-          files,
-          errorMessage: null,
+        setSelection((current) => {
+          if (!current) {
+            return null;
+          }
+          const stillExists = Object.values(result.buckets)
+            .flat()
+            .some((file) => file.absolutePath === current.file.absolutePath);
+          return stillExists ? current : null;
         });
       })
       .catch((error) => {
         if (cancelled) {
           return;
         }
-
-        setState({
-          status: 'error',
-          files: [],
-          errorMessage: toErrorMessage(error),
-        });
+        setCategorised({ rootPath: '', buckets: emptyBuckets() });
+        setLoad({ status: 'error', message: toErrorMessage(error) });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [currentUserId, reloadToken]);
+  }, [browserPreview, currentUserId, reloadToken]);
 
   useEffect(() => {
     return subscribeMemoryPathChanged(() => {
-      setReloadToken((currentValue) => currentValue + 1);
+      setReloadToken((value) => value + 1);
     });
   }, []);
 
-  const reloadFiles = (): void => {
-    setReloadToken((currentValue) => currentValue + 1);
-  };
+  useEffect(() => {
+    if (!selection) {
+      setDiffText('');
+      setDiffLoading(false);
+      return;
+    }
 
-  const openFile = (file: MemoryMarkdownFile): void => {
-    filePaneRuntime?.openFile(file.absolutePath, { mime: 'text/markdown' });
-  };
+    if (browserPreview) {
+      setDiffText(PREVIEW_MEMORY_DIFF[selection.file.absolutePath] ?? '');
+      setDiffLoading(false);
+      return;
+    }
 
-  const fileCountLabel =
-    state.status === 'loading' ? 'Loading…' : `${state.files.length} file${state.files.length === 1 ? '' : 's'}`;
+    let cancelled = false;
+    setDiffLoading(true);
+    void readMemoryDiff(selection.file.absolutePath)
+      .then((text) => {
+        if (!cancelled) {
+          setDiffText(text);
+          setDiffLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDiffText('');
+          setDiffLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [browserPreview, selection]);
+
+  const reloadFiles = useCallback((): void => {
+    setReloadToken((value) => value + 1);
+  }, []);
+
+  const handleSelect = useCallback(
+    (file: MemoryMarkdownFile, bucket: MemoryEntryBucket): void => {
+      setSelection({ file, bucket });
+      setSeenPaths((current) => {
+        if (current.has(file.absolutePath)) {
+          return current;
+        }
+        const next = new Set(current);
+        next.add(file.absolutePath);
+        return next;
+      });
+      setActionError(null);
+    },
+    [],
+  );
+
+  const handleApprove = useCallback(async (): Promise<void> => {
+    if (!selection || selection.bucket !== 'pending' || isBusy) {
+      return;
+    }
+    if (browserPreview) {
+      setActionError('Approve is unavailable in browser preview.');
+      return;
+    }
+    setIsBusy(true);
+    setActionError(null);
+    try {
+      const text = await readTextFile(selection.file.absolutePath);
+      const { frontmatter } = parseFrontmatter(text);
+      const categoryId = bucketForFrontmatter(frontmatter);
+      if (!categoryId) {
+        throw new Error(
+          'Memory entry is missing a recognised "kind:" frontmatter (people, active-work, capabilities, preferences, organization).',
+        );
+      }
+      await approveMemoryEntry(selection.file.absolutePath, MEMORY_CATEGORY_DIRECTORIES[categoryId]);
+      setSelection(null);
+      reloadFiles();
+    } catch (error) {
+      setActionError(toErrorMessage(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }, [browserPreview, isBusy, reloadFiles, selection]);
+
+  const handleDismiss = useCallback(async (): Promise<void> => {
+    if (!selection || selection.bucket !== 'pending' || isBusy) {
+      return;
+    }
+    if (browserPreview) {
+      setActionError('Dismiss is unavailable in browser preview.');
+      return;
+    }
+    setIsBusy(true);
+    setActionError(null);
+    try {
+      await dismissMemoryEntry(selection.file.absolutePath);
+      setSelection(null);
+      reloadFiles();
+    } catch (error) {
+      setActionError(toErrorMessage(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }, [browserPreview, isBusy, reloadFiles, selection]);
+
+  const handleOpenInTab = useCallback(
+    (file: MemoryMarkdownFile): void => {
+      filePaneRuntime?.openFile(file.absolutePath, { mime: 'text/markdown' });
+    },
+    [filePaneRuntime],
+  );
+
+  if (load.status === 'error') {
+    return (
+      <div className="tinker-memory-pane tinker-memory-pane--error">
+        <EmptyState
+          align="start"
+          title="Could not load memory"
+          description={load.message}
+          action={
+            <Button variant="secondary" size="s" onClick={reloadFiles}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <section className="tinker-memory-pane">
-      <header className="tinker-memory-pane__header">
-        <h2 className="tinker-memory-pane__title">Memory files</h2>
-        <Badge variant="default" size="small">
-          {fileCountLabel}
-        </Badge>
-      </header>
-
-      <div className="tinker-memory-pane__content">
-        {state.status === 'loading' ? (
-          <div className="tinker-memory-pane__loading" aria-label="Loading memory files">
-            {Array.from({ length: 4 }, (_, index) => (
-              <Skeleton
-                key={`memory-loading-${index}`}
-                variant="rect"
-                height={48}
-                className="tinker-memory-pane__state"
-              />
-            ))}
+    <section className="tinker-memory-pane" aria-label="Memory">
+      <MemorySidebar
+        buckets={categorised.buckets}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        selectedPath={selection?.file.absolutePath ?? null}
+        onSelect={handleSelect}
+        seenPaths={seenPaths}
+        referenceTimeMs={browserPreview ? PREVIEW_MEMORY_REFERENCE_TIME_MS : undefined}
+      />
+      <div className="tinker-memory-pane__detail">
+        {actionError ? (
+          <div className="tinker-memory-pane__banner" role="alert">
+            {actionError}
           </div>
         ) : null}
-
-        {state.status === 'error' ? (
-          <EmptyState
-            className="tinker-memory-pane__state"
-            align="start"
-            title="Could not load memory"
-            description={state.errorMessage}
-            action={
-              <Button variant="secondary" size="s" onClick={reloadFiles}>
-                Try again
-              </Button>
-            }
-          />
-        ) : null}
-
-        {state.status === 'ready' && state.files.length === 0 ? (
-          <EmptyState
-            className="tinker-memory-pane__state"
-            align="start"
-            title="No memory yet"
-            description="Session captures and handwritten notes will show up here as markdown files."
-          />
-        ) : null}
-
-        {state.status === 'ready' && state.files.length > 0 ? (
-          <ul className="tinker-memory-pane__list">
-            {state.files.map((file) => (
-              <li key={file.absolutePath}>
-                <Button
-                  variant="ghost"
-                  className="tinker-memory-pane__file-button"
-                  title={file.relativePath}
-                  onClick={() => {
-                    openFile(file);
-                  }}
-                >
-                  <span className="tinker-memory-pane__file-title">{file.name}</span>
-                  <span className="tinker-memory-pane__file-meta">
-                    {formatRelative(file.modifiedAt, relativeFormatter, nowMs)}
-                  </span>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <MemoryDetail
+          file={selection?.file ?? null}
+          bucket={selection?.bucket ?? null}
+          diffText={diffText}
+          diffLoading={diffLoading}
+          onApprove={() => {
+            void handleApprove();
+          }}
+          onDismiss={() => {
+            void handleDismiss();
+          }}
+          onOpenInTab={handleOpenInTab}
+          isBusy={isBusy}
+          previewMarkdown={
+            !browserPreview || !selection ? null : (PREVIEW_MEMORY_MARKDOWN[selection.file.absolutePath] ?? null)
+          }
+        />
       </div>
     </section>
   );

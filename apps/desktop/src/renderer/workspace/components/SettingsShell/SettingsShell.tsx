@@ -1,4 +1,4 @@
-import { useCallback, useState, type JSX, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type JSX, type ReactNode } from 'react';
 import { EmptyPane } from '../EmptyPane/index.js';
 import './SettingsShell.css';
 
@@ -13,6 +13,7 @@ export type SettingsShellProps = {
   readonly sections: ReadonlyArray<SettingsShellSection>;
   readonly activeSectionId?: string;
   readonly defaultActiveSectionId?: string;
+  readonly scrollTargetSectionId?: string | undefined;
   readonly onActiveSectionChange?: (id: string) => void;
   readonly emptyState?: ReactNode;
   readonly title?: string;
@@ -30,6 +31,7 @@ export const SettingsShell = ({
   sections,
   activeSectionId,
   defaultActiveSectionId,
+  scrollTargetSectionId,
   onActiveSectionChange,
   emptyState,
   title = 'Settings',
@@ -40,6 +42,18 @@ export const SettingsShell = ({
   );
   const isControlled = activeSectionId !== undefined;
   const resolvedId = isControlled ? activeSectionId : internalId;
+
+  useEffect(() => {
+    if (
+      scrollTargetSectionId !== undefined &&
+      sections.some((s) => s.id === scrollTargetSectionId)
+    ) {
+      if (!isControlled) {
+        setInternalId(scrollTargetSectionId);
+      }
+      onActiveSectionChange?.(scrollTargetSectionId);
+    }
+  }, [scrollTargetSectionId, sections, isControlled, onActiveSectionChange]);
 
   const handleSelect = useCallback(
     (id: string) => {

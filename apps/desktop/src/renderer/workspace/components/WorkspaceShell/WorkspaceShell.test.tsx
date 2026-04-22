@@ -40,4 +40,46 @@ describe('WorkspaceShell', () => {
     expect(markup).toContain('tinker-workspace-shell__sidebar');
     expect(markup).toContain('tinker-workspace-shell__content');
   });
+
+  it('renders inspector slot when provided', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceShell
+        titlebar={null}
+        sidebar={null}
+        inspector={<aside data-testid="inspector">inspector</aside>}
+        isRightInspectorVisible
+      >
+        <span>content</span>
+      </WorkspaceShell>,
+    );
+
+    expect(markup).toContain('tinker-workspace-shell__inspector');
+    expect(markup).toContain('data-testid="inspector"');
+    expect(markup).toContain('data-collapsed="false"');
+  });
+
+  it('collapses sidebar when isLeftRailVisible is false', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceShell titlebar={null} sidebar={<nav>sidebar</nav>} isLeftRailVisible={false}>
+        <span>content</span>
+      </WorkspaceShell>,
+    );
+
+    expect(markup).toContain('data-collapsed="true"');
+  });
+
+  it('collapses inspector when isRightInspectorVisible is false', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceShell
+        titlebar={null}
+        sidebar={null}
+        inspector={<aside>inspector</aside>}
+        isRightInspectorVisible={false}
+      >
+        <span>content</span>
+      </WorkspaceShell>,
+    );
+
+    expect(markup).toContain('data-collapsed="true"');
+  });
 });

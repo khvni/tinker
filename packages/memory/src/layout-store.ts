@@ -34,11 +34,20 @@ const normalizePreferences = (value: unknown): WorkspacePreferences => {
   }
 
   const candidate = value as Record<string, unknown>;
+  const defaults = createDefaultWorkspacePreferences();
   return {
     autoOpenAgentWrittenFiles:
       typeof candidate.autoOpenAgentWrittenFiles === 'boolean'
         ? candidate.autoOpenAgentWrittenFiles
-        : createDefaultWorkspacePreferences().autoOpenAgentWrittenFiles,
+        : defaults.autoOpenAgentWrittenFiles,
+    isLeftRailVisible:
+      typeof candidate.isLeftRailVisible === 'boolean'
+        ? candidate.isLeftRailVisible
+        : defaults.isLeftRailVisible,
+    isRightInspectorVisible:
+      typeof candidate.isRightInspectorVisible === 'boolean'
+        ? candidate.isRightInspectorVisible
+        : defaults.isRightInspectorVisible,
   };
 };
 

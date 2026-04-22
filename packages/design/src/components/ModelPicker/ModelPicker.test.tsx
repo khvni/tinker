@@ -140,4 +140,14 @@ describe('<ModelPicker>', () => {
     const trigger = screen.getByRole('button', { name: /Select model/i });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
+
+  it('dock variant renders persistent bg and dual labels', () => {
+    const { container } = render(
+      <ModelPicker items={items} value={items[0]?.id} onSelect={() => undefined} variant="dock" />,
+    );
+    const trigger = container.querySelector('.tk-modelpicker__trigger--dock');
+    expect(trigger).not.toBeNull();
+    expect(screen.getByText('Anthropic')).toBeInTheDocument();
+    expect(screen.getByText('Claude Sonnet 4')).toBeInTheDocument();
+  });
 });

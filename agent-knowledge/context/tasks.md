@@ -121,6 +121,7 @@ Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
 | 4.15 | Clear existing tool-call / thinking UI from `Chat.tsx` that doesn't match 4.5/4.6 semantics. | S | 4.5, 4.6 | review | TIN-52 · PR #67 (bundled — see 4.5). |
 | 4.16 | Build vs Plan mode picker in Chat pane header. Persist per session and pass to OpenCode prompt agent. | M | 2.2, 4.7, 4.8, 5.2 | review | TIN-173 · PR #80. Header ships ModelPicker + ModeToggle + plan badge + ContextBadge wiring. |
 | 4.17 | Reasoning level picker for reasoning-capable models. Persist per session; new session inherits last-used value for that model family. | M | 2.2, 4.7, 4.8, 5.1 | review | TIN-174 · PR #80. Hidden for non-reasoning models; maps UI low/medium/high to OpenCode variants. |
+| 4.18 | Composer/StatusDock pixel parity vs Paper 9I-0: ContextPill, kebab menu, pane actions, ModelPicker dock variant, PromptComposer slot refactor, FolderPill. | L | 4.7, 4.16, 5.3 | review | TIN-199 · PR #119 · `khvni/tin-199`. |
 
 ### M5 — Context usage badge
 Spec: [[25-mvp-context-badge]] · Depends on: M4.2
@@ -146,6 +147,7 @@ Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5, M8.3 (current user resol
 | 6.7 | Simple memory injection (MVP): before `session.prompt()`, read up to N most recent `.md` files (default N=5) from `<memory_root>/<current-user-id>/`, prepend as `noReply` system context. Existing `bridge/memory-injector.ts` scaffold extended. | M | 6.3, 4.2 | review | TIN-63 · PR #97. Top-5 recency only; skips files over 100KB. |
 | 6.8 | Simple memory append (MVP, toggleable): after assistant response finishes streaming, write `<memory_root>/<user-id>/sessions/YYYY-MM-DD-HHMM-<session-id>.md` with the user prompt + final assistant message. Setting `app_settings.memory_auto_append` default `true`. | M | 6.3, 4.4 | review | TIN-64 · PR #97. Append-only; toggle now lives in the Settings pane. |
 | 6.9 | Path-change / user-switch propagation: 6.6 AND M8.8 both trigger 6.7/6.8 to re-resolve path + trigger M7.7 (MCP env var refresh). | S | 6.6, 6.7, 6.8, 7.7, 8.8 | review | TIN-65 · PR #97. Shared `memory.path-changed` event invalidates chat caches + restarts OpenCode on switch/root move. |
+| 6.10 | Categorised memory view per Paper IQ-0: `MemorySidebar` (search + filter + Pending/People/Active Work/Capabilities/Preferences/Organization accordion with counts + unread dots) + `MemoryDetail` (header + CONTENT/CHANGES sections + Approve/Dismiss). Rust `memory_approve` / `memory_dismiss` / `memory_diff` commands, frontmatter `kind:` → folder lookup, tombstone log. | L | 6.4 | review | TIN-196 · PR #116. |
 
 ### M7 — Built-in MCP servers (qmd, smart-connections, exa)
 Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
@@ -248,6 +250,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
 | TIN-167 | release | Cross-platform tag-triggered GitHub Release pipeline + updater manifest | review | PR #49. Supersedes TIN-164 scope on `v*` tag trigger; reconcile before merge. |
 | TIN-176 | UI.1 | Paper design source audit + tokens.css parity report | review | `agent-knowledge/reference/paper-design-audit.md`. Dark tokens 1:1 match; light surface tokens drift (D23 layer reversal inverted in code). Blocks downstream UI cleanup chain. |
+| TIN-198 | UI.1 | Typography role tokens + Paper 9J-0 parity playground | review | PR #117. Adds `--font-size-*` / `--font-weight-*` / `--line-height-*` role tokens, dark display-weight override, tokenizes remaining literal px values, adds `check-typography-tokens.sh` guard. |
 | TIN-177 + TIN-178 + TIN-181 | 09 | UI trio: `<Modal>` + `<Toast>` provider + `<EmptyState>` primitives in `@tinker/design`; `EmptyState` adopted by Chat / Today / IntegrationsStrip | review | Branch `khvni/ui-design-trio`. One bundled PR. Session: [[2026-04-21-2146-ui-trio]]. Folder-per-component (D21), tokens-only (D14/D23), dual-theme verified. 31 new tests. |
 | TIN-172 | 15 / M7.8 | `<ConnectionGate>` primitive (minimal MCP variant) | review | PR #50. Ships the atom TIN-155 generalizes. |
 | TIN-155 | 15 | `<ConnectionSplash>` full-window splash (generalizes TIN-172) | review | PR stacks on #50. Composes ConnectionGate + Tinker wordmark + spinner + 4 service categories. |
@@ -256,6 +259,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | TIN-158 + TIN-159 | integrations | GitHub + Linear MCP server wiring | review | PR #102. Swapped stale package refs to current official remote MCP endpoints, expanded GitHub scopes for repo access, and added boot-time GitHub/Linear MCP status handling. |
 | TIN-182 | UI.7 | Workspace shell redesign per Paper — Titlebar + tauri Overlay + delete bespoke header + IntegrationsStrip compact | review | Branch `khvni/ui7-shell`. Session [[2026-04-22-0315-ui7-shell]]. Folder-per-component `<Titlebar>` (D21), tokens-only (D14/D23), macOS traffic-lights honored via `titleBarStyle:"Overlay"` + 68px reservation. 9 new tests. |
 | TIN-146 + TIN-147 | 12 | Pane-frame attention ring + pane-tab unread dot in `@tinker/panes`; desktop chat raises unread attention for unfocused assistant output; panes demo can trigger both states | review | PR #89. Branch `khvni/tin146-147-workspace-ui`. Paper MCP unavailable in-session, so parity used existing tokens + local workspace patterns. |
+| TIN-193 + TIN-194 + TIN-195 | UI / M1 | Titlebar toggle buttons (left rail / right inspector), Paper 9J-0 light token flip, rail cleanup (remove deferred items + onOpenConnections + SettingsShell scrollTargetSectionId) | review | PR #118 · Branch `khvni/tin-193-195`. Ships collapse-to-0 WorkspaceShell, ⌘B/⌘⌥B keybinds, D28 decision record. |
 | follow-up | cleanup | Delete legacy `IntegrationsStrip` once FirstRun + Workspace stop importing it — the Settings Connections surface now lives in `ConnectionsSection` (TIN-70) inside the `SettingsPane` rail. | not started | Kicked out of TIN-70/71/175 scope. |
 
 ## Rejected (not coming back)

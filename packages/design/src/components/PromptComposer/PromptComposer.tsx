@@ -27,8 +27,14 @@ export type PromptComposerProps = {
   readonly onAttach?: () => void;
   readonly attachDisabled?: boolean;
   readonly attachLabel?: string;
+  /** Top-left slot — e.g. ContextPill */
+  readonly contextSlot?: ReactNode;
+  /** Top-right slot — e.g. StatusDot + Kebab menu */
+  readonly statusSlot?: ReactNode;
+  /** Bottom row left-side controls — e.g. Mode chip, ModelPicker, ReasoningPicker */
   readonly controls?: ReactNode;
-  readonly notice?: ReactNode;
+  /** Bottom row right-side trailing slot — e.g. FolderPill */
+  readonly trailingSlot?: ReactNode;
   readonly textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   readonly className?: string;
 };
@@ -103,8 +109,10 @@ export const PromptComposer = forwardRef<HTMLTextAreaElement, PromptComposerProp
       onAttach,
       attachDisabled = false,
       attachLabel = 'Add attachment',
+      contextSlot,
+      statusSlot,
       controls,
-      notice,
+      trailingSlot,
       textareaRef,
       className,
     },
@@ -132,10 +140,17 @@ export const PromptComposer = forwardRef<HTMLTextAreaElement, PromptComposerProp
 
     const submitDisabled = disabled || busy || !canSubmit || value.trim().length === 0;
     const sendClickable = busy ? !!onAbort : !submitDisabled;
+    const hasTopRow = Boolean(contextSlot) || Boolean(statusSlot);
+    const hasBottomRow = Boolean(controls) || Boolean(trailingSlot);
 
     return (
       <div className={cx('tk-prompt-composer', className)}>
-        {notice ? <div className="tk-prompt-composer__notice">{notice}</div> : null}
+        {hasTopRow ? (
+          <div className="tk-prompt-composer__top-row">
+            <div className="tk-prompt-composer__context-slot">{contextSlot}</div>
+            <div className="tk-prompt-composer__status-slot">{statusSlot}</div>
+          </div>
+        ) : null}
         <div
           className={cx(
             'tk-prompt-composer__card',
@@ -184,7 +199,12 @@ export const PromptComposer = forwardRef<HTMLTextAreaElement, PromptComposerProp
             </button>
           </div>
         </div>
-        {controls ? <div className="tk-prompt-composer__controls">{controls}</div> : null}
+        {hasBottomRow ? (
+          <div className="tk-prompt-composer__bottom-row">
+            <div className="tk-prompt-composer__controls">{controls}</div>
+            <div className="tk-prompt-composer__trailing-slot">{trailingSlot}</div>
+          </div>
+        ) : null}
       </div>
     );
   },

@@ -18,11 +18,15 @@ export type TabKind =
 
 export type WorkspacePreferences = {
   autoOpenAgentWrittenFiles: boolean;
+  isLeftRailVisible: boolean;
+  isRightInspectorVisible: boolean;
 };
 
 export const createDefaultWorkspacePreferences = (): WorkspacePreferences => {
   return {
     autoOpenAgentWrittenFiles: true,
+    isLeftRailVisible: true,
+    isRightInspectorVisible: false,
   };
 };
 

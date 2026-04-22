@@ -33,6 +33,8 @@ const settingsRuntime: SettingsPaneRuntime = {
   opencode: null,
   vaultPath: null,
   mcpSeedStatuses: {},
+  pendingSectionId: null,
+  onPendingSectionConsumed: vi.fn(),
   onSignOut: vi.fn().mockResolvedValue(undefined),
   onContinueAsGuest: vi.fn().mockResolvedValue(undefined),
   onConnectGoogle: vi.fn().mockResolvedValue(undefined),
@@ -70,8 +72,8 @@ describe('registerWorkspacePaneRenderers', () => {
     expect(settingsMarkup).toContain('Model');
     expect(settingsMarkup).toContain('Memory');
     expect(settingsMarkup).toContain('Connections');
-    expect(memoryMarkup).toContain('Memory files');
     expect(memoryMarkup).toContain('tinker-memory-pane');
-    expect(memoryMarkup).toContain('Loading…');
+    expect(memoryMarkup).toContain('tinker-memory-sidebar');
+    expect(memoryMarkup).toContain('Select a memory entry');
   });
 });

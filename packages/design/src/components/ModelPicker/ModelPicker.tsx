@@ -17,9 +17,12 @@ export type ModelPickerItem = {
   providerId: string;
   providerName: string;
   name: string;
+  groupLabel?: string;
   contextWindow?: number;
   pricingHint?: string;
 };
+
+export type ModelPickerVariant = 'default' | 'dock';
 
 export type ModelPickerProps = {
   items: ReadonlyArray<ModelPickerItem>;
@@ -35,6 +38,7 @@ export type ModelPickerProps = {
   openShortcut?: string | undefined;
   defaultOpen?: boolean | undefined;
   defaultFilter?: string | undefined;
+  variant?: ModelPickerVariant;
   className?: string | undefined;
 };
 
@@ -173,6 +177,7 @@ export const ModelPicker = ({
   openShortcut = "Mod+'",
   defaultOpen = false,
   defaultFilter = '',
+  variant = 'default',
   className,
 }: ModelPickerProps): JSX.Element => {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -337,6 +342,7 @@ export const ModelPicker = ({
         fallbackLabel={triggerLabel}
         disabled={disabled}
         open={state.open}
+        variant={variant}
         onToggle={togglePicker}
       />
       {state.open ? (

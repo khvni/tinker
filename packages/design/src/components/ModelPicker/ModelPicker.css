@@ -59,14 +59,41 @@
   cursor: not-allowed;
 }
 
+/* Dock variant — persistent elevated fill, dual label */
+.tk-modelpicker__trigger--dock {
+  height: 28px;
+  padding: 5px 9px 5px 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  font-size: var(--font-size-sm);
+}
+
+.tk-modelpicker__trigger--dock:hover:not(.tk-modelpicker__trigger--disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+.tk-modelpicker__trigger--dock.tk-modelpicker__trigger--open {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
 .tk-modelpicker__trigger-icon {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 14px;
   height: 14px;
   flex-shrink: 0;
   border-radius: var(--radius-xs);
   background: var(--color-accent-soft);
   opacity: 0.72;
+}
+
+.tk-modelpicker__trigger--dock .tk-modelpicker__trigger-icon {
+  background: transparent;
+  opacity: 1;
+  color: var(--color-text-secondary);
 }
 
 .tk-modelpicker__trigger:hover .tk-modelpicker__trigger-icon,
@@ -81,9 +108,32 @@
   text-overflow: ellipsis;
 }
 
+.tk-modelpicker__trigger-provider {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.tk-modelpicker__trigger-separator {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-muted);
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
 .tk-modelpicker__chevron {
   flex-shrink: 0;
   color: var(--color-text-muted);
+}
+
+.tk-modelpicker__trigger--dock .tk-modelpicker__chevron {
+  color: var(--color-text-secondary);
 }
 
 /* ---------------- Popover panel ---------------- */

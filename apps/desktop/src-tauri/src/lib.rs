@@ -441,6 +441,9 @@ pub fn run() {
             commands::keychain::save_refresh_token,
             commands::keychain::load_refresh_token,
             commands::keychain::clear_refresh_token,
+            commands::memory::memory_approve,
+            commands::memory::memory_dismiss,
+            commands::memory::memory_diff,
             commands::opencode::start_opencode,
             commands::opencode::stop_opencode
         ])

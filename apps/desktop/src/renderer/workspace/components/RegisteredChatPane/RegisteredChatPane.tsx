@@ -10,6 +10,8 @@ type RegisteredChatPaneProps = {
   paneId?: string;
   paneData?: Extract<TinkerPaneData, { readonly kind: 'chat' }>;
   onAttentionSignal?: (reason: FlashReason) => void;
+  onDuplicatePane?: () => void;
+  onClosePane?: () => void;
 };
 
 export const RegisteredChatPane = ({
@@ -18,6 +20,8 @@ export const RegisteredChatPane = ({
   paneId,
   paneData,
   onAttentionSignal,
+  onDuplicatePane,
+  onClosePane,
 }: RegisteredChatPaneProps): JSX.Element => {
   const runtime = useChatPaneRuntime();
   const { persistPaneSessionId, ...chatRuntime } = runtime;
@@ -27,6 +31,8 @@ export const RegisteredChatPane = ({
       {...chatRuntime}
       {...(isActive !== undefined ? { paneIsActive: isActive } : {})}
       {...(onAttentionSignal ? { onAttentionSignal } : {})}
+      {...(onDuplicatePane ? { onDuplicatePane } : {})}
+      {...(onClosePane ? { onClosePane } : {})}
       {...(paneData?.sessionId ? { paneSessionId: paneData.sessionId } : {})}
       {...(persistPaneSessionId && tabId && paneId
         ? {

@@ -5,9 +5,24 @@
   width: 100%;
 }
 
-.tk-prompt-composer__notice {
+.tk-prompt-composer__top-row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: 0 var(--space-1);
+}
+
+.tk-prompt-composer__context-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tk-prompt-composer__status-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .tk-prompt-composer__card {
@@ -15,11 +30,11 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-2) var(--space-3);
+  padding: 12px 14px 10px 14px;
+  gap: 10px;
   transition:
     border-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
@@ -42,11 +57,16 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  padding: var(--space-2) 0;
-  min-height: calc(var(--space-6) * 3);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
+  padding: 0;
+  min-height: 80px;
+  font-size: var(--font-size-md);
+  line-height: 20px;
   resize: none;
+  color: var(--color-text-primary);
+}
+
+.tk-prompt-composer__card > .tk-prompt-composer__textarea::placeholder {
+  color: var(--color-text-muted);
 }
 
 .tk-prompt-composer__card > .tk-prompt-composer__textarea:hover,
@@ -61,24 +81,28 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-top: var(--space-1);
 }
 
 .tk-prompt-composer__attach {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
   color: var(--color-text-muted);
+  background: transparent;
 }
 
 .tk-prompt-composer__send {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-md);
-  background: var(--color-bg-panel);
-  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
   cursor: pointer;
   transition:
     background var(--duration-fast) var(--ease-standard),
@@ -105,10 +129,23 @@
   cursor: not-allowed;
 }
 
+.tk-prompt-composer__bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+}
+
 .tk-prompt-composer__controls {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
-  padding: 0 var(--space-1);
+}
+
+.tk-prompt-composer__trailing-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }

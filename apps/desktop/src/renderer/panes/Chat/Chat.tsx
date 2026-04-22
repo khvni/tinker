@@ -14,14 +14,15 @@ import type { Message, Part } from '@opencode-ai/sdk/v2/client';
 import {
   Badge,
   Button,
-  ClickableBadge,
   ComposerChip,
   ContextBadge,
+  ContextPill,
   EmptyState,
   Menu,
   ModelPicker,
   PromptComposer,
   SelectFolderButton,
+  StatusDot,
   type MenuItem,
 } from '@tinker/design';
 import {
@@ -62,6 +63,7 @@ import {
 import { SaveAsSkillButton } from './components/SaveAsSkillButton/index.js';
 import { SaveAsSkillModal, buildSkillTranscript } from './components/SaveAsSkillModal/index.js';
 import { ChatMessage } from '../ChatMessage/index.js';
+import { FolderPill } from './components/FolderPill/index.js';
 import { McpConnectionGate } from './components/McpConnectionGate/index.js';
 import { resolvePreferredStoredModelId, resolveSelectedModelId } from './modelSelection.js';
 import {
@@ -108,6 +110,8 @@ type ChatProps = {
    * re-inject. Also called after "Save as skill" publishes a new skill.
    */
   onActiveSkillsChanged?: () => void;
+  onDuplicatePane?: () => void;
+  onClosePane?: () => void;
   paneIsActive?: boolean;
   onAttentionSignal?: (reason: 'notification-arrival') => void;
 };
@@ -125,8 +129,16 @@ const THINKING_ITEMS: ReadonlyArray<MenuItem<ReasoningLevel>> = [
   { value: 'xhigh', label: 'X-High' },
 ];
 
+type KebabAction = 'clear' | 'duplicate' | 'close';
+
+const KEBAB_ITEMS: ReadonlyArray<MenuItem<KebabAction>> = [
+  { value: 'clear', label: 'Clear chat' },
+  { value: 'duplicate', label: 'Duplicate pane' },
+  { value: 'close', label: 'Close pane' },
+];
+
 const MODE_LABELS: Record<SessionMode, string> = {
-  build: 'Build',
+  build: 'Auto Accept',
   plan: 'Plan',
 };
 
@@ -250,6 +262,8 @@ export const Chat = ({
   onOpenNewChat,
   onMemoryCommitted,
   onActiveSkillsChanged,
+  onDuplicatePane,
+  onClosePane,
   paneIsActive = true,
   onAttentionSignal,
 }: ChatProps): JSX.Element => {
@@ -891,6 +905,26 @@ export const Chat = ({
     }
   };
 
+  const handleClearChat = useCallback((): void => {
+    const activeSessionID = sessionIDRef.current;
+    if (activeSessionID) {
+      void client.session.abort({ sessionID: activeSessionID });
+    }
+    abortRequestedRef.current = false;
+    sessionIDRef.current = null;
+    sessionCreatedAtRef.current = null;
+    setActiveSessionId(null);
+    setMessages([]);
+    dispatchDraft({ type: 'reset' });
+    setHistoryCursor(null);
+    contextUsageSnapshotRef.current = null;
+    setContextUsage(null);
+    setShowNewMessagesPill(false);
+    setDisclosureOverrides({});
+    setDefaultDisclosureOpen(false);
+    setStatus(readyStatus);
+  }, [client, readyStatus]);
+
   useEffect(() => {
     if (!busy || typeof window === 'undefined') {
       return;
@@ -1111,6 +1145,19 @@ export const Chat = ({
     }
   };
 
+  const handleKebabSelect = useCallback(
+    (action: KebabAction) => {
+      if (action === 'clear') {
+        handleClearChat();
+      } else if (action === 'duplicate') {
+        onDuplicatePane?.();
+      } else if (action === 'close') {
+        onClosePane?.();
+      }
+    },
+    [handleClearChat, onDuplicatePane, onClosePane],
+  );
+
   return (
     <section className="tinker-pane tinker-pane--chat">
       <header className="tinker-chat-header">
@@ -1143,7 +1190,6 @@ export const Chat = ({
           ) : null}
         </div>
       </header>
-
       <div className="tinker-chat-log-shell">
         <div
           className="tinker-chat-log"
@@ -1155,7 +1201,7 @@ export const Chat = ({
             awaitingFolder ? (
               <EmptyState
                 title="Select a folder to start"
-                description="The agent works inside a local folder. Use the “Select folder” button in the header to pick one."
+                description="The agent works inside a local folder. Pick one to begin."
                 action={
                   <Button
                     variant="primary"
@@ -1265,9 +1311,13 @@ export const Chat = ({
 
         {showNewMessagesPill ? (
           <div className="tinker-chat-scroll-pill">
-            <ClickableBadge variant="info" size="small" onClick={() => scrollToBottom('smooth')}>
+            <button
+              type="button"
+              className="tinker-chat-scroll-pill__btn"
+              onClick={() => scrollToBottom('smooth')}
+            >
               New messages
-            </ClickableBadge>
+            </button>
           </div>
         ) : null}
       </div>
@@ -1279,18 +1329,46 @@ export const Chat = ({
           onSubmit={() => void sendMessage()}
           onAbort={() => void abortActiveStream()}
           onKeyDown={handleComposerKeyDown}
-          placeholder='Ask anything… "What dependencies are outdated?"'
+          placeholder="Reply…"
           disabled={composerBlocked}
           busy={busy}
           canSubmit={!composerBlocked}
           attachLabel="Attachments coming soon"
           attachDisabled
-          notice={
-            mcpConnectionGate.notice ? (
-              <Badge variant="info" size="small">
-                {mcpConnectionGate.notice}
-              </Badge>
+          contextSlot={
+            contextUsage ? (
+              <ContextPill
+                percent={contextUsage.percent}
+                tokens={contextUsage.tokens}
+                windowSize={contextUsage.windowSize}
+                model={contextUsage.model}
+              />
             ) : null
+          }
+          statusSlot={
+            <>
+              <StatusDot state={modelConnected ? 'halo' : 'muted'} />
+              <Menu
+                items={KEBAB_ITEMS}
+                onSelect={handleKebabSelect}
+                trigger={({ open, toggle }) => (
+                  <button
+                    type="button"
+                    className="tinker-chat-kebab"
+                    aria-label="Pane options"
+                    aria-haspopup="menu"
+                    aria-expanded={open}
+                    onClick={toggle}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <circle cx="4" cy="8" r="1" fill="currentColor" />
+                      <circle cx="8" cy="8" r="1" fill="currentColor" />
+                      <circle cx="12" cy="8" r="1" fill="currentColor" />
+                    </svg>
+                  </button>
+                )}
+              />
+            </>
           }
           controls={
             <>
@@ -1302,6 +1380,7 @@ export const Chat = ({
                 trigger={({ open, toggle }) => (
                   <ComposerChip
                     label={MODE_LABELS[composerMode]}
+                    variant={composerMode === 'build' ? 'primary' : 'default'}
                     open={open}
                     disabled={busy || hydratingHistory}
                     onClick={toggle}
@@ -1315,6 +1394,7 @@ export const Chat = ({
                 loading={modelOptionsLoading}
                 disabled={busy || hydratingHistory}
                 emptyLabel="No models available in OpenCode."
+                variant="dock"
               />
               <Menu
                 items={THINKING_ITEMS}
@@ -1332,6 +1412,7 @@ export const Chat = ({
               />
             </>
           }
+          trailingSlot={<FolderPill />}
         />
       </div>
 

@@ -28,6 +28,6 @@
 
 .tk-kbdhint__key--wide {
   padding: 0 6px;
-  font-size: 10px;
-  letter-spacing: 0.02em;
+  font-size: var(--font-size-xxs);
+  letter-spacing: 0.02em; /* kbd-glyph legibility — intentionally tighter than label tracking */
 }

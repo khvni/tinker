@@ -80,6 +80,7 @@ export type WorkspaceActions<TData> = {
     ratio?: number,
   ) => void;
   readonly closePane: (tabId: TabId, paneId: PaneId) => void;
+  readonly duplicatePane: (tabId: TabId, paneId: PaneId) => void;
   readonly focusPane: (tabId: TabId, paneId: PaneId) => void;
   readonly focusStack: (tabId: TabId, stackId: StackId) => void;
   readonly updatePaneData: (
@@ -321,6 +322,29 @@ export const createWorkspaceStore = <TData>(
             panes: remainingPanes,
             activePaneId: next.paneId,
             activeStackId: next.stackId,
+          })),
+        );
+      },
+
+      duplicatePane: (tabId, paneId) => {
+        const current = get();
+        const tab = current.tabs.find((candidate) => candidate.id === tabId);
+        if (!tab) return;
+        const source = tab.panes[paneId];
+        if (!source) return;
+        const newPaneId = `${paneId}-copy-${crypto.randomUUID()}`;
+        const paneRecord: Pane<TData> = { ...source, id: newPaneId };
+        const host = findStackContainingPane(tab.layout, paneId);
+        if (!host) return;
+        const updatedStack = insertPaneInStack(host, paneRecord.id);
+        const nextLayout = replaceStack(tab.layout, host.id, { ...updatedStack, activePaneId: paneRecord.id });
+        set(
+          setTab(current, tabId, (existing) => ({
+            ...existing,
+            layout: nextLayout,
+            panes: { ...existing.panes, [paneRecord.id]: paneRecord },
+            activePaneId: paneRecord.id,
+            activeStackId: host.id,
           })),
         );
       },

@@ -1,0 +1,43 @@
+.folder-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  height: 24px;
+  padding: 5px 9px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.folder-pill:hover:not(.folder-pill--disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+.folder-pill--open {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+.folder-pill--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.folder-pill__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}

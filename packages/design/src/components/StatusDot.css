@@ -1,7 +1,7 @@
 .tk-statusdot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: var(--radius-pill);
   flex-shrink: 0;
   background: var(--color-muted);
@@ -34,6 +34,11 @@
 .tk-statusdot--pulse {
   background: var(--color-success);
   animation: tk-statusdot-pulse 1.4s ease-in-out infinite;
+}
+
+.tk-statusdot--halo {
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-soft);
 }
 
 @keyframes tk-statusdot-pulse {

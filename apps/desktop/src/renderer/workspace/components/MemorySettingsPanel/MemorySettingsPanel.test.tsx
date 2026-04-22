@@ -62,7 +62,7 @@ describe('MemorySettingsPanel', () => {
 
     const markup = renderToStaticMarkup(
       <MemorySettingsPanel
-        workspacePreferences={{ autoOpenAgentWrittenFiles: false }}
+        workspacePreferences={{ ...createDefaultWorkspacePreferences(), autoOpenAgentWrittenFiles: false }}
         onWorkspacePreferencesChange={vi.fn()}
       />,
     );

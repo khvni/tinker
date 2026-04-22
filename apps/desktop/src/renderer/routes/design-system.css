@@ -391,6 +391,16 @@
   flex: 1;
 }
 
+/* Chat Composer tab */
+.ds-chat-composer-frame {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  padding: 10px var(--space-4) 14px;
+  max-width: 720px;
+}
+
 /* Give the ModelPicker panel (which anchors bottom: calc(100% + 4px)) enough
  * room to render above its trigger inside the playground flow. */
 .ds-modelpicker-anchor {

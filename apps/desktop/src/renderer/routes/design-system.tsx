@@ -8,6 +8,7 @@ import {
   ConnectionGate,
   ConnectionSplash,
   ContextBadge,
+  ContextPill,
   EmptyState,
   IconButton,
   KeyboardHint,
@@ -48,10 +49,16 @@ import {
 } from '../workspace/components/SettingsShell/index.js';
 import { AccountPanel } from '../workspace/components/AccountPanel/index.js';
 import { Titlebar } from '../workspace/components/Titlebar/index.js';
+import { FolderPill } from '../panes/Chat/components/FolderPill/index.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
 import { PlaybookPane } from '../workspace/components/PlaybookPane/index.js';
 import { SignIn } from './SignIn/index.js';
+import { MemorySidebar } from '../panes/MemoryPane/components/MemorySidebar/index.js';
+import {
+  PREVIEW_MEMORY_BUCKETS,
+  PREVIEW_MEMORY_REFERENCE_TIME_MS,
+} from '../panes/MemoryPane/memory-preview.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -65,6 +72,7 @@ type PlaygroundTab =
   | 'empty'
   | 'chat'
   | 'playbook'
+  | 'chat-composer'
   | 'settings-shell'
   | 'sign-in'
   | 'titlebar';
@@ -80,6 +88,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
   { value: 'playbook', label: 'Playbook' },
+  { value: 'chat-composer', label: 'Chat Composer' },
   { value: 'settings-shell', label: 'Settings Shell' },
   { value: 'sign-in', label: 'Sign In' },
   { value: 'titlebar', label: 'Titlebar' },
@@ -783,7 +792,7 @@ const SURFACE_SWATCHES: ReadonlyArray<Swatch> = [
   { name: 'bg-primary', varName: '--color-bg-primary', hex: '#fefcf8', note: 'canvas · dark #1a1612' },
   { name: 'bg-elevated', varName: '--color-bg-elevated', hex: '#ffffff', note: 'cards / modals · dark #221d17' },
   { name: 'bg-panel', varName: '--color-bg-panel', hex: '#f9f5ec', note: 'sidebar · dark #16120e' },
-  { name: 'bg-input', varName: '--color-bg-input', hex: '#ffffff', note: 'inputs · dark #120f0c' },
+  { name: 'bg-input', varName: '--color-bg-input', hex: '#fefcf8', note: 'inputs · dark #120f0c' },
   { name: 'bg-hover', varName: '--color-bg-hover', hex: '#f4efe4', note: 'interactive hover · dark #25201a' },
 ];
 
@@ -1180,6 +1189,10 @@ const EmptyStateTab = (): JSX.Element => (
       />
     </Section>
 
+    <Section label="Memory sidebar (TIN-196)">
+      <MemorySidebarPlayground />
+    </Section>
+
     <Section label="Connections — none connected">
       <EmptyState
         size="s"
@@ -1503,6 +1516,139 @@ const PlaybookTab = (): JSX.Element => (
   </ToastProvider>
 );
 
+/* -------------------- Chat Composer -------------------- */
+
+const ChatComposerTab = (): JSX.Element => {
+  const [idleMsg, setIdleMsg] = useState('');
+  const [streamMsg, setStreamMsg] = useState('Generating response…');
+  const [disabledMsg, setDisabledMsg] = useState('');
+  const [mode, setMode] = useState<'build' | 'plan'>('build');
+
+  return (
+    <div className="ds-sections">
+      <Section label="Idle">
+        <div className="ds-chat-composer-frame">
+          <PromptComposer
+            value={idleMsg}
+            onChange={setIdleMsg}
+            onSubmit={() => undefined}
+            placeholder="Reply…"
+            contextSlot={
+              <ContextPill percent={4} tokens={8_000} windowSize={200_000} model="claude-sonnet-4-6" />
+            }
+            statusSlot={
+              <>
+                <StatusDot state="halo" />
+                <button type="button" className="tinker-chat-kebab" aria-label="Pane options">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="4" cy="8" r="1" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1" fill="currentColor" />
+                    <circle cx="12" cy="8" r="1" fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            }
+            controls={
+              <>
+                <ComposerChip label={mode === 'build' ? 'Auto Accept' : 'Plan'} variant={mode === 'build' ? 'primary' : 'default'} onClick={() => setMode(mode === 'build' ? 'plan' : 'build')} />
+                <ModelPicker
+                  items={MODEL_PICKER_ITEMS}
+                  value={MODEL_PICKER_ITEMS[0]?.id}
+                  onSelect={() => undefined}
+                  variant="dock"
+                />
+                <ComposerChip label="Default" />
+              </>
+            }
+            trailingSlot={<FolderPill />}
+          />
+        </div>
+      </Section>
+
+      <Section label="Streaming">
+        <div className="ds-chat-composer-frame">
+          <PromptComposer
+            value={streamMsg}
+            onChange={setStreamMsg}
+            onSubmit={() => undefined}
+            onAbort={() => undefined}
+            busy
+            placeholder="Reply…"
+            contextSlot={
+              <ContextPill percent={58} tokens={116_000} windowSize={200_000} model="claude-sonnet-4-6" />
+            }
+            statusSlot={
+              <>
+                <StatusDot state="pulse" />
+                <button type="button" className="tinker-chat-kebab" aria-label="Pane options">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="4" cy="8" r="1" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1" fill="currentColor" />
+                    <circle cx="12" cy="8" r="1" fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            }
+            controls={
+              <>
+                <ComposerChip label="Auto Accept" variant="primary" />
+                <ModelPicker
+                  items={MODEL_PICKER_ITEMS}
+                  value={MODEL_PICKER_ITEMS[0]?.id}
+                  onSelect={() => undefined}
+                  variant="dock"
+                />
+                <ComposerChip label="Default" />
+              </>
+            }
+            trailingSlot={<FolderPill />}
+          />
+        </div>
+      </Section>
+
+      <Section label="Disabled">
+        <div className="ds-chat-composer-frame">
+          <PromptComposer
+            value={disabledMsg}
+            onChange={setDisabledMsg}
+            onSubmit={() => undefined}
+            disabled
+            placeholder="Reply…"
+            contextSlot={
+              <ContextPill percent={0} tokens={0} windowSize={200_000} model="claude-sonnet-4-6" />
+            }
+            statusSlot={
+              <>
+                <StatusDot state="muted" />
+                <button type="button" className="tinker-chat-kebab" aria-label="Pane options">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="4" cy="8" r="1" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1" fill="currentColor" />
+                    <circle cx="12" cy="8" r="1" fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            }
+            controls={
+              <>
+                <ComposerChip label="Auto Accept" variant="primary" disabled />
+                <ModelPicker
+                  items={MODEL_PICKER_ITEMS}
+                  value={MODEL_PICKER_ITEMS[0]?.id}
+                  onSelect={() => undefined}
+                  variant="dock"
+                  disabled
+                />
+                <ComposerChip label="Default" disabled />
+              </>
+            }
+            trailingSlot={<FolderPill disabled />}
+          />
+        </div>
+      </Section>
+    </div>
+  );
+};
 /* -------------------- Settings Shell --------------------- */
 
 const UserIcon = () => (
@@ -1710,18 +1856,30 @@ const TitlebarTab = (): JSX.Element => (
     <Section label="No session — bare brand">
       <Titlebar
         sessionFolderPath={null}
-        onNewSession={() => undefined}
-        onOpenMemory={() => undefined}
-        onOpenSettings={() => undefined}
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
       />
     </Section>
 
     <Section label="With session folder crumb">
       <Titlebar
         sessionFolderPath="/Users/khani/Desktop/projects/tinker"
-        onNewSession={() => undefined}
-        onOpenMemory={() => undefined}
-        onOpenSettings={() => undefined}
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
+      />
+    </Section>
+
+    <Section label="Left rail collapsed (left toggle aria-pressed)">
+      <Titlebar
+        sessionFolderPath="/Users/khani/Desktop/projects/tinker"
+        isLeftRailVisible={false}
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
       />
     </Section>
 
@@ -1729,14 +1887,38 @@ const TitlebarTab = (): JSX.Element => (
       <div data-theme="dark" style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-4)' }}>
         <Titlebar
           sessionFolderPath="/Users/khani/Desktop/projects/tinker"
-          onNewSession={() => undefined}
-          onOpenMemory={() => undefined}
-          onOpenSettings={() => undefined}
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
         />
       </div>
     </Section>
   </div>
 );
+
+/* --------------------- Memory sidebar -------------------- */
+
+const MemorySidebarPlayground = (): JSX.Element => {
+  const [selected, setSelected] = useState<string | null>(
+    '/memory/demo/pending/writing-articles.md',
+  );
+  const [search, setSearch] = useState('');
+
+  return (
+    <div style={{ height: 480, border: '1px solid var(--color-border-subtle)' }}>
+      <MemorySidebar
+        buckets={PREVIEW_MEMORY_BUCKETS}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        selectedPath={selected}
+        onSelect={(file) => setSelected(file.absolutePath)}
+        seenPaths={new Set(['/memory/demo/pending/writing-articles.md'])}
+        referenceTimeMs={PREVIEW_MEMORY_REFERENCE_TIME_MS}
+      />
+    </div>
+  );
+};
 
 /* ----------------------- Router ------------------------- */
 
@@ -1762,6 +1944,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ChatTab />;
     case 'playbook':
       return <PlaybookTab />;
+    case 'chat-composer':
+      return <ChatComposerTab />;
     case 'settings-shell':
       return <SettingsShellTab />;
     case 'sign-in':

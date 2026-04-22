@@ -2,8 +2,12 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cx } from '../cx.js';
 import './ComposerChip.css';
 
+export type ComposerChipVariant = 'default' | 'primary';
+
 export type ComposerChipProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   readonly label: string;
+  readonly secondaryLabel?: string;
+  readonly variant?: ComposerChipVariant;
   readonly open?: boolean;
   readonly leadingIcon?: ReactNode;
   readonly showChevron?: boolean;
@@ -30,7 +34,7 @@ const ChevronDownIcon = () => (
 
 export const ComposerChip = forwardRef<HTMLButtonElement, ComposerChipProps>(
   function ComposerChip(
-    { label, open = false, leadingIcon, showChevron = true, className, type = 'button', disabled, ...rest },
+    { label, secondaryLabel, variant = 'default', open = false, leadingIcon, showChevron = true, className, type = 'button', disabled, ...rest },
     ref,
   ) {
     return (
@@ -39,6 +43,7 @@ export const ComposerChip = forwardRef<HTMLButtonElement, ComposerChipProps>(
         type={type}
         className={cx(
           'tk-composer-chip',
+          `tk-composer-chip--${variant}`,
           open && 'tk-composer-chip--open',
           disabled && 'tk-composer-chip--disabled',
           className,
@@ -54,6 +59,12 @@ export const ComposerChip = forwardRef<HTMLButtonElement, ComposerChipProps>(
           </span>
         ) : null}
         <span className="tk-composer-chip__label">{label}</span>
+        {secondaryLabel ? (
+          <>
+            <span className="tk-composer-chip__separator" aria-hidden="true" />
+            <span className="tk-composer-chip__secondary-label">{secondaryLabel}</span>
+          </>
+        ) : null}
         {showChevron ? <ChevronDownIcon /> : null}
       </button>
     );

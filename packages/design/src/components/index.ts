@@ -55,6 +55,7 @@ export {
   SelectFolderButton,
   type SelectFolderButtonProps,
 } from './SelectFolderButton/index.js';
-export { ComposerChip, type ComposerChipProps } from './ComposerChip/index.js';
+export { ComposerChip, type ComposerChipProps, type ComposerChipVariant } from './ComposerChip/index.js';
+export { ContextPill, type ContextPillProps } from './ContextPill/index.js';
 export { Menu, type MenuItem, type MenuProps } from './Menu/index.js';
 export { PromptComposer, type PromptComposerProps } from './PromptComposer/index.js';
