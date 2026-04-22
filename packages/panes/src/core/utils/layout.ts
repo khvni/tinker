@@ -421,7 +421,7 @@ export const getSpatialNeighborStackId = (
 /**
  * Fraction of the body that counts as "edge" vs. "center" when a drag hovers a
  * stack. 0.28 means the outer 28% on every side is an edge zone and the inner
- * 44% square is the center. Mirrors Dockview's `_rootDropTarget` geometry.
+ * 44% square is the center. Tuned to match the old workspace drop affordance.
  */
 export const EDGE_ZONE_FRACTION = 0.28;
 

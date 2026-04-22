@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { Badge, Button, SegmentedControl } from '@tinker/design';
 import { readFile } from '@tauri-apps/plugin-fs';
-import type { IDockviewPanelProps } from 'dockview-react';
 import { getPanelTitleForPath, type FilePaneParams } from '../file-utils.js';
 import { getWorksheetPageCount, getWorksheetPageRows, XLSX_ROWS_PER_PAGE } from './constants.js';
 import './XlsxRenderer.css';
@@ -11,7 +10,7 @@ const getDefaultSheetName = (workbook: WorkbookPreview | null): string | null =>
   return workbook?.sheets[0]?.name ?? null;
 };
 
-export const XlsxRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JSX.Element => {
+export const XlsxRenderer = ({ params }: { params?: FilePaneParams }): JSX.Element => {
   const path = params?.path;
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);

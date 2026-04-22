@@ -19,7 +19,7 @@ describe('hydrateLayoutRow', () => {
   it('returns null and warns when the stored version is incompatible', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION + 1,
-      dockview_model_json: '{"tabs":[],"activeTabId":null,"version":2}',
+      workspace_state_json: '{"tabs":[],"activeTabId":null,"version":2}',
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
@@ -30,7 +30,7 @@ describe('hydrateLayoutRow', () => {
   it('returns null and warns when the payload is not valid JSON', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION,
-      dockview_model_json: '{ not json',
+      workspace_state_json: '{ not json',
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
@@ -41,7 +41,7 @@ describe('hydrateLayoutRow', () => {
   it('returns null when the payload is valid JSON but not an object', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION,
-      dockview_model_json: 'null',
+      workspace_state_json: 'null',
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
@@ -51,7 +51,7 @@ describe('hydrateLayoutRow', () => {
   it('round-trips a persisted layout including workspace preferences', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION,
-      dockview_model_json: serializeLayoutState({
+      workspace_state_json: serializeLayoutState({
         version: CURRENT_LAYOUT_VERSION,
         workspaceState: {
           version: CURRENT_LAYOUT_VERSION,
@@ -79,7 +79,7 @@ describe('hydrateLayoutRow', () => {
   it('defaults auto-open on when loading a raw workspace payload', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION,
-      dockview_model_json: '{"version":2,"tabs":[],"activeTabId":null}',
+      workspace_state_json: '{"version":2,"tabs":[],"activeTabId":null}',
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 

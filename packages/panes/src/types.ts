@@ -3,10 +3,8 @@
 // A workspace holds N top-level Tabs. Each Tab owns a recursive LayoutNode
 // tree. Branches are `Split` (orientation + ratio + two children). Leaves are
 // `Stack` — tab groups that hold 1..N Panes with one active. This mirrors the
-// grid model used by VSCode (GridView + EditorGroupView), Dockview
-// (BranchNode + LeafNode→DockviewGroupPanel), FlexLayout (Row + TabSet), and
-// rc-dock (BoxData + PanelData). It is intentionally more capable than
-// react-mosaic's single-key leaf.
+// grid model used by VSCode, FlexLayout, and rc-dock while staying generic
+// over pane payload data.
 
 export type SplitOrientation = 'row' | 'column';
 

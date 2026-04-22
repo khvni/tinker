@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { Badge, Textarea } from '@tinker/design';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
-import type { IDockviewPanelProps } from 'dockview-react';
-import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
+import { getPanelTitleForPath } from './file-utils.js';
 
 const isSaveShortcut = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
   return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's';
 };
 
-type MarkdownEditorProps = IDockviewPanelProps<FilePaneParams> & {
+export type MarkdownEditorProps = {
+  path: string;
   vaultRevision: number;
 };
 
-export const MarkdownEditor = ({ params, vaultRevision }: MarkdownEditorProps): JSX.Element => {
-  const path = params?.path;
+export const MarkdownEditor = ({ path, vaultRevision }: MarkdownEditorProps): JSX.Element => {
   const [value, setValue] = useState('');
   const [savedValue, setSavedValue] = useState('');
   const [status, setStatus] = useState('Loading note…');
@@ -24,16 +23,6 @@ export const MarkdownEditor = ({ params, vaultRevision }: MarkdownEditorProps): 
   const loadedRevisionRef = useRef<number>(-1);
 
   useEffect(() => {
-    if (!path) {
-      setError('Missing markdown file path.');
-      setStatus('Unavailable');
-      setValue('');
-      setSavedValue('');
-      dirtyRef.current = false;
-      loadedPathRef.current = null;
-      return;
-    }
-
     const isSamePath = loadedPathRef.current === path;
     const externalChange = isSamePath && loadedRevisionRef.current !== vaultRevision;
 
@@ -99,7 +88,7 @@ export const MarkdownEditor = ({ params, vaultRevision }: MarkdownEditorProps): 
       <header className="tinker-pane-header">
         <div>
           <p className="tinker-eyebrow">Markdown editor</p>
-          <h2>{path ? getPanelTitleForPath(path) : 'Untitled note'}</h2>
+          <h2>{getPanelTitleForPath(path)}</h2>
         </div>
         <Badge
           variant={value === savedValue ? 'default' : 'warning'}

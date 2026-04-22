@@ -1,7 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import DOMPurify from 'dompurify';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import type { IDockviewPanelProps } from 'dockview-react';
 import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 
 export const HTML_PREVIEW_SANDBOX = 'allow-same-origin';
@@ -12,7 +11,7 @@ export const htmlNeedsExternalOpenHint = (html: string): boolean => {
   return SCRIPT_TAG_PATTERN.test(html);
 };
 
-export const HtmlRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JSX.Element => {
+export const HtmlRenderer = ({ params }: { params?: FilePaneParams }): JSX.Element => {
   const path = params?.path;
   const [html, setHtml] = useState('');
   const [error, setError] = useState<string | null>(null);

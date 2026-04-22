@@ -11,9 +11,7 @@
 /**
  * Union of pane kinds shipped in the MVP workspace.
  *
- * Narrower than the legacy `TabKind` in `layout.ts` (which covered deferred
- * panes like `today`, `scheduler`, `playbook`, `vault-browser`). `TabKind` is
- * retired during M1.8–1.9 once the Dockview registry is gone.
+ * Narrow enough that deferred pane kinds stay out of the runtime workspace.
  */
 export type TinkerPaneKind = 'chat' | 'file' | 'settings' | 'memory';
 

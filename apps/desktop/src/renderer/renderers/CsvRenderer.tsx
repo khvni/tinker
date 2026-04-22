@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { Badge, Button } from '@tinker/design';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import type { IDockviewPanelProps } from 'dockview-react';
 import Papa, { type ParseResult } from 'papaparse';
-import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
+import { getPanelTitleForPath } from './file-utils.js';
 
 const ROWS_PER_PAGE = 500;
 
@@ -26,19 +25,16 @@ const parseCsv = (text: string): ParsedCsv => {
   };
 };
 
-export const CsvRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JSX.Element => {
-  const path = params?.path;
+export type CsvRendererProps = {
+  path: string;
+};
+
+export const CsvRenderer = ({ path }: CsvRendererProps): JSX.Element => {
   const [parsed, setParsed] = useState<ParsedCsv>({ header: [], rows: [] });
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!path) {
-      setError('Missing CSV file path.');
-      setParsed({ header: [], rows: [] });
-      return;
-    }
-
     let active = true;
 
     void (async () => {
@@ -73,7 +69,7 @@ export const CsvRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JS
       <header className="tinker-pane-header">
         <div>
           <p className="tinker-eyebrow">CSV</p>
-          <h2>{path ? getPanelTitleForPath(path) : 'Untitled table'}</h2>
+          <h2>{getPanelTitleForPath(path)}</h2>
         </div>
         <Badge variant="default" size="small">
           {parsed.rows.length} rows · page {page + 1} / {pageCount}

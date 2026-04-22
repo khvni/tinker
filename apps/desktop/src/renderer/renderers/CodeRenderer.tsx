@@ -1,11 +1,10 @@
 import { useEffect, useState, type JSX } from 'react';
 import { Badge } from '@tinker/design';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import type { IDockviewPanelProps } from 'dockview-react';
 import { getCodeLanguage, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 import { highlightCode, MAX_HIGHLIGHTABLE_CODE_LENGTH } from './code-highlighter.js';
 
-export const CodeRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): JSX.Element => {
+export const CodeRenderer = ({ params }: { params?: FilePaneParams }): JSX.Element => {
   const path = params?.path;
   const [content, setContent] = useState('');
   const [error, setError] = useState<string | null>(null);
