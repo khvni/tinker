@@ -39,6 +39,16 @@ describe('<ModelPicker>', () => {
     expect(screen.getByRole('dialog', { name: /Select model/i })).toBeInTheDocument();
   });
 
+  it('does not repeat the provider label inside each model row', () => {
+    const { container } = render(
+      <ModelPicker items={items} onSelect={() => undefined} defaultOpen />,
+    );
+
+    expect(container.querySelector('.tk-modelpicker__row-provider')).toBeNull();
+    expect(screen.getByText('Anthropic')).toBeInTheDocument();
+    expect(screen.getByText('OpenAI')).toBeInTheDocument();
+  });
+
   it('filters rows by typing in the search input', () => {
     render(<ModelPicker items={items} onSelect={() => undefined} defaultOpen />);
     const input = screen.getByTestId('modelpicker-search') as HTMLInputElement;

@@ -135,7 +135,6 @@ export const ModelPickerPanel = ({
                       onRowMouseMove(thisIndex);
                     }}
                   >
-                    <span className="tk-modelpicker__row-provider">{item.providerName}</span>
                     <span className="tk-modelpicker__row-name">{item.name}</span>
                     <span className="tk-modelpicker__row-meta">
                       {item.contextWindow != null ? (
