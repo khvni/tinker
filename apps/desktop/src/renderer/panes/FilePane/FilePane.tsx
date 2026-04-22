@@ -7,8 +7,9 @@ import { HtmlRenderer } from '../../renderers/HtmlRenderer.js';
 import { ImageRenderer } from '../../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../../renderers/MarkdownEditor.js';
 import { MarkdownRenderer } from '../../renderers/MarkdownRenderer.js';
-import type { FilePaneParams } from '../../renderers/file-utils.js';
+import { getPanelTitleForPath, type FilePaneParams } from '../../renderers/file-utils.js';
 import { ExternalPreviewPane } from './components/ExternalPreviewPane/index.js';
+import { MISSING_FILE_MIME } from './file-mime.js';
 
 type FilePaneData = Extract<TinkerPaneData, { readonly kind: 'file' }>;
 
@@ -123,9 +124,32 @@ export const mimeToRenderer: Readonly<Record<string, FileRenderer>> = Object.fre
   'text/x-markdown': MarkdownFileRenderer,
 });
 
+type MissingFilePaneProps = {
+  path: string;
+};
+
+const MissingFilePane = ({ path }: MissingFilePaneProps): JSX.Element => {
+  return (
+    <section className="tinker-pane tinker-renderer-pane">
+      <header className="tinker-pane-header">
+        <div>
+          <p className="tinker-eyebrow">File unavailable</p>
+          <h2>{getPanelTitleForPath(path)}</h2>
+        </div>
+      </header>
+
+      <p className="tinker-muted">File no longer exists at this path.</p>
+      <p className="tinker-muted">{path}</p>
+    </section>
+  );
+};
 export { openFileExternally } from './components/ExternalPreviewPane/index.js';
 
 export const FilePane = ({ data, vaultRevision = 0 }: FilePaneProps): JSX.Element => {
+  if (data.mime === MISSING_FILE_MIME) {
+    return <MissingFilePane path={data.path} />;
+  }
+
   const Renderer = mimeToRenderer[data.mime];
 
   if (!Renderer) {

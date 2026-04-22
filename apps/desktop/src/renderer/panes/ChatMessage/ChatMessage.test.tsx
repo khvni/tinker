@@ -68,6 +68,15 @@ describe('ChatMessage', () => {
     expect(markup).toContain('rel="noreferrer noopener"');
   });
 
+  it('keeps local file links in-app instead of forcing a browser tab', () => {
+    const markup = renderToStaticMarkup(
+      <ChatMessage role="assistant" text={'[note](notes/today.md)'} />,
+    );
+
+    expect(markup).toContain('href="notes/today.md"');
+    expect(markup).not.toContain('target="_blank"');
+  });
+
   it('shows copy + save-as-skill actions only when assistant text is non-empty and not streaming', () => {
     const withContent = renderToStaticMarkup(
       <ChatMessage role="assistant" text="hello" onSaveAsSkill={vi.fn()} />,

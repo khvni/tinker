@@ -2,6 +2,7 @@ import { isValidElement, useEffect, useRef, useState, type JSX, type ReactElemen
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@tinker/design';
+import { getChatLinkTarget } from '../../file-links.js';
 import { CodeBlock } from './CodeBlock.js';
 
 export type ChatMessageRole = 'user' | 'assistant' | 'system';
@@ -10,6 +11,7 @@ type ChatMessageProps = {
   role: ChatMessageRole;
   text: string;
   streaming?: boolean;
+  onOpenFileLink?: ((path: string) => void) | undefined;
   onSaveAsSkill?: () => void;
 };
 
@@ -63,7 +65,7 @@ const extractLanguage = (className: string | undefined): string => {
   return match?.[1] ?? 'text';
 };
 
-const MARKDOWN_COMPONENTS: Components = {
+const createMarkdownComponents = (onOpenFileLink?: (path: string) => void): Components => ({
   pre: ({ children }) => {
     const codeChild = Array.isArray(children)
       ? children.find((child) => isCodeElement(child))
@@ -77,17 +79,41 @@ const MARKDOWN_COMPONENTS: Components = {
 
     return <pre>{children}</pre>;
   },
-  a: ({ href, children, ...rest }) => (
-    <a href={href} target="_blank" rel="noreferrer noopener" {...rest}>
-      {children}
-    </a>
-  ),
-};
+  a: ({ href, children, ...rest }) => {
+    const target = getChatLinkTarget(href);
+
+    if (target.kind === 'file') {
+      return (
+        <a
+          href={href}
+          onClick={(event) => {
+            event.preventDefault();
+            onOpenFileLink?.(target.path);
+          }}
+          {...rest}
+        >
+          {children}
+        </a>
+      );
+    }
+
+    if (target.kind === 'external') {
+      return (
+        <a href={target.href} target="_blank" rel="noreferrer noopener" {...rest}>
+          {children}
+        </a>
+      );
+    }
+
+    return <span>{children}</span>;
+  },
+});
 
 export const ChatMessage = ({
   role,
   text,
   streaming = false,
+  onOpenFileLink,
   onSaveAsSkill,
 }: ChatMessageProps): JSX.Element => {
   const [copied, setCopied] = useState(false);
@@ -138,7 +164,7 @@ export const ChatMessage = ({
   return (
     <div className={className}>
       <div className="tinker-chat-markdown">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents(onOpenFileLink)}>
           {text}
         </ReactMarkdown>
       </div>
