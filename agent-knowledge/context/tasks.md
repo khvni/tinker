@@ -84,7 +84,7 @@ Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
 | 3.1 | **Research**: pick libraries for pdf / xlsx / docx / pptx / html / code / markdown. Deliverable: `agent-knowledge/reference/inline-renderers.md` with lib name + license + bundle size + rationale per format. Criterion: no paid libs, no copyleft licenses (MIT/Apache/ISC/BSD only). | M | — | done | TIN-27 · PR #18 merged 2026-04-21. |
 | 3.2 | Unified `FilePane` component: accepts `{ path, mime }`, looks up renderer in `mimeToRenderer` map, renders. Fallback = "unsupported, open externally" with Tauri `shell.open`. | S | 1.4, 3.1 | review | TIN-28 · PR #59 |
 | 3.3 | PDF renderer integration per 3.1 choice. Accepts file path → embedded viewer. Keyboard navigation (PgUp/PgDn). | M | 3.1, 3.2 | not started | Probably `react-pdf`. |
-| 3.4 | XLSX renderer per 3.1. First-sheet-by-default + `<SegmentedControl>` sheet switcher. Read-only table. | M | 3.1, 3.2 | not started | Probably SheetJS. |
+| 3.4 | XLSX renderer per 3.1. First-sheet-by-default + `<SegmentedControl>` sheet switcher. Read-only table. | M | 3.1, 3.2 | review | TIN-30 · PR #74 · `exceljs` parser, lazy workbook load, 250 rows/page cap. |
 | 3.5 | DOCX renderer per 3.1. Converts → sanitized HTML → renders. No editing. | M | 3.1, 3.2 | not started | Probably `mammoth`. |
 | 3.6 | PPTX renderer per 3.1. Slide carousel w/ next/prev + thumbnail strip. | M | 3.1, 3.2 | not started | Stretch if 3.1 flags as risky. |
 | 3.7 | HTML renderer: sandbox iframe (`sandbox="allow-same-origin"` only, no scripts). Verify against existing `HtmlRenderer.tsx`. | S | 3.2 | review | TIN-33 · PR #59 |
