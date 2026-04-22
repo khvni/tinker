@@ -91,7 +91,7 @@ Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
 | 3.8 | Code renderer: move existing `CodeRenderer.tsx` behind FilePane dispatch; add language autodetect via existing `code-highlighter`. | S | 3.2 | review | TIN-34 · PR #59 |
 | 3.9 | Markdown renderer: move existing `MarkdownRenderer.tsx` behind FilePane dispatch. Confirm GFM + code highlighting. | S | 3.2 | review | TIN-35 · PR #59 |
 | 3.10 | "Open file" from Chat: when OpenCode output includes a file path link, clicking opens a new FilePane tab. | M | 3.2, M1.7 | review | TIN-36 · PR #75. Relative links resolve against session folder; missing files render friendly FilePane state. |
-| 3.11 | Remove `panes/Today.tsx`, `panes/SchedulerPane.tsx`, `panes/Playbook.tsx`, `panes/VaultBrowser.tsx` from build. Either delete or move to `apps/desktop/_deferred/` with git mv. Per D25 only chat/file/settings/memory ship. | S | 1.10 | in progress | TIN-37 · `khvni/tin37-91-workspace` · deleting `Today` / `SchedulerPane`; `Playbook` + `VaultBrowser` already absent on `main`. |
+| 3.11 | Remove `panes/Today.tsx`, `panes/SchedulerPane.tsx`, `panes/Playbook.tsx`, `panes/VaultBrowser.tsx` from build. Either delete or move to `apps/desktop/_deferred/` with git mv. Per D25 only chat/file/settings/memory ship. | S | 1.10 | review | TIN-37 · PR #88 · deleted `Today` / `SchedulerPane`; `Playbook` + `VaultBrowser` were already absent on `main`. |
 
 ### M4 — Chat interface (markdown rendering, input, model picker)
 Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
@@ -182,7 +182,7 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 |----|------|------|------------|--------|-------|
 | X.1 | Repo-wide: add `.cursor/rules` or `.github/copilot-instructions.md` pointing async agents at this file + D25 + claim rules. | S | — | done | TIN-89 · PR #28 merged 2026-04-22. Both `.github/copilot-instructions.md` + `.cursor/rules/tinker.mdc` landed. |
 | X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | done | TIN-90 · PR #29 merged 2026-04-22. |
-| X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | in progress | TIN-91 · `khvni/tin37-91-workspace` |
+| X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | review | TIN-91 · PR #88 · documented with repo-root `pnpm dev:desktop` because `pnpm tauri dev` is not wired in this workspace. |
 
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
 
