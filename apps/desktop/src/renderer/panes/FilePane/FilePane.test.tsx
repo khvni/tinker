@@ -1,10 +1,26 @@
+import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { isValidElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRenderer, resetPaneRegistry } from '../../workspace/pane-registry.js';
-import { FilePane, MARKDOWN_EDITOR_MIME, mimeToRenderer, registerFilePane } from './index.js';
+
+vi.mock('@tauri-apps/plugin-shell', () => ({
+  open: vi.fn(),
+}));
+
+import {
+  FilePane,
+  MARKDOWN_EDITOR_MIME,
+  mimeToRenderer,
+  openFileExternally,
+  registerFilePane,
+} from './index.js';
 
 describe('FilePane', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   afterEach(() => {
     resetPaneRegistry();
   });
@@ -50,6 +66,7 @@ describe('FilePane', () => {
 
     expect(element.type).toBe(mimeToRenderer['text/csv']);
     expect(element.props).toEqual({
+      mime: 'text/csv',
       path: '/tmp/table.csv',
       vaultRevision: 0,
     });
@@ -57,6 +74,12 @@ describe('FilePane', () => {
 
   it('supports the temporary markdown editor MIME until the editor flow is replaced', () => {
     expect(mimeToRenderer[MARKDOWN_EDITOR_MIME]).toBeDefined();
+  });
+
+  it('opens unsupported files through the OS shell helper', async () => {
+    await openFileExternally('/tmp/archive.bin');
+
+    expect(openExternal).toHaveBeenCalledWith('/tmp/archive.bin');
   });
 
   it('renders unsupported fallback UI for unknown MIME types', () => {

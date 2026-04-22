@@ -10,7 +10,7 @@ export const CodeRenderer = ({ params }: IDockviewPanelProps<FilePaneParams>): J
   const [content, setContent] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
-  const language = path ? getCodeLanguage(path) : 'plaintext';
+  const language = path ? getCodeLanguage(path, params?.mime) : 'plaintext';
 
   useEffect(() => {
     if (!path) {

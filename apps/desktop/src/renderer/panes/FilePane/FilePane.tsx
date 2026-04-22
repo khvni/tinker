@@ -20,36 +20,37 @@ export type FilePaneProps = {
 
 type FileRendererProps = {
   path: string;
+  mime: string;
   vaultRevision: number;
 };
 
 type FileRenderer = (props: FileRendererProps) => JSX.Element;
 
-const createDockviewProps = (path: string): IDockviewPanelProps<FilePaneParams> => {
+const createDockviewProps = (path: string, mime: string): IDockviewPanelProps<FilePaneParams> => {
   // Legacy file renderers still consume Dockview props. Keep the adapter
   // contained here until M1.7/M3 retire that contract.
-  return { params: { path } } as unknown as IDockviewPanelProps<FilePaneParams>;
+  return { params: { path, mime } } as unknown as IDockviewPanelProps<FilePaneParams>;
 };
 
-const CodeFileRenderer: FileRenderer = ({ path }) => {
-  return <CodeRenderer {...createDockviewProps(path)} />;
+const CodeFileRenderer: FileRenderer = ({ path, mime }) => {
+  return <CodeRenderer {...createDockviewProps(path, mime)} />;
 };
 
-const CsvFileRenderer: FileRenderer = ({ path }) => {
-  return <CsvRenderer {...createDockviewProps(path)} />;
+const CsvFileRenderer: FileRenderer = ({ path, mime }) => {
+  return <CsvRenderer {...createDockviewProps(path, mime)} />;
 };
 
-const HtmlFileRenderer: FileRenderer = ({ path }) => {
-  return <HtmlRenderer {...createDockviewProps(path)} />;
+const HtmlFileRenderer: FileRenderer = ({ path, mime }) => {
+  return <HtmlRenderer {...createDockviewProps(path, mime)} />;
 };
 
-const ImageFileRenderer: FileRenderer = ({ path }) => {
-  return <ImageRenderer {...createDockviewProps(path)} />;
+const ImageFileRenderer: FileRenderer = ({ path, mime }) => {
+  return <ImageRenderer {...createDockviewProps(path, mime)} />;
 };
 
-const MarkdownFileRenderer: FileRenderer = ({ path, vaultRevision }) => {
+const MarkdownFileRenderer: FileRenderer = ({ path, mime, vaultRevision }) => {
   const props = {
-    ...createDockviewProps(path),
+    ...createDockviewProps(path, mime),
     api: { id: getPanelIdForPath('file', path) } as ComponentProps<typeof MarkdownRenderer>['api'],
     vaultRevision,
   } as ComponentProps<typeof MarkdownRenderer>;
@@ -57,9 +58,9 @@ const MarkdownFileRenderer: FileRenderer = ({ path, vaultRevision }) => {
   return <MarkdownRenderer {...props} />;
 };
 
-const MarkdownEditorFileRenderer: FileRenderer = ({ path, vaultRevision }) => {
+const MarkdownEditorFileRenderer: FileRenderer = ({ path, mime, vaultRevision }) => {
   const props = {
-    ...createDockviewProps(path),
+    ...createDockviewProps(path, mime),
     vaultRevision,
   } as ComponentProps<typeof MarkdownEditor>;
 
@@ -121,6 +122,10 @@ type UnsupportedFilePaneProps = {
   mime: string;
 };
 
+export const openFileExternally = async (path: string): Promise<void> => {
+  await openExternal(path);
+};
+
 const UnsupportedFilePane = ({ path, mime }: UnsupportedFilePaneProps): JSX.Element => {
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
@@ -130,7 +135,7 @@ const UnsupportedFilePane = ({ path, mime }: UnsupportedFilePaneProps): JSX.Elem
     setError(null);
 
     try {
-      await openExternal(path);
+      await openFileExternally(path);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
@@ -171,5 +176,5 @@ export const FilePane = ({ data, vaultRevision = 0 }: FilePaneProps): JSX.Elemen
     return <UnsupportedFilePane path={data.path} mime={data.mime} />;
   }
 
-  return <Renderer path={data.path} vaultRevision={vaultRevision} />;
+  return <Renderer path={data.path} mime={data.mime} vaultRevision={vaultRevision} />;
 };

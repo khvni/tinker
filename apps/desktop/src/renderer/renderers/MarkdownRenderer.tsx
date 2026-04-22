@@ -1,17 +1,69 @@
 import { useEffect, useState, type JSX } from 'react';
 import { Button } from '@tinker/design';
 import DOMPurify from 'dompurify';
-import { marked } from 'marked';
+import { Renderer, marked, type Tokens } from 'marked';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { parseFrontmatter } from '@tinker/memory';
 import { getPanelIdForPath, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 import { useDockviewApi } from '../workspace/DockviewContext.js';
 import { readTextFile } from '@tauri-apps/plugin-fs';
+import { highlightCode } from './code-highlighter.js';
 
-const renderMarkdown = async (text: string): Promise<string> => {
+const escapeHtml = (value: string): string => {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+};
+
+const getCodeFenceLanguage = (lang?: string): string => {
+  const language = lang?.trim().split(/\s+/u, 1)[0];
+  return language && language.length > 0 ? language : 'plaintext';
+};
+
+const renderHighlightedCodeBlock = async (text: string, lang?: string): Promise<string> => {
+  const language = getCodeFenceLanguage(lang);
+  const highlightedHtml = await highlightCode(text, language);
+  const codeClassName = highlightedHtml
+    ? `tinker-code-content hljs language-${language}`
+    : `tinker-code-content language-${language}`;
+  const blockClassName = highlightedHtml
+    ? 'tinker-code-block tinker-code-block--highlighted'
+    : 'tinker-code-block';
+
+  return `<pre class="${blockClassName}"><code class="${codeClassName}">${
+    highlightedHtml ?? escapeHtml(text)
+  }</code></pre>`;
+};
+
+type HighlightedCodeToken = Tokens.Code & {
+  highlightedHtml?: string;
+};
+
+export const renderMarkdown = async (text: string): Promise<string> => {
   const { body } = parseFrontmatter(text);
-  const html = await marked.parse(body);
-  return DOMPurify.sanitize(html);
+  const renderer = new Renderer();
+  const defaultCodeRenderer = renderer.code.bind(renderer);
+
+  renderer.code = (token: HighlightedCodeToken): string => {
+    return token.highlightedHtml ?? defaultCodeRenderer(token);
+  };
+
+  return await marked.parse(body, {
+    async: true,
+    gfm: true,
+    renderer,
+    async walkTokens(token): Promise<void> {
+      if (token.type !== 'code') {
+        return;
+      }
+
+      const codeToken = token as HighlightedCodeToken;
+      codeToken.highlightedHtml = await renderHighlightedCodeBlock(codeToken.text, codeToken.lang);
+    },
+  });
 };
 
 type MarkdownRendererProps = IDockviewPanelProps<FilePaneParams> & {
@@ -39,7 +91,7 @@ export const MarkdownRenderer = ({ api, params, vaultRevision }: MarkdownRendere
         const text = await readTextFile(path);
         const rendered = await renderMarkdown(text);
         if (active) {
-          setHtml(rendered);
+          setHtml(DOMPurify.sanitize(rendered));
         }
       } catch (nextError) {
         if (active) {
