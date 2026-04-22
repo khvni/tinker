@@ -52,6 +52,24 @@ const joinRelativePath = (prefix: string, child: string): string => {
   return prefix.length === 0 ? child : `${prefix}/${child}`;
 };
 
+const normalizePathForNestCheck = (path: string): string => {
+  const forwardSlashed = path.replace(/\\/gu, '/');
+  return forwardSlashed.replace(/\/+$/u, '');
+};
+
+const isSamePath = (a: string, b: string): boolean => {
+  return normalizePathForNestCheck(a) === normalizePathForNestCheck(b);
+};
+
+const isPathNestedUnder = (candidate: string, ancestor: string): boolean => {
+  const normalizedCandidate = normalizePathForNestCheck(candidate);
+  const normalizedAncestor = normalizePathForNestCheck(ancestor);
+  if (normalizedAncestor.length === 0) {
+    return false;
+  }
+  return normalizedCandidate.startsWith(`${normalizedAncestor}/`);
+};
+
 const listMemoryTree = async (rootPath: string, relativeDirectory = ''): Promise<RelativeMemoryTree> => {
   const absoluteDirectory = relativeDirectory.length === 0 ? rootPath : await join(rootPath, relativeDirectory);
   const entries = await readDir(absoluteDirectory);
@@ -222,8 +240,15 @@ export const moveMemoryRoot = async (
   }
 
   const currentRoot = await getMemoryRoot(options?.runtimePlatform);
-  if (currentRoot === normalizedNextRoot) {
+  if (isSamePath(currentRoot, normalizedNextRoot)) {
     return currentRoot;
+  }
+
+  if (isPathNestedUnder(normalizedNextRoot, currentRoot)) {
+    throw new Error('New memory folder cannot be inside current memory folder.');
+  }
+  if (isPathNestedUnder(currentRoot, normalizedNextRoot)) {
+    throw new Error('New memory folder cannot contain current memory folder.');
   }
 
   const destinationAlreadyExists = await exists(normalizedNextRoot);
@@ -253,17 +278,12 @@ export const moveMemoryRoot = async (
       options?.onProgress?.({ copiedFiles, totalFiles, currentPath: relativeFile });
     }
 
-    await remove(currentRoot, { recursive: true });
-
     const settingsStore = createMemorySettingsStore();
     await settingsStore.set({
       key: MEMORY_ROOT_SETTING_KEY,
       value: { path: normalizedNextRoot },
       updatedAt: new Date().toISOString(),
     });
-
-    emitMemoryPathChanged({ previousRoot: currentRoot, nextRoot: normalizedNextRoot });
-    return normalizedNextRoot;
   } catch (error) {
     await removeDirectoryContents(normalizedNextRoot);
 
@@ -273,6 +293,11 @@ export const moveMemoryRoot = async (
 
     throw error;
   }
+
+  await remove(currentRoot, { recursive: true }).catch(() => undefined);
+
+  emitMemoryPathChanged({ previousRoot: currentRoot, nextRoot: normalizedNextRoot });
+  return normalizedNextRoot;
 };
 
 export const subscribeMemoryPathChanged = (

@@ -313,4 +313,51 @@ describe('default memory root resolution', () => {
     expect(mockRemove).toHaveBeenCalledWith('/new-memory', { recursive: true });
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it('rejects next root nested inside current root', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/old-memory'));
+
+    await expect(moveMemoryRoot('/old-memory/nested', { runtimePlatform: 'linux' })).rejects.toThrow(
+      'New memory folder cannot be inside current memory folder.',
+    );
+
+    expect(mockCopyFile).not.toHaveBeenCalled();
+    expect(mockSettingsSet).not.toHaveBeenCalled();
+  });
+
+  it('rejects next root that contains current root', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/old-memory/inner'));
+
+    await expect(moveMemoryRoot('/old-memory', { runtimePlatform: 'linux' })).rejects.toThrow(
+      'New memory folder cannot contain current memory folder.',
+    );
+
+    expect(mockCopyFile).not.toHaveBeenCalled();
+    expect(mockSettingsSet).not.toHaveBeenCalled();
+  });
+
+  it('keeps old root intact when settings write fails after copy', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/old-memory'));
+    mockExists.mockResolvedValue(false);
+    mockReadDir.mockImplementation(async (path: string) => {
+      if (path === '/old-memory') {
+        return [createDirEntry('profile.md', 'file')];
+      }
+      if (path === '/new-memory') {
+        return [createDirEntry('profile.md', 'file')];
+      }
+      return [];
+    });
+    mockSettingsSet.mockRejectedValueOnce(new Error('settings lock'));
+
+    const listener = vi.fn();
+    const unsubscribe = subscribeMemoryPathChanged(listener);
+
+    await expect(moveMemoryRoot('/new-memory', { runtimePlatform: 'linux' })).rejects.toThrow('settings lock');
+
+    unsubscribe();
+
+    expect(mockRemove).not.toHaveBeenCalledWith('/old-memory', { recursive: true });
+    expect(listener).not.toHaveBeenCalled();
+  });
 });
