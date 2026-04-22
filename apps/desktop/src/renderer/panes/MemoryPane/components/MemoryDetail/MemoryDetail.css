@@ -42,9 +42,9 @@
 .tinker-memory-detail__title {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 26px;
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-h2);
+  line-height: calc(var(--line-height-h2) * 1em);
   letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -56,8 +56,8 @@
   align-items: center;
   gap: 8px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 16px;
+  font-size: var(--font-size-secondary);
+  line-height: calc(var(--line-height-secondary) * 1em);
 }
 
 .tinker-memory-detail__status-dot {
@@ -92,10 +92,10 @@
 
 .tinker-memory-detail__section-label {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-label);
   font-weight: 600;
   letter-spacing: 0.08em;
-  line-height: 14px;
+  line-height: calc(var(--line-height-label) * 1em);
   text-transform: uppercase;
 }
 
@@ -125,9 +125,9 @@
 
 .tinker-memory-detail__file-name {
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-secondary);
   font-weight: 600;
-  line-height: 16px;
+  line-height: calc(var(--line-height-secondary) * 1em);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -136,9 +136,9 @@
 .tinker-memory-detail__file-path {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-label);
   font-weight: 400;
-  line-height: 14px;
+  line-height: calc(var(--line-height-label) * 1em);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -168,10 +168,10 @@
 
 .tinker-memory-detail__footer-eyebrow {
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-label);
   font-weight: 500;
   letter-spacing: 0.08em;
-  line-height: 14px;
+  line-height: calc(var(--line-height-label) * 1em);
   text-transform: uppercase;
 }
 
@@ -186,22 +186,22 @@
 
 .tinker-memory-detail__footer-mode {
   color: var(--color-text-secondary);
-  font-size: 11px;
-  line-height: 14px;
+  font-size: var(--font-size-label);
+  line-height: calc(var(--line-height-label) * 1em);
 }
 
 .tinker-memory-detail__preview {
   max-width: 82ch;
   color: var(--color-text-primary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-body);
+  line-height: calc(var(--line-height-body) * 1em);
 }
 
 .tinker-memory-detail__muted {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-secondary);
+  line-height: calc(var(--line-height-body) * 1em);
 }
 
 .tinker-memory-detail__diff-card {
@@ -216,7 +216,7 @@
   margin: 0;
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 20px;
+  font-size: var(--font-size-mono);
+  line-height: calc(var(--line-height-mono) * 1em);
   white-space: pre;
 }

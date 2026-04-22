@@ -117,7 +117,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  line-height: 16px;
+  line-height: 16px; /* pixel-aligned for 26px avatar circle — do not tokenize */
 }
 
 .tinker-workspace-sidebar__avatar-image {
