@@ -59,7 +59,7 @@ Every pick below has its license link inlined and has been cross-checked against
 
 ### DOCX — `mammoth`
 
-- **Version pin**: `mammoth@^1.8.0`.
+- **Version pin**: `mammoth@^1.12.0`.
 - **Install**: `pnpm -F @tinker/desktop add mammoth`.
 - **Integration notes**:
   - Call `mammoth.convertToHtml({ arrayBuffer })`; feed output through existing `DOMPurify` sanitization before injection.
@@ -71,16 +71,21 @@ Every pick below has its license link inlined and has been cross-checked against
 ### PPTX — `pptxtojson` (risky, with fallback)
 
 - **Status**: **flagged**. No MIT/Apache library renders PPTX with acceptable fidelity.
+- **[2026-04-21] TIN-32 decision**: cut inline PPTX rendering from the MVP. `.pptx` / `.ppt` now route to an explicit "PPTX preview" fallback pane with an `Open externally` CTA.
 - **Version pin (primary)**: `pptxtojson@^1.3.0`.
 - **Install**: `pnpm -F @tinker/desktop add pptxtojson`.
 - **Integration notes**:
   - Parse slide XML into structured JSON; render each slide as a fixed-aspect-ratio `<div>` with absolutely-positioned shapes/text using the parsed geometry.
   - Ship a deliberately-basic slide view — text + images + background fill only. No animations, no slide transitions, no embedded media playback.
   - Reconcile fonts to our token font stack; don't try to match Office fonts exactly.
-- **Fallback plan** (primary if `pptxtojson` fidelity is unacceptable during M3.6 implementation):
-  1. Render a **first-slide thumbnail** using the embedded `/ppt/media/` preview image shipped inside the `.pptx` zip (PowerPoint writes one).
-  2. Show a "PPTX preview (limited) — open externally to edit" affordance using Tauri's `shell.open` on the original file.
-  3. Punt full rendering to a follow-up feature ticket; do **not** inline-expand M3 scope.
+- **Why TIN-32 shipped fallback instead**:
+  1. `pptxtojson` gets us parsed geometry, not a trustworthy renderer. Typical decks still lose grouped-shape layout, font metrics, theme mapping, and mixed media fidelity unless we build a much larger custom layout engine.
+  2. A low-fidelity slide carousel would look "supported" while silently misrendering real work. Explicit fallback is more honest and keeps M3 within D25's MVP bar.
+  3. The current fallback stays local-first, dependency-light, and reversible. If a better permissive renderer appears later, we can swap the FilePane mapping without touching session state.
+- **Shipped MVP fallback**:
+  1. Recognize `.pptx` / `.ppt` as presentation MIME types in file-open routing.
+  2. Show a dedicated **PPTX preview** pane with a clear "inline preview unavailable" message.
+  3. Use Tauri `shell.open` to launch the original file in the user's default presentation app.
 - **Why not alternatives**:
   - **`pptxjs`**: MIT but unmaintained (last release 2019) and requires jQuery.
   - **LibreOffice headless conversion**: would work but adds a ~200 MB external binary dependency — violates "local-first, no hidden deps".
@@ -147,7 +152,7 @@ All four new libs load **lazily via dynamic import** keyed off `file-utils.ts` e
 
 - M3.3 — extension → renderer dispatch table.
 - M3.4 / M3.5 / M3.6 — per-format pane implementations.
-- PPTX fallback path decision (thumbnail-only vs. `pptxtojson` full render) is deferred until M3.6 has parity measurements in hand.
+- PPTX full inline rendering is deferred past MVP. TIN-32 ships the explicit external-open fallback above.
 
 ## References
 

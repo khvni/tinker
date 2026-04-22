@@ -11,6 +11,7 @@ vi.mock('@tauri-apps/plugin-shell', () => ({
 import {
   FilePane,
   MARKDOWN_EDITOR_MIME,
+  MISSING_FILE_MIME,
   mimeToRenderer,
   openFileExternally,
   registerFilePane,
@@ -51,29 +52,43 @@ describe('FilePane', () => {
   });
 
   it('dispatches known MIME types through mimeToRenderer', () => {
-    const element = FilePane({
-      data: {
-        kind: 'file',
-        path: '/tmp/table.csv',
-        mime: 'text/csv',
-      },
-    });
+    const markup = renderToStaticMarkup(
+      <FilePane
+        data={{
+          kind: 'file',
+          path: '/tmp/table.csv',
+          mime: 'text/csv',
+        }}
+      />,
+    );
 
-    expect(isValidElement(element)).toBe(true);
-    if (!isValidElement(element)) {
-      throw new Error('FilePane did not return a React element.');
-    }
-
-    expect(element.type).toBe(mimeToRenderer['text/csv']);
-    expect(element.props).toEqual({
-      mime: 'text/csv',
-      path: '/tmp/table.csv',
-      vaultRevision: 0,
-    });
+    expect(markup).toContain('tinker-renderer-pane');
   });
 
   it('supports the temporary markdown editor MIME until the editor flow is replaced', () => {
     expect(mimeToRenderer[MARKDOWN_EDITOR_MIME]).toBeDefined();
+  });
+
+  it('dispatches DOCX files through the DOCX renderer', () => {
+    expect(
+      mimeToRenderer['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ).toBeDefined();
+  });
+
+  it('routes pptx files through the explicit external-preview fallback', () => {
+    const markup = renderToStaticMarkup(
+      <FilePane
+        data={{
+          kind: 'file',
+          path: '/tmp/deck.pptx',
+          mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        }}
+      />,
+    );
+
+    expect(markup).toContain('PPTX preview');
+    expect(markup).toContain('Inline PowerPoint preview is unavailable.');
+    expect(markup).toContain('Open externally');
   });
 
   it('opens unsupported files through the OS shell helper', async () => {
@@ -97,5 +112,21 @@ describe('FilePane', () => {
     expect(markup).toContain('Unsupported, open externally.');
     expect(markup).toContain('Open externally');
     expect(markup).toContain('application/octet-stream');
+  });
+
+  it('renders a friendly missing-file state', () => {
+    const markup = renderToStaticMarkup(
+      <FilePane
+        data={{
+          kind: 'file',
+          path: '/tmp/missing.md',
+          mime: MISSING_FILE_MIME,
+        }}
+      />,
+    );
+
+    expect(markup).toContain('File unavailable');
+    expect(markup).toContain('File no longer exists at this path.');
+    expect(markup).toContain('/tmp/missing.md');
   });
 });

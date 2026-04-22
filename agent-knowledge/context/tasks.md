@@ -85,12 +85,12 @@ Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
 | 3.2 | Unified `FilePane` component: accepts `{ path, mime }`, looks up renderer in `mimeToRenderer` map, renders. Fallback = "unsupported, open externally" with Tauri `shell.open`. | S | 1.4, 3.1 | review | TIN-28 · PR #59 |
 | 3.3 | PDF renderer integration per 3.1 choice. Accepts file path → embedded viewer. Keyboard navigation (PgUp/PgDn). | M | 3.1, 3.2 | not started | Probably `react-pdf`. |
 | 3.4 | XLSX renderer per 3.1. First-sheet-by-default + `<SegmentedControl>` sheet switcher. Read-only table. | M | 3.1, 3.2 | not started | Probably SheetJS. |
-| 3.5 | DOCX renderer per 3.1. Converts → sanitized HTML → renders. No editing. | M | 3.1, 3.2 | not started | Probably `mammoth`. |
-| 3.6 | PPTX renderer per 3.1. Slide carousel w/ next/prev + thumbnail strip. | M | 3.1, 3.2 | not started | Stretch if 3.1 flags as risky. |
+| 3.5 | DOCX renderer per 3.1. Converts → sanitized HTML → renders. No editing. | M | 3.1, 3.2 | review | TIN-31 · PR #72 |
+| 3.6 | PPTX renderer per 3.1. Slide carousel w/ next/prev + thumbnail strip. | M | 3.1, 3.2 | review | TIN-32 · PR #71. Cut to explicit external-open fallback per `agent-knowledge/reference/inline-renderers.md`; full inline rendering deferred past MVP. |
 | 3.7 | HTML renderer: sandbox iframe (`sandbox="allow-same-origin"` only, no scripts). Verify against existing `HtmlRenderer.tsx`. | S | 3.2 | review | TIN-33 · PR #59 |
 | 3.8 | Code renderer: move existing `CodeRenderer.tsx` behind FilePane dispatch; add language autodetect via existing `code-highlighter`. | S | 3.2 | review | TIN-34 · PR #59 |
 | 3.9 | Markdown renderer: move existing `MarkdownRenderer.tsx` behind FilePane dispatch. Confirm GFM + code highlighting. | S | 3.2 | review | TIN-35 · PR #59 |
-| 3.10 | "Open file" from Chat: when OpenCode output includes a file path link, clicking opens a new FilePane tab. | M | 3.2, M1.7 | not started | Requires link handler in Chat message renderer. |
+| 3.10 | "Open file" from Chat: when OpenCode output includes a file path link, clicking opens a new FilePane tab. | M | 3.2, M1.7 | review | TIN-36 · PR #75. Relative links resolve against session folder; missing files render friendly FilePane state. |
 | 3.11 | Remove `panes/Today.tsx`, `panes/SchedulerPane.tsx`, `panes/Playbook.tsx`, `panes/VaultBrowser.tsx` from build. Either delete or move to `apps/desktop/_deferred/` with git mv. Per D25 only chat/file/settings/memory ship. | S | 1.10 | not started | Dead-code cleanup. |
 
 ### M4 — Chat interface (markdown rendering, input, model picker)
@@ -110,7 +110,7 @@ Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
 | 4.10 | Parity verification: side-by-side with OpenCode Desktop from 4.1. Checklist in PR description. | S | 4.9 | not started | Review-as-task. |
 | 4.11 | Input box: multi-line `<Textarea>` (already shipped). `Enter` submits, `Shift+Enter` newline, disabled while streaming, `Escape` calls `session.abort()`. Auto-resize up to 10 lines. | M | 4.2 | review | TIN-48 · PR #58. |
 | 4.12 | Stop button: visible only while streaming, calls `session.abort()`. Replaces send button during stream. | S | 4.11 | review | TIN-49 · PR #58. |
-| 4.13 | Auto-scroll: stick to bottom during streaming unless user scrolled up. `[New messages]` pill appears when user is scrolled up + new content arrives. | M | 4.4 | not started | UX polish. |
+| 4.13 | Auto-scroll: stick to bottom during streaming unless user scrolled up. `[New messages]` pill appears when user is scrolled up + new content arrives. | M | 4.4 | review | TIN-50 + PR #73. Sticky-bottom threshold = 100px; pill uses `ClickableBadge`; helper tests cover tail-signature + threshold logic. |
 | 4.14 | Copy-message button on each assistant message. Hover-reveal. | S | 4.2 | review | TIN-51 · PR #57. Copies raw markdown; hidden while streaming. |
 | 4.15 | Clear existing tool-call / thinking UI from `Chat.tsx` that doesn't match 4.5/4.6 semantics. | S | 4.5, 4.6 | review | TIN-52 · PR #67 (bundled — see 4.5). |
 
@@ -121,7 +121,7 @@ Spec: [[25-mvp-context-badge]] · Depends on: M4.2
 |----|------|------|------------|--------|-------|
 | 5.1 | **Research**: locate OpenCode SDK field for per-session token usage + model context window. Deliverable: 1-page `agent-knowledge/reference/opencode-sdk-usage.md` with exact field paths + example payload. | S | — | done | TIN-53 · PR #16 merged 2026-04-21. |
 | 5.2 | `<ContextBadge percent={n} tokens={used} windowSize={max} model={name} />` primitive in `@tinker/design`. Pill w/ percent. Color: green <50%, amber 50–80%, red >80%. Tooltip w/ exact counts. | M | 5.1 | done | TIN-54 · PR #22 merged 2026-04-22. Pure visual + playground. |
-| 5.3 | Wire badge into Chat pane header. Subscribes to same SSE stream as chat; recomputes on each message. | S | 5.2, 4.4 | not started | One call site. |
+| 5.3 | Wire badge into Chat pane header. Subscribes to same SSE stream as chat; recomputes on each message. | S | 5.2, 4.4 | review | TIN-55 + PR #73. Chat now consumes `context_usage` events from `packages/bridge/src/stream.ts`; badge resolves from provider/model metadata or selected-model fallback. |
 | 5.4 | Playground entry in `routes/design-system.tsx` with three states (low/mid/high). Per D14 canonical rule. | S | 5.2 | review | TIN-56 · PR #40. |
 
 ### M6 — Memory as desktop-native filesystem (per-user subdir)
@@ -166,7 +166,7 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | 8.6 | `@tinker/auth-sidecar` wire Microsoft (consumer) provider per 8.1. | S | 8.4 | review | TIN-79 · PR #70. |
 | 8.7 | Rust Tauri command `start_auth_sidecar() -> Result<AuthHandle, Error>` spawns the auth sidecar + returns base URL. Rust binds OS-level loopback redirect URIs needed by the sidecar (Google, GitHub, Microsoft). | M | 8.4 | review | TIN-80 · PR #70. |
 | 8.8 | Rust keychain bridge: Tauri commands `save_refresh_token(provider, user_id, token)`, `load_refresh_token(provider, user_id) -> Option<String>`, `clear_refresh_token(provider, user_id)` via `tauri-plugin-keyring`. | M | — | done | TIN-81 · PR #33 merged 2026-04-22. |
-| 8.9 | Sign-in UX: first-run screen shows three buttons (Google / GitHub / Microsoft). Click → renderer calls `auth/start` → opens system browser to provider → redirect comes back to loopback → renderer polls `auth/session` until `authenticated: true` → upserts `users` row → navigates to folder picker. | L | 8.4, 8.5, 8.6, 8.7, 8.3 | not started | Subdivide if >500 LOC: split into (a) provider-picker screen, (b) in-flight "waiting for browser…" screen, (c) session-poll hook. |
+| 8.9 | Sign-in UX: first-run screen shows three buttons (Google / GitHub / Microsoft). Click → renderer calls `auth/start` → opens system browser to provider → redirect comes back to loopback → renderer polls `auth/session` until `authenticated: true` → upserts `users` row → navigates to folder picker. | L | 8.4, 8.5, 8.6, 8.7, 8.3 | review | TIN-82 · PR #79. SignIn route at `apps/desktop/src/renderer/routes/SignIn/` — ProviderPicker + WaitingForBrowser + useAuthSignIn hook. Wraps existing `handleProviderConnect`; cancel is UI-only (Rust task continues 180s). Playground tab `sign-in` added. |
 | 8.10 | Current-user context: renderer `useCurrentUser()` hook reads session + hydrates from `users` table. App boot blocks on this until resolved or unauthenticated. | M | 8.9 | not started | Single source of truth for `user_id` everywhere. |
 | 8.11 | Settings pane: "Account" section shows current user's name + avatar + provider + `<Button>Sign out</Button>`. Sign-out clears keychain + returns to sign-in screen. | M | 8.10 | not started | Routes through `clear_refresh_token` + resets `useCurrentUser` state. |
 | 8.12 | Auto-sign-in on cold launch: Rust checks keychain for any refresh token → if found, Better Auth sidecar validates → `useCurrentUser` resolves without showing sign-in screen. If invalid, fall through to sign-in. | M | 8.8, 8.10 | not started | Silent sign-in. |

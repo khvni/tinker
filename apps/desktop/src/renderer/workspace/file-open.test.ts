@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createWorkspaceStore } from '@tinker/panes';
 import type { TinkerPaneData } from '@tinker/shared-types';
+import { MISSING_FILE_MIME } from '../panes/FilePane/index.js';
 import { getPanelIdForPath } from '../renderers/file-utils.js';
 import { openWorkspaceFile } from './file-open.js';
 import { createDefaultWorkspaceState } from './layout.default.js';
 
 describe('openWorkspaceFile', () => {
-  it('focuses an existing file pane instead of opening a duplicate', () => {
+  it('focuses an existing file pane instead of opening a duplicate', async () => {
     const store = createWorkspaceStore<TinkerPaneData>({
       initial: createDefaultWorkspaceState(),
     });
@@ -26,17 +27,17 @@ describe('openWorkspaceFile', () => {
       },
     });
 
-    openWorkspaceFile(store, '/vault/note.ts');
+    await openWorkspaceFile(store, '/vault/note.ts', async () => 'application/typescript');
 
     expect(store.getState().tabs[0]?.activePaneId).toBe(getPanelIdForPath('file', '/vault/note.ts'));
   });
 
-  it('creates a new file pane in the active workspace tab when none exists', () => {
+  it('creates a new file pane in the active workspace tab when none exists', async () => {
     const store = createWorkspaceStore<TinkerPaneData>({
       initial: createDefaultWorkspaceState(),
     });
 
-    openWorkspaceFile(store, '/vault/note.ts');
+    await openWorkspaceFile(store, '/vault/note.ts', async () => 'application/typescript');
 
     const activeTab = store.getState().tabs[0];
     expect(activeTab?.panes[getPanelIdForPath('file', '/vault/note.ts')]?.data).toEqual({
@@ -46,16 +47,75 @@ describe('openWorkspaceFile', () => {
     });
   });
 
-  it('creates a workspace tab when file opens into an empty store', () => {
+  it('creates a workspace tab when file opens into an empty store', async () => {
     const store = createWorkspaceStore<TinkerPaneData>();
 
-    openWorkspaceFile(store, '/vault/readme.md');
+    await openWorkspaceFile(store, '/vault/readme.md', async () => 'text/markdown');
 
     expect(store.getState().tabs).toHaveLength(1);
     expect(store.getState().tabs[0]?.panes[getPanelIdForPath('file', '/vault/readme.md')]?.data).toEqual({
       kind: 'file',
       path: '/vault/readme.md',
       mime: 'text/markdown',
+    });
+  });
+
+  it('updates an existing pane when MIME resolution becomes more specific', async () => {
+    const store = createWorkspaceStore<TinkerPaneData>({
+      initial: createDefaultWorkspaceState(),
+    });
+    const tabId = store.getState().activeTabId;
+    if (!tabId) {
+      throw new Error('expected an active workspace tab');
+    }
+
+    store.getState().actions.addPane(tabId, {
+      id: getPanelIdForPath('file', '/vault/report'),
+      kind: 'file',
+      title: 'report',
+      data: {
+        kind: 'file',
+        path: '/vault/report',
+        mime: 'application/octet-stream',
+      },
+    });
+
+    await openWorkspaceFile(store, '/vault/report', async () => 'application/pdf');
+
+    expect(store.getState().tabs[0]?.panes[getPanelIdForPath('file', '/vault/report')]?.data).toEqual({
+      kind: 'file',
+      path: '/vault/report',
+      mime: 'application/pdf',
+    });
+  });
+
+  it('opens missing files into the friendly missing-file pane', async () => {
+    const store = createWorkspaceStore<TinkerPaneData>({
+      initial: createDefaultWorkspaceState(),
+    });
+
+    await openWorkspaceFile(store, '/vault/missing.md', async () => MISSING_FILE_MIME);
+
+    expect(store.getState().tabs[0]?.panes[getPanelIdForPath('file', '/vault/missing.md')]?.data).toEqual({
+      kind: 'file',
+      path: '/vault/missing.md',
+      mime: MISSING_FILE_MIME,
+    });
+  });
+
+  it('opens pptx files with the presentation MIME so FilePane can show the fallback renderer', async () => {
+    const store = createWorkspaceStore<TinkerPaneData>();
+
+    await openWorkspaceFile(
+      store,
+      '/vault/deck.pptx',
+      async () => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    );
+
+    expect(store.getState().tabs[0]?.panes[getPanelIdForPath('file', '/vault/deck.pptx')]?.data).toEqual({
+      kind: 'file',
+      path: '/vault/deck.pptx',
+      mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     });
   });
 });

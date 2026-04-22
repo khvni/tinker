@@ -1,8 +1,7 @@
 import type { WorkspaceStore } from '@tinker/panes';
 import type { TinkerPaneData } from '@tinker/shared-types';
+import { resolveFilePaneMime } from '../panes/FilePane/file-mime.js';
 import {
-  getFileExtension,
-  getImageMimeType,
   getPanelIdForPath,
   getPanelTitleForPath,
   isAbsolutePath,
@@ -12,53 +11,69 @@ const createWorkspaceTabId = (): string => {
   return `workspace-${crypto.randomUUID()}`;
 };
 
-const getPaneMimeForPath = (absolutePath: string): string => {
-  switch (getFileExtension(absolutePath)) {
-    case '.csv':
-      return 'text/csv';
-    case '.gif':
-    case '.jpeg':
-    case '.jpg':
-    case '.png':
-    case '.svg':
-    case '.webp':
-      return getImageMimeType(absolutePath);
-    case '.htm':
-    case '.html':
-      return 'text/html';
-    case '.json':
-      return 'application/json';
-    case '.md':
-      return 'text/markdown';
-    case '.mjs':
-    case '.js':
-      return 'text/javascript';
-    case '.ts':
-      return 'application/typescript';
-    case '.tsx':
-      return 'text/typescript';
-    default:
-      return 'text/plain';
-  }
+export type ResolveWorkspaceFileMime = (absolutePath: string) => Promise<string>;
+
+type ExistingFilePane = {
+  paneId: string;
+  tabId: string;
+  data: Extract<TinkerPaneData, { readonly kind: 'file' }>;
 };
 
-export const openWorkspaceFile = (store: WorkspaceStore<TinkerPaneData>, absolutePath: string): void => {
-  if (!isAbsolutePath(absolutePath)) {
-    return;
-  }
-
+const findExistingFilePane = (
+  store: WorkspaceStore<TinkerPaneData>,
+  absolutePath: string,
+): ExistingFilePane | null => {
   const state = store.getState();
+
   for (const tab of state.tabs) {
     const existingPane = Object.values(tab.panes).find((pane) => {
       return pane.data.kind === 'file' && pane.data.path === absolutePath;
     });
 
-    if (!existingPane) {
-      continue;
+    if (existingPane?.data.kind === 'file') {
+      return {
+        paneId: existingPane.id,
+        tabId: tab.id,
+        data: existingPane.data,
+      };
+    }
+  }
+
+  return null;
+};
+
+export const openWorkspaceFile = async (
+  store: WorkspaceStore<TinkerPaneData>,
+  absolutePath: string,
+  resolveMime: ResolveWorkspaceFileMime = resolveFilePaneMime,
+): Promise<void> => {
+  if (!isAbsolutePath(absolutePath)) {
+    return;
+  }
+
+  let mime = 'application/octet-stream';
+  try {
+    mime = await resolveMime(absolutePath);
+  } catch (error) {
+    console.warn(`Failed to resolve pane MIME for "${absolutePath}".`, error);
+  }
+
+  const existingPane = findExistingFilePane(store, absolutePath);
+  const state = store.getState();
+
+  if (existingPane) {
+    if (existingPane.data.mime !== mime) {
+      state.actions.updatePaneData(existingPane.tabId, existingPane.paneId, (data) => {
+        if (data.kind !== 'file') {
+          return data;
+        }
+
+        return { ...data, mime };
+      });
     }
 
-    state.actions.activateTab(tab.id);
-    state.actions.focusPane(tab.id, existingPane.id);
+    state.actions.activateTab(existingPane.tabId);
+    state.actions.focusPane(existingPane.tabId, existingPane.paneId);
     return;
   }
 
@@ -69,7 +84,7 @@ export const openWorkspaceFile = (store: WorkspaceStore<TinkerPaneData>, absolut
     data: {
       kind: 'file',
       path: absolutePath,
-      mime: getPaneMimeForPath(absolutePath),
+      mime,
     } as const,
   };
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
