@@ -19,7 +19,7 @@ describe('hydrateLayoutRow', () => {
   it('returns null and warns when the stored version is incompatible', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION + 1,
-      workspace_state_json: '{"workspace":{"version":2,"tabs":[],"activeTabId":null}}',
+      workspace_state_json: '{"tabs":[],"activeTabId":null,"version":2}',
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
@@ -53,7 +53,11 @@ describe('hydrateLayoutRow', () => {
       version: CURRENT_LAYOUT_VERSION,
       workspace_state_json: serializeLayoutState({
         version: CURRENT_LAYOUT_VERSION,
-        workspace: { version: 2, tabs: [], activeTabId: null },
+        workspaceState: {
+          version: CURRENT_LAYOUT_VERSION,
+          tabs: [],
+          activeTabId: null,
+        },
         updatedAt: '2026-04-15T00:00:00.000Z',
         preferences: { autoOpenAgentWrittenFiles: false },
       }),
@@ -62,13 +66,17 @@ describe('hydrateLayoutRow', () => {
 
     expect(hydrateLayoutRow(row, 'user')).toEqual({
       version: CURRENT_LAYOUT_VERSION,
-      workspace: { version: 2, tabs: [], activeTabId: null },
+      workspaceState: {
+        version: CURRENT_LAYOUT_VERSION,
+        tabs: [],
+        activeTabId: null,
+      },
       updatedAt: '2026-04-15T00:00:00.000Z',
       preferences: { autoOpenAgentWrittenFiles: false },
     });
   });
 
-  it('defaults auto-open on when loading an unwrapped workspace payload', () => {
+  it('defaults auto-open on when loading a raw workspace payload', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION,
       workspace_state_json: '{"version":2,"tabs":[],"activeTabId":null}',
@@ -77,7 +85,11 @@ describe('hydrateLayoutRow', () => {
 
     expect(hydrateLayoutRow(row, 'user')).toEqual({
       version: CURRENT_LAYOUT_VERSION,
-      workspace: { version: 2, tabs: [], activeTabId: null },
+      workspaceState: {
+        version: CURRENT_LAYOUT_VERSION,
+        tabs: [],
+        activeTabId: null,
+      },
       updatedAt: '2026-04-15T00:00:00.000Z',
       preferences: { autoOpenAgentWrittenFiles: true },
     });

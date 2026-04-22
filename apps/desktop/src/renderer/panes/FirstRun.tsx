@@ -14,12 +14,15 @@ type FirstRunProps = {
   googleAuthMessage: string | null;
   githubAuthBusy: boolean;
   githubAuthMessage: string | null;
+  microsoftAuthBusy: boolean;
+  microsoftAuthMessage: string | null;
   sessions: SSOStatus;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
   onConnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
   onConnectGithub(): Promise<void>;
+  onConnectMicrosoft(): Promise<void>;
   onSelectVault(): Promise<void>;
   onCreateVault(): Promise<void>;
   onContinue(): void;
@@ -35,9 +38,12 @@ export const FirstRun = ({
   googleAuthMessage,
   githubAuthBusy,
   githubAuthMessage,
+  microsoftAuthBusy,
+  microsoftAuthMessage,
   mcpStatus,
   onConnectGithub,
   onConnectGoogle,
+  onConnectMicrosoft,
   onConnectModel,
   onContinue,
   onCreateVault,
@@ -79,7 +85,8 @@ export const FirstRun = ({
           <article className="tinker-list-item">
             <h3>2. Connected tools</h3>
             <p className="tinker-muted">
-              Google unlocks Gmail, Calendar, Drive. GitHub unlocks repos, issues, and PRs. Both stay optional.
+              Google unlocks Gmail, Calendar, Drive. GitHub unlocks repos, issues, and PRs. Microsoft signs Tinker in
+              with a personal account. All stay optional.
             </p>
             <div className="tinker-inline-actions">
               <Button
@@ -96,9 +103,17 @@ export const FirstRun = ({
               >
                 {githubAuthBusy ? 'Signing in…' : sessions.github ? 'Reconnect GitHub' : 'Sign in with GitHub'}
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void onConnectMicrosoft()}
+                disabled={!nativeRuntimeAvailable || microsoftAuthBusy}
+              >
+                {microsoftAuthBusy ? 'Signing in…' : sessions.microsoft ? 'Reconnect Microsoft' : 'Sign in with Microsoft'}
+              </Button>
             </div>
             {googleAuthMessage ? <p className="tinker-muted">{googleAuthMessage}</p> : null}
             {githubAuthMessage ? <p className="tinker-muted">{githubAuthMessage}</p> : null}
+            {microsoftAuthMessage ? <p className="tinker-muted">{microsoftAuthMessage}</p> : null}
           </article>
 
           <article className="tinker-list-item">

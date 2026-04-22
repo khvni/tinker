@@ -1,4 +1,4 @@
-export const SSO_PROVIDERS = ['google', 'github'] as const;
+export const SSO_PROVIDERS = ['google', 'github', 'microsoft'] as const;
 
 export type SSOProvider = (typeof SSO_PROVIDERS)[number];
 

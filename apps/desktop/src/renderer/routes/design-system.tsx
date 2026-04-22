@@ -1,22 +1,36 @@
 import { useState, type JSX, type ReactNode } from 'react';
 import {
+  Avatar,
   Badge,
   Button,
   ClickableBadge,
   ContextBadge,
+  EmptyState,
   IconButton,
+  KeyboardHint,
+  Modal,
   ModelPicker,
+  Progress,
   SearchInput,
   SegmentedControl,
+  Skeleton,
   StatusDot,
   TextInput,
   Textarea,
   Toggle,
+  ToastProvider,
+  useToast,
+  type AvatarSize,
   type BadgeVariant,
   type ModelPickerItem,
+  type ProgressSpinnerSize,
   type StatusDotState,
 } from '@tinker/design';
 import '@tinker/design/styles/tokens.css';
+import {
+  SettingsShell,
+  type SettingsShellSection,
+} from '../workspace/components/SettingsShell/index.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -25,7 +39,11 @@ type PlaygroundTab =
   | 'spacing'
   | 'components'
   | 'modelpicker'
-  | 'chat';
+  | 'modal'
+  | 'toast'
+  | 'empty'
+  | 'chat'
+  | 'settings-shell';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
@@ -33,7 +51,11 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'spacing', label: 'Spacing' },
   { value: 'components', label: 'Components' },
   { value: 'modelpicker', label: 'Model Picker' },
+  { value: 'modal', label: 'Modal' },
+  { value: 'toast', label: 'Toast' },
+  { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
+  { value: 'settings-shell', label: 'Settings Shell' },
 ];
 
 const BADGE_VARIANTS: ReadonlyArray<{ variant: BadgeVariant; label: string }> = [
@@ -76,6 +98,28 @@ const CONTEXT_BADGE_TOOLTIP_DEMO = {
   windowSize: 200_000,
   model: 'claude-sonnet-4-6',
 } as const;
+
+const AVATAR_SIZES: ReadonlyArray<{ size: AvatarSize; label: string }> = [
+  { size: 'xs', label: 'xs · 20' },
+  { size: 'sm', label: 'sm · 24' },
+  { size: 'md', label: 'md · 32' },
+  { size: 'lg', label: 'lg · 40' },
+];
+
+const AVATAR_NAMES: ReadonlyArray<string> = [
+  'Khani Bangalu',
+  'Ada Lovelace',
+  'Grace Hopper',
+  'Linus Torvalds',
+  'Margaret Hamilton',
+  'Ken Thompson',
+];
+
+const PROGRESS_SPINNER_SIZES: ReadonlyArray<{ size: ProgressSpinnerSize; label: string }> = [
+  { size: 'xs', label: 'xs · 12' },
+  { size: 'sm', label: 'sm · 16' },
+  { size: 'md', label: 'md · 24' },
+];
 
 const PlusIcon = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -266,6 +310,68 @@ const ComponentsTab = (): JSX.Element => {
         </div>
       </Section>
 
+      <Section label="Avatar">
+        <Row>
+          {AVATAR_SIZES.map((item) => (
+            <span key={item.size} className="ds-status-item">
+              <Avatar name="Khani Bangalu" size={item.size} />
+              <span className="ds-status-item__label">{item.label}</span>
+            </span>
+          ))}
+        </Row>
+        <Row>
+          {AVATAR_NAMES.map((name) => (
+            <span key={name} className="ds-status-item">
+              <Avatar name={name} size="md" />
+              <span className="ds-status-item__label">{name}</span>
+            </span>
+          ))}
+        </Row>
+        <Row>
+          <span className="ds-status-item">
+            <Avatar
+              name="Octocat"
+              size="md"
+              src="https://avatars.githubusercontent.com/u/583231?v=4"
+            />
+            <span className="ds-status-item__label">Image</span>
+          </span>
+          <span className="ds-status-item">
+            <Avatar name="Missing Link" size="md" src="https://x.invalid/404.png" />
+            <span className="ds-status-item__label">Broken src → initials</span>
+          </span>
+          <span className="ds-status-item">
+            <Avatar name="" size="md" />
+            <span className="ds-status-item__label">No name</span>
+          </span>
+        </Row>
+      </Section>
+
+      <Section label="Progress">
+        <Row>
+          <div className="ds-progress-bar-wrap">
+            <Progress variant="bar" value={25} max={100} label="25%" />
+            <span className="ds-status-item__label">Determinate · 25%</span>
+          </div>
+          <div className="ds-progress-bar-wrap">
+            <Progress variant="bar" value={72} max={100} label="72%" />
+            <span className="ds-status-item__label">Determinate · 72%</span>
+          </div>
+          <div className="ds-progress-bar-wrap">
+            <Progress variant="bar" label="Working" />
+            <span className="ds-status-item__label">Indeterminate</span>
+          </div>
+        </Row>
+        <Row>
+          {PROGRESS_SPINNER_SIZES.map((item) => (
+            <span key={item.size} className="ds-status-item">
+              <Progress variant="spinner" size={item.size} />
+              <span className="ds-status-item__label">{item.label}</span>
+            </span>
+          ))}
+        </Row>
+      </Section>
+
       <Section label="SegmentedControl">
         <Row>
           <SegmentedControl<'first' | 'second' | 'third'>
@@ -332,6 +438,62 @@ const ComponentsTab = (): JSX.Element => {
               onChange={(event) => setTextareaValue(event.target.value)}
             />
           </div>
+        </Row>
+      </Section>
+
+      <Section label="Skeleton">
+        <Row>
+          <span className="ds-status-item">
+            <Skeleton variant="text" width={160} />
+            <span className="ds-status-item__label">text</span>
+          </span>
+          <span className="ds-status-item">
+            <Skeleton variant="circle" width={32} />
+            <span className="ds-status-item__label">circle</span>
+          </span>
+          <span className="ds-status-item">
+            <Skeleton variant="rect" width={180} height={96} />
+            <span className="ds-status-item__label">rect</span>
+          </span>
+        </Row>
+        <div className="ds-skeleton-composed">
+          <Skeleton variant="circle" width={28} />
+          <div className="ds-skeleton-composed__lines">
+            <Skeleton variant="text" width="70%" />
+            <Skeleton variant="text" width="90%" />
+            <Skeleton variant="text" width="40%" />
+          </div>
+        </div>
+      </Section>
+
+      <Section label="KeyboardHint">
+        <Row>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Esc']} os="mac" />
+            <span className="ds-status-item__label">single</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Cmd', 'K']} os="mac" />
+            <span className="ds-status-item__label">two-key (mac)</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Cmd', 'Shift', 'P']} os="mac" />
+            <span className="ds-status-item__label">three-key (mac)</span>
+          </span>
+        </Row>
+        <Row>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Cmd', 'K']} os="other" />
+            <span className="ds-status-item__label">two-key (win/linux)</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Alt', 'T']} os="other" />
+            <span className="ds-status-item__label">toggle disclosures</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Ctrl', 'Shift', 'Enter']} os="other" />
+            <span className="ds-status-item__label">wide modifier</span>
+          </span>
         </Row>
       </Section>
     </div>
@@ -695,6 +857,240 @@ const SpacingTab = (): JSX.Element => (
   </div>
 );
 
+/* ------------------------- Modal ------------------------- */
+
+const ModalTab = (): JSX.Element => {
+  const [basicOpen, setBasicOpen] = useState(false);
+  const [destructiveOpen, setDestructiveOpen] = useState(false);
+  const [longOpen, setLongOpen] = useState(false);
+
+  return (
+    <div className="ds-sections">
+      <Section label="Basic confirm">
+        <Row>
+          <Button variant="primary" onClick={() => setBasicOpen(true)}>
+            Open modal
+          </Button>
+        </Row>
+        <Modal
+          open={basicOpen}
+          onClose={() => setBasicOpen(false)}
+          title="Rename vault"
+          actions={
+            <>
+              <Button variant="ghost" onClick={() => setBasicOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={() => setBasicOpen(false)}>
+                Rename
+              </Button>
+            </>
+          }
+        >
+          <p>Enter a new label for this vault. It only affects how Tinker displays the vault in the sidebar.</p>
+          <div className="ds-input-wrap">
+            <TextInput placeholder="Vault name" defaultValue="Daily workspace" />
+          </div>
+        </Modal>
+      </Section>
+
+      <Section label="Destructive">
+        <Row>
+          <Button variant="danger" onClick={() => setDestructiveOpen(true)}>
+            Delete session
+          </Button>
+        </Row>
+        <Modal
+          open={destructiveOpen}
+          onClose={() => setDestructiveOpen(false)}
+          title="Delete this session"
+          actions={
+            <>
+              <Button variant="ghost" onClick={() => setDestructiveOpen(false)}>
+                Keep
+              </Button>
+              <Button variant="danger" onClick={() => setDestructiveOpen(false)}>
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <p>The transcript and any streamed tool output will be removed from local state. Vault memory is unaffected.</p>
+        </Modal>
+      </Section>
+
+      <Section label="Long content">
+        <Row>
+          <Button variant="secondary" onClick={() => setLongOpen(true)}>
+            Open long modal
+          </Button>
+        </Row>
+        <Modal
+          open={longOpen}
+          onClose={() => setLongOpen(false)}
+          title="About memory injection"
+          actions={<Button variant="primary" onClick={() => setLongOpen(false)}>Got it</Button>}
+        >
+          <p>Memory injection resolves the top relevant entities for the current prompt, then rewrites the session prelude before dispatching to OpenCode.</p>
+          <p>Only the top N entities are ever included, to keep token spend predictable on long histories.</p>
+          <p>Relevance scoring uses a cached embedding, and the injection path falls back to raw note titles if the embedding cache is unavailable.</p>
+          <p>Scroll to see how the body stays inside the card while header and footer remain anchored.</p>
+          <p>Scroll to see how the body stays inside the card while header and footer remain anchored.</p>
+          <p>Scroll to see how the body stays inside the card while header and footer remain anchored.</p>
+        </Modal>
+      </Section>
+    </div>
+  );
+};
+
+/* ------------------------- Toast ------------------------- */
+
+const ToastTabInner = (): JSX.Element => {
+  const { show } = useToast();
+  return (
+    <div className="ds-sections">
+      <Section label="Variants">
+        <Row>
+          <Button variant="secondary" onClick={() => show({ title: 'Note indexed', variant: 'info' })}>
+            Info
+          </Button>
+          <Button variant="secondary" onClick={() => show({ title: 'Vault synced', description: 'All 42 notes up to date.', variant: 'success' })}>
+            Success
+          </Button>
+          <Button variant="secondary" onClick={() => show({ title: 'Rate limit approaching', description: '80% of your model quota used today.', variant: 'warning' })}>
+            Warning
+          </Button>
+          <Button variant="secondary" onClick={() => show({ title: 'OpenCode disconnected', description: 'Sidecar exited unexpectedly.', variant: 'error' })}>
+            Error
+          </Button>
+        </Row>
+      </Section>
+
+      <Section label="With action">
+        <Row>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              show({
+                title: 'Skill added',
+                description: 'coach was pinned to this session.',
+                variant: 'success',
+                actionLabel: 'Undo',
+                onAction: () => show({ title: 'Skill removed', variant: 'info' }),
+              })
+            }
+          >
+            Trigger with undo
+          </Button>
+        </Row>
+      </Section>
+
+      <Section label="Persistent">
+        <Row>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              show({
+                title: 'Stuck until dismissed',
+                description: 'Pass durationMs: 0 to pin the toast.',
+                durationMs: 0,
+              })
+            }
+          >
+            Show persistent
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              show({ title: 'Note indexed', variant: 'info', durationMs: 0 });
+              show({ title: 'Vault synced', description: 'All 42 notes up to date.', variant: 'success', durationMs: 0 });
+              show({ title: 'Rate limit approaching', description: '80% of your model quota used today.', variant: 'warning', durationMs: 0 });
+              show({ title: 'OpenCode disconnected', description: 'Sidecar exited unexpectedly.', variant: 'error', durationMs: 0 });
+            }}
+          >
+            Show all (pinned)
+          </Button>
+        </Row>
+      </Section>
+    </div>
+  );
+};
+
+const ToastTab = (): JSX.Element => (
+  <ToastProvider>
+    <ToastTabInner />
+  </ToastProvider>
+);
+
+/* ---------------------- Empty State ---------------------- */
+
+const EmptyStateTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Chat — no messages">
+      <EmptyState
+        title="Start a conversation"
+        description="Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE."
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+        }
+      />
+    </Section>
+
+    <Section label="Memory — no notes yet">
+      <EmptyState
+        title="No indexed notes yet"
+        description="Connect a vault or create the default one. Tinker will surface recent notes and entities here."
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M6 4.5h9l3 3v12a1.5 1.5 0 0 1-1.5 1.5h-10.5A1.5 1.5 0 0 1 4.5 19.5v-13.5A1.5 1.5 0 0 1 6 4.5Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+            <path d="M8 12h8M8 15.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        }
+        action={<Button variant="secondary" size="s">Run memory sweep</Button>}
+      />
+    </Section>
+
+    <Section label="Connections — none connected">
+      <EmptyState
+        size="s"
+        align="start"
+        title="No connections yet"
+        description="Sign in with Google or GitHub to light up your connected tools. Tinker still works as a local coding agent without them."
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M10 14a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 1 0-5.66-5.66L11 7.34"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14 10a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 1 0 5.66 5.66L13 16.66"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        }
+      />
+    </Section>
+  </div>
+);
+
 /* -------------------------- Chat ------------------------- */
 
 const ChatTab = (): JSX.Element => {
@@ -759,6 +1155,143 @@ const ChatTab = (): JSX.Element => {
   );
 };
 
+/* -------------------- Settings Shell --------------------- */
+
+const UserIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+const MemoryIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 3h6" />
+    <path d="M9 21h6" />
+    <rect x="4" y="6" width="16" height="12" rx="2" />
+    <path d="M9 10h6M9 14h4" />
+  </svg>
+);
+
+const PlugIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 22v-5" />
+    <path d="M9 7V2" />
+    <path d="M15 7V2" />
+    <path d="M6 13V8h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z" />
+  </svg>
+);
+
+const DisplayIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="4" width="20" height="14" rx="2" />
+    <path d="M8 21h8" />
+    <path d="M12 18v3" />
+  </svg>
+);
+
+const SettingsSectionBody = ({
+  eyebrow,
+  title,
+  lede,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  lede: string;
+  children?: ReactNode;
+}): JSX.Element => (
+  <div className="ds-settings-body">
+    <p className="ds-settings-body__eyebrow">{eyebrow}</p>
+    <h2 className="ds-settings-body__title">{title}</h2>
+    <p className="ds-settings-body__lede">{lede}</p>
+    {children ? <div className="ds-settings-body__content">{children}</div> : null}
+  </div>
+);
+
+const SETTINGS_SECTIONS: ReadonlyArray<SettingsShellSection> = [
+  {
+    id: 'account',
+    label: 'Account',
+    icon: <UserIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Identity"
+        title="Account"
+        lede="Identity, providers, and sign-in handled by Better Auth."
+      >
+        <div className="ds-settings-card">
+          <p className="ds-settings-card__label">Signed in as</p>
+          <p className="ds-settings-card__value">khani@berkeley.edu</p>
+        </div>
+      </SettingsSectionBody>
+    ),
+  },
+  {
+    id: 'memory',
+    label: 'Memory',
+    icon: <MemoryIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Knowledge"
+        title="Memory"
+        lede="Vault index + entity graph live in the local SQLite store."
+      >
+        <div className="ds-settings-card">
+          <p className="ds-settings-card__label">Vault root</p>
+          <p className="ds-settings-card__value">~/Documents/tinker-vault</p>
+        </div>
+      </SettingsSectionBody>
+    ),
+  },
+  {
+    id: 'connections',
+    label: 'Connections',
+    icon: <PlugIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Integrations"
+        title="Connections"
+        lede="MCP servers configured in opencode.json surface here as toggles."
+      />
+    ),
+  },
+  {
+    id: 'display',
+    label: 'Display',
+    icon: <DisplayIcon />,
+    content: (
+      <SettingsSectionBody
+        eyebrow="Appearance"
+        title="Display"
+        lede="Theme, density, and accent preview."
+      />
+    ),
+  },
+];
+
+const SettingsShellTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Default shell (Account · Memory · Connections · Display)">
+      <div className="ds-settings-frame">
+        <SettingsShell sections={SETTINGS_SECTIONS} />
+      </div>
+    </Section>
+
+    <Section label="Controlled — Memory active">
+      <div className="ds-settings-frame">
+        <SettingsShell sections={SETTINGS_SECTIONS} activeSectionId="memory" />
+      </div>
+    </Section>
+
+    <Section label="Empty — default EmptyPane">
+      <div className="ds-settings-frame">
+        <SettingsShell sections={[]} />
+      </div>
+    </Section>
+  </div>
+);
+
 /* ----------------------- Router ------------------------- */
 
 const renderTab = (tab: PlaygroundTab): JSX.Element => {
@@ -773,8 +1306,16 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ComponentsTab />;
     case 'modelpicker':
       return <ModelPickerTab />;
+    case 'modal':
+      return <ModalTab />;
+    case 'toast':
+      return <ToastTab />;
+    case 'empty':
+      return <EmptyStateTab />;
     case 'chat':
       return <ChatTab />;
+    case 'settings-shell':
+      return <SettingsShellTab />;
   }
 };
 

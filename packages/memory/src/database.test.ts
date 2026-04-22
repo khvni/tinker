@@ -22,4 +22,27 @@ describe('DATABASE_SCHEMA', () => {
       ),
     ).toBe(true);
   });
+
+  it('creates the sessions table with shared-session columns and user foreign key', () => {
+    expect(
+      DATABASE_SCHEMA.some(
+        (statement) =>
+          statement.includes('CREATE TABLE IF NOT EXISTS sessions') &&
+          statement.includes('user_id TEXT NOT NULL') &&
+          statement.includes('folder_path TEXT NOT NULL') &&
+          statement.includes('last_active_at TEXT NOT NULL') &&
+          statement.includes('FOREIGN KEY (user_id) REFERENCES users(id)'),
+      ),
+    ).toBe(true);
+  });
+
+  it('creates the sessions user/activity index for switcher queries', () => {
+    expect(
+      DATABASE_SCHEMA.some(
+        (statement) =>
+          statement.includes('CREATE INDEX IF NOT EXISTS sessions_user_id_last_active_at_idx') &&
+          statement.includes('ON sessions (user_id, last_active_at)'),
+      ),
+    ).toBe(true);
+  });
 });

@@ -34,6 +34,8 @@ describe('registerWorkspacePanes', () => {
     }
 
     expect(filePane.type).toBe(FilePane);
+    expect(isValidElement(getRenderer('settings')({ kind: 'settings' }))).toBe(true);
+    expect(isValidElement(getRenderer('memory')({ kind: 'memory' }))).toBe(true);
   });
 
   it('is safe to call more than once', () => {

@@ -1,3 +1,4 @@
 /target/
 /gen/
 /binaries/opencode-*
+/tauri.release.conf.json

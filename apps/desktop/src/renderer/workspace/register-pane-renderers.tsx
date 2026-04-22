@@ -4,6 +4,18 @@ import { MemoryPane } from './components/MemoryPane/index.js';
 import { SettingsPane } from './components/SettingsPane/index.js';
 import { getRenderer, registerPane } from './pane-registry.js';
 
+const renderSettingsPane = (
+  _data: Extract<TinkerPaneData, { readonly kind: 'settings' }>,
+): JSX.Element => {
+  return <SettingsPane />;
+};
+
+const renderMemoryPane = (
+  _data: Extract<TinkerPaneData, { readonly kind: 'memory' }>,
+): JSX.Element => {
+  return <MemoryPane />;
+};
+
 const isMissingPaneError = (kind: 'settings' | 'memory', error: unknown): boolean => {
   return (
     error instanceof Error &&
@@ -22,18 +34,6 @@ const ensurePaneRegistered = (kind: 'settings' | 'memory', register: () => void)
   }
 
   register();
-};
-
-const renderSettingsPane = (
-  _data: Extract<TinkerPaneData, { readonly kind: 'settings' }>,
-): JSX.Element => {
-  return <SettingsPane />;
-};
-
-const renderMemoryPane = (
-  _data: Extract<TinkerPaneData, { readonly kind: 'memory' }>,
-): JSX.Element => {
-  return <MemoryPane />;
 };
 
 // Future settings and memory tasks should replace the component internals,

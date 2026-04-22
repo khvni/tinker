@@ -52,9 +52,9 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 | 1.3 | Register `{ kind: 'chat' }` → existing `<Chat>` component. No Chat-component internals change. | S | 1.2 | review | TIN-12 · PR #35. Boot-time registration via `register-panes.tsx`; `Chat.tsx` unchanged. |
 | 1.4 | Register `{ kind: 'file', data: { path, mime } }` → single dispatch component that reads `mime` and picks renderer. | S | 1.2 | review | TIN-13 · PR #38 |
 | 1.5 | Register `{ kind: 'settings' }` + `{ kind: 'memory' }` placeholders (render empty `<EmptyPane/>` until filled by M5/M6). | S | 1.2 | review | TIN-7 · PR #37 |
-| 1.6 | Rewrite `layout.default.ts` → returns `WorkspaceState<TinkerPaneData>` with a single Chat pane. No split, no secondary pane. | S | 1.3 | review | TIN-9/TIN-10/TIN-11 chain · PR #62. Folded into the legacy-shell retirement because `main` still lacked the prerequisite `@tinker/panes` swap. |
-| 1.7 | Swap `Workspace.tsx` internals: replace `<DockviewReact>` with `<Workspace>` from `@tinker/panes/react`. Read + write `WorkspaceState` via `@tinker/memory/layout-store` (already exists). | M | 1.3, 1.4, 1.5, 1.6 | review | TIN-9/TIN-10/TIN-11 chain · PR #62. Legacy workspace shell removed from the render tree. |
-| 1.8 | Delete `workspace/DockviewContext.ts`, `workspace/chat-panels.ts` + callers. Delete Dockview CSS imports. | S | 1.7 | review | TIN-9 · PR #62. |
+| 1.6 | Rewrite `layout.default.ts` → returns `WorkspaceState<TinkerPaneData>` with a single Chat pane. No split, no secondary pane. | S | 1.3 | done | TIN-8 + TIN-14 · PR #61. |
+| 1.7 | Swap `Workspace.tsx` internals: replace `<DockviewReact>` with `<Workspace>` from `@tinker/panes/react`. Read + write `WorkspaceState` via `@tinker/memory/layout-store` (already exists). | M | 1.3, 1.4, 1.5, 1.6 | done | TIN-8 + TIN-14 · PR #61. |
+| 1.8 | Delete `workspace/DockviewContext.ts`, `workspace/chat-panels.ts` + callers. Delete Dockview CSS imports. | S | 1.7 | review | TIN-9 · PR #62 (cleanup finish after PR #61 swap). |
 | 1.9 | Remove `dockview-react` from `apps/desktop/package.json`. Run `pnpm install`. Verify `pnpm typecheck` passes. | S | 1.8 | review | TIN-10 · PR #62. |
 | 1.10 | Layout snapshot migration: detect old Dockview-shaped JSON in SQLite `layouts` table → delete + re-seed default. Log once. | S | 1.9 | review | TIN-11 · PR #62. One-shot schema migration drops incompatible pre-v1 snapshots. |
 
@@ -64,7 +64,7 @@ Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to cur
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | 2.1 | Add `Session` type in `@tinker/shared-types`: `{ id, userId, folderPath, createdAt, lastActiveAt, modelId?: string }`. Also export `User` type placeholder (expanded in M8.1). | S | — | done | TIN-15 · PR #17 merged 2026-04-21. |
-| 2.2 | SQLite `sessions` table + migrations in `@tinker/memory/database.ts` (columns: `id, user_id, folder_path, created_at, last_active_at, model_id`; FK `user_id → users(id)` once M8.3 lands — add the FK in the same PR if possible, else gate behind a follow-up). CRUD helpers in new `packages/memory/src/session-store.ts`. | M | 2.1, 8.3 | not started | Mirrors existing `scheduler-store` shape. |
+| 2.2 | SQLite `sessions` table + migrations in `@tinker/memory/database.ts` (columns: `id, user_id, folder_path, created_at, last_active_at, model_id`; FK `user_id → users(id)` once M8.3 lands — add the FK in the same PR if possible, else gate behind a follow-up). CRUD helpers in new `packages/memory/src/session-store.ts`. | M | 2.1, 8.3 | review | TIN-16 · PR #56. FK included because `users` table already exists on `main`. |
 | 2.3 | Rust Tauri command `open_folder_picker() -> Result<String, Error>` using `tauri-plugin-dialog`. | S | — | done | TIN-17 · PR #19 merged 2026-04-21. |
 | 2.4 | Rust Tauri command `start_opencode(folder_path, user_id, memory_subdir) -> Result<OpencodeHandle, Error>` that spawns `opencode serve --cwd <folder>` with `SMART_VAULT_PATH=<memory_subdir>`. Health-poll until ready. Returns `{ baseUrl, pid }`. | M | — | done | TIN-18 · PR #20 merged 2026-04-21. 0600 manifest + detached drain task for D17 unref. Follow-up: TIN-108 to delete legacy bootstrap path. |
 | 2.5 | Rust Tauri command `stop_opencode(pid: u32)` for session close. | S | 2.4 | done | TIN-19 · PR #25 merged 2026-04-22. SIGTERM → 2s grace → SIGKILL → manifest removed. Idempotent. Legacy `stop_opencode(&AppHandle)` renamed to `terminate_legacy_opencode`; full replacement follow-up TIN-108. |
@@ -72,7 +72,7 @@ Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to cur
 | 2.7 | Session restore: on app launch (post-auth), list sessions from SQLite **filtered by `user_id = currentUser.id`** ordered by `lastActiveAt`. If ≥1, show session switcher; if 0, show folder picker. | M | 2.2, 8.5 | not started | Simple list UI using `@tinker/design`. |
 | 2.8 | "New session" button in session switcher → folder picker → spawn OpenCode → open new Chat pane tab. | S | 2.6 | not started | Same code path as first-run. |
 | 2.9 | Active session indicator in workspace titlebar: shows folder basename + monospace short path + current user's avatar (avatar from M8.10). | S | 2.7, 8.10 | not started | Purely cosmetic surface. |
-| 2.10 | On app quit, stop all running OpenCode instances (best-effort; survive kill -9 via manifest). | S | 2.5 | not started | Per D22 coordinator pattern. |
+| 2.10 | On app quit, stop all running OpenCode instances (best-effort; survive kill -9 via manifest). | S | 2.5 | review | TIN-24 · PR #60 · `khvni/tin-24-ask-user` |
 | 2.11 | Chat history JSONL writer: every OpenCode SSE event from the active session appends one line to `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Buffered + flushed per event. Create dirs on first write. | M | 2.2, 4.2 | not started | Stream-persistence bridge. Lives in `packages/bridge/src/chat-history.ts`. |
 | 2.12 | Chat history hydration: on session open, read JSONL (if exists) and seed Chat pane with prior messages before the SSE subscription resumes. | M | 2.11 | not started | Hydrate-before-stream. Render from JSONL via same markdown path as live events. |
 
@@ -82,14 +82,14 @@ Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | 3.1 | **Research**: pick libraries for pdf / xlsx / docx / pptx / html / code / markdown. Deliverable: `agent-knowledge/reference/inline-renderers.md` with lib name + license + bundle size + rationale per format. Criterion: no paid libs, no copyleft licenses (MIT/Apache/ISC/BSD only). | M | — | done | TIN-27 · PR #18 merged 2026-04-21. |
-| 3.2 | Unified `FilePane` component: accepts `{ path, mime }`, looks up renderer in `mimeToRenderer` map, renders. Fallback = "unsupported, open externally" with Tauri `shell.open`. | S | 1.4, 3.1 | not started | Dispatcher. |
+| 3.2 | Unified `FilePane` component: accepts `{ path, mime }`, looks up renderer in `mimeToRenderer` map, renders. Fallback = "unsupported, open externally" with Tauri `shell.open`. | S | 1.4, 3.1 | review | TIN-28 · PR #59 |
 | 3.3 | PDF renderer integration per 3.1 choice. Accepts file path → embedded viewer. Keyboard navigation (PgUp/PgDn). | M | 3.1, 3.2 | not started | Probably `react-pdf`. |
 | 3.4 | XLSX renderer per 3.1. First-sheet-by-default + `<SegmentedControl>` sheet switcher. Read-only table. | M | 3.1, 3.2 | not started | Probably SheetJS. |
 | 3.5 | DOCX renderer per 3.1. Converts → sanitized HTML → renders. No editing. | M | 3.1, 3.2 | not started | Probably `mammoth`. |
 | 3.6 | PPTX renderer per 3.1. Slide carousel w/ next/prev + thumbnail strip. | M | 3.1, 3.2 | not started | Stretch if 3.1 flags as risky. |
-| 3.7 | HTML renderer: sandbox iframe (`sandbox="allow-same-origin"` only, no scripts). Verify against existing `HtmlRenderer.tsx`. | S | 3.2 | not started | Already exists; move behind FilePane dispatch. |
-| 3.8 | Code renderer: move existing `CodeRenderer.tsx` behind FilePane dispatch; add language autodetect via existing `code-highlighter`. | S | 3.2 | not started | Repackaging. |
-| 3.9 | Markdown renderer: move existing `MarkdownRenderer.tsx` behind FilePane dispatch. Confirm GFM + code highlighting. | S | 3.2 | not started | Repackaging. |
+| 3.7 | HTML renderer: sandbox iframe (`sandbox="allow-same-origin"` only, no scripts). Verify against existing `HtmlRenderer.tsx`. | S | 3.2 | review | TIN-33 · PR #59 |
+| 3.8 | Code renderer: move existing `CodeRenderer.tsx` behind FilePane dispatch; add language autodetect via existing `code-highlighter`. | S | 3.2 | review | TIN-34 · PR #59 |
+| 3.9 | Markdown renderer: move existing `MarkdownRenderer.tsx` behind FilePane dispatch. Confirm GFM + code highlighting. | S | 3.2 | review | TIN-35 · PR #59 |
 | 3.10 | "Open file" from Chat: when OpenCode output includes a file path link, clicking opens a new FilePane tab. | M | 3.2, M1.7 | not started | Requires link handler in Chat message renderer. |
 | 3.11 | Remove `panes/Today.tsx`, `panes/SchedulerPane.tsx`, `panes/Playbook.tsx`, `panes/VaultBrowser.tsx` from build. Either delete or move to `apps/desktop/_deferred/` with git mv. Per D25 only chat/file/settings/memory ship. | S | 1.10 | not started | Dead-code cleanup. |
 
@@ -99,20 +99,20 @@ Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | 4.1 | **Research**: clone/browse OpenCode Desktop (sst/opencode) model-picker UI. Document open/close behavior, keyboard nav, filter semantics, grouping (provider/model/context-window display). Deliverable: `agent-knowledge/reference/opencode-desktop-model-picker.md`. | M | — | done | TIN-38 · PR #15 merged 2026-04-21. Source commit pinned `d2181e9273`. |
-| 4.2 | Chat message list renders markdown via `react-markdown` + `remark-gfm` + `rehype-shiki` (match existing code-highlighter choice). Covers: headings, bold/italic, lists, tables, blockquotes, inline code, fenced code, links. | M | 1.3 | not started | Core chat requirement. |
-| 4.3 | Code block renderer: uses existing `code-highlighter.ts`. Copy button per block. Language label. | S | 4.2 | not started | Reuses code. |
-| 4.4 | Streaming render: SSE chunks → incremental markdown parse. Debounce re-render to 60fps max (requestAnimationFrame). No full re-parse per chunk. | M | 4.2 | not started | Perf-sensitive. |
-| 4.5 | Tool-call blocks: parse OpenCode event stream for `tool.use` events. Render as collapsed `▸ used <tool-name>` disclosure. Expands on click. Hidden by default. | M | 4.2 | not started | Matches OpenCode Desktop behavior. |
-| 4.6 | Thinking/reasoning blocks: same disclosure pattern. Hidden by default. Keyboard shortcut `⌥T` toggles all. | S | 4.5 | not started | Parity feature. |
+| 4.2 | Chat message list renders markdown via `react-markdown` + `remark-gfm` + `rehype-shiki` (match existing code-highlighter choice). Covers: headings, bold/italic, lists, tables, blockquotes, inline code, fenced code, links. | M | 1.3 | review | TIN-39 · PR #57. Reuses existing `highlightCode()` (highlight.js) via custom `pre` override — no second highlighter. |
+| 4.3 | Code block renderer: uses existing `code-highlighter.ts`. Copy button per block. Language label. | S | 4.2 | review | TIN-40 · PR #57. Hover-reveal copy button; DOMPurify-sanitized highlight output. |
+| 4.4 | Streaming render: SSE chunks → incremental markdown parse. Debounce re-render to 60fps max (requestAnimationFrame). No full re-parse per chunk. | M | 4.2 | review | TIN-41 · PR #57. `useStreamingMarkdown` coalesces chunks into one rAF/frame; pure `createStreamingBuffer` factory unit-tested. |
+| 4.5 | Tool-call blocks: parse OpenCode event stream for `tool.use` events. Render as collapsed `▸ used <tool-name>` disclosure. Expands on click. Hidden by default. | M | 4.2 | review | TIN-42 · PR #67 (bundled with TIN-43 + TIN-52). |
+| 4.6 | Thinking/reasoning blocks: same disclosure pattern. Hidden by default. Keyboard shortcut `⌥T` toggles all. | S | 4.5 | review | TIN-43 · PR #67 (bundled — see 4.5). |
 | 4.7 | `<ModelPicker>` primitive in `@tinker/design` per 4.1 findings. Dropdown + search input + keyboard nav + provider/model/context-window rows. | L | 4.1 | done | TIN-44 · PR #32 merged 2026-04-22. Folder `ModelPicker/` (Trigger + Panel + CSS + tests). Substring filter; fuzzysort deferred. Follow-up tickets: Ctrl+N/P + click-outside scrollbar gap + ARIA combobox upgrade. |
 | 4.8 | Wire ModelPicker to `opencode.config.providers()` SDK call. Group by provider. | M | 4.7 | review | TIN-45 · PR #43. Chat composer picker now loads from SDK, applies selected `{ providerID, modelID }` on prompt, and handles zero-provider empty state. |
 | 4.9 | Persist selected model per-session in SQLite `sessions.model_id`. New session inherits last-used model. | S | 4.8, 2.2 | not started | Cross-pillar touch. |
 | 4.10 | Parity verification: side-by-side with OpenCode Desktop from 4.1. Checklist in PR description. | S | 4.9 | not started | Review-as-task. |
-| 4.11 | Input box: multi-line `<Textarea>` (already shipped). `Enter` submits, `Shift+Enter` newline, disabled while streaming, `Escape` calls `session.abort()`. Auto-resize up to 10 lines. | M | 4.2 | not started | Composer. |
-| 4.12 | Stop button: visible only while streaming, calls `session.abort()`. Replaces send button during stream. | S | 4.11 | not started | Inline with composer. |
+| 4.11 | Input box: multi-line `<Textarea>` (already shipped). `Enter` submits, `Shift+Enter` newline, disabled while streaming, `Escape` calls `session.abort()`. Auto-resize up to 10 lines. | M | 4.2 | review | TIN-48 · PR #58. |
+| 4.12 | Stop button: visible only while streaming, calls `session.abort()`. Replaces send button during stream. | S | 4.11 | review | TIN-49 · PR #58. |
 | 4.13 | Auto-scroll: stick to bottom during streaming unless user scrolled up. `[New messages]` pill appears when user is scrolled up + new content arrives. | M | 4.4 | not started | UX polish. |
-| 4.14 | Copy-message button on each assistant message. Hover-reveal. | S | 4.2 | not started | Polish. |
-| 4.15 | Clear existing tool-call / thinking UI from `Chat.tsx` that doesn't match 4.5/4.6 semantics. | S | 4.5, 4.6 | not started | Cleanup. |
+| 4.14 | Copy-message button on each assistant message. Hover-reveal. | S | 4.2 | review | TIN-51 · PR #57. Copies raw markdown; hidden while streaming. |
+| 4.15 | Clear existing tool-call / thinking UI from `Chat.tsx` that doesn't match 4.5/4.6 semantics. | S | 4.5, 4.6 | review | TIN-52 · PR #67 (bundled — see 4.5). |
 
 ### M5 — Context usage badge
 Spec: [[25-mvp-context-badge]] · Depends on: M4.2
@@ -162,9 +162,9 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | 8.2 | Add `User` type in `@tinker/shared-types`: `{ id, provider, providerUserId, displayName, avatarUrl?: string, email?: string, createdAt, lastSeenAt }`. | S | — | done | TIN-75 · PR #27 merged 2026-04-22. |
 | 8.3 | SQLite `users` table in `@tinker/memory/database.ts` (columns mirror `User` type, unique composite index on `(provider, provider_user_id)`). CRUD helpers in new `packages/memory/src/user-store.ts`. | M | 8.2 | review | TIN-76 · PR #36 opened 2026-04-22. Seeds on every successful sign-in (upsert). |
 | 8.4 | `@tinker/auth-sidecar` wire Google provider per 8.1: provider config, loopback URI, PKCE flow, callback handler. Sidecar exposes HTTP endpoints `POST /auth/start`, `GET /auth/callback`, `POST /auth/logout`, `GET /auth/session`. | M | 8.1 | review | TIN-77 · PR #48. Sidecar now uses ticketed `/auth/*` polling flow; Rust callback listener deleted. |
-| 8.5 | `@tinker/auth-sidecar` wire GitHub provider per 8.1. | S | 8.4 | not started | Config-only once 8.4 lands. |
-| 8.6 | `@tinker/auth-sidecar` wire Microsoft (consumer) provider per 8.1. | S | 8.4 | not started | Consumer/personal only. No tenant federation. |
-| 8.7 | Rust Tauri command `start_auth_sidecar() -> Result<AuthHandle, Error>` spawns the auth sidecar + returns base URL. Rust binds OS-level loopback redirect URIs needed by the sidecar (Google, GitHub, Microsoft). | M | 8.4 | not started | Mirrors OpenCode sidecar lifecycle (coordinator pattern D22). |
+| 8.5 | `@tinker/auth-sidecar` wire GitHub provider per 8.1. | S | 8.4 | review | TIN-78 · PR #70. |
+| 8.6 | `@tinker/auth-sidecar` wire Microsoft (consumer) provider per 8.1. | S | 8.4 | review | TIN-79 · PR #70. |
+| 8.7 | Rust Tauri command `start_auth_sidecar() -> Result<AuthHandle, Error>` spawns the auth sidecar + returns base URL. Rust binds OS-level loopback redirect URIs needed by the sidecar (Google, GitHub, Microsoft). | M | 8.4 | review | TIN-80 · PR #70. |
 | 8.8 | Rust keychain bridge: Tauri commands `save_refresh_token(provider, user_id, token)`, `load_refresh_token(provider, user_id) -> Option<String>`, `clear_refresh_token(provider, user_id)` via `tauri-plugin-keyring`. | M | — | done | TIN-81 · PR #33 merged 2026-04-22. |
 | 8.9 | Sign-in UX: first-run screen shows three buttons (Google / GitHub / Microsoft). Click → renderer calls `auth/start` → opens system browser to provider → redirect comes back to loopback → renderer polls `auth/session` until `authenticated: true` → upserts `users` row → navigates to folder picker. | L | 8.4, 8.5, 8.6, 8.7, 8.3 | not started | Subdivide if >500 LOC: split into (a) provider-picker screen, (b) in-flight "waiting for browser…" screen, (c) session-poll hook. |
 | 8.10 | Current-user context: renderer `useCurrentUser()` hook reads session + hydrates from `users` table. App boot blocks on this until resolved or unauthenticated. | M | 8.9 | not started | Single source of truth for `user_id` everywhere. |
@@ -230,6 +230,9 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 |--------|---------|-------|--------|-------|
 | TIN-112 | 02 | Playbook shared skill schema + markdown frontmatter spec | review | PR #46 |
 | TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
+| TIN-167 | release | Cross-platform tag-triggered GitHub Release pipeline + updater manifest | review | PR #49. Supersedes TIN-164 scope on `v*` tag trigger; reconcile before merge. |
+| TIN-176 | UI.1 | Paper design source audit + tokens.css parity report | review | `agent-knowledge/reference/paper-design-audit.md`. Dark tokens 1:1 match; light surface tokens drift (D23 layer reversal inverted in code). Blocks downstream UI cleanup chain. |
+| TIN-177 + TIN-178 + TIN-181 | 09 | UI trio: `<Modal>` + `<Toast>` provider + `<EmptyState>` primitives in `@tinker/design`; `EmptyState` adopted by Chat / Today / IntegrationsStrip | review | Branch `khvni/ui-design-trio`. One bundled PR. Session: [[2026-04-21-2146-ui-trio]]. Folder-per-component (D21), tokens-only (D14/D23), dual-theme verified. 31 new tests. |
 
 ## Rejected (not coming back)
 

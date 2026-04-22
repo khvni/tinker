@@ -8,8 +8,7 @@ import { HtmlRenderer } from '../../renderers/HtmlRenderer.js';
 import { ImageRenderer } from '../../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../../renderers/MarkdownEditor.js';
 import { MarkdownRenderer } from '../../renderers/MarkdownRenderer.js';
-import { getPanelTitleForPath } from '../../renderers/file-utils.js';
-import { useFilePaneRuntime } from './file-pane-runtime.js';
+import { getPanelTitleForPath, type FilePaneParams } from '../../renderers/file-utils.js';
 
 type FilePaneData = Extract<TinkerPaneData, { readonly kind: 'file' }>;
 
@@ -20,36 +19,32 @@ export type FilePaneProps = {
 
 type FileRendererProps = {
   path: string;
+  mime: string;
   vaultRevision: number;
-  onEdit?: () => void;
 };
 
 type FileRenderer = (props: FileRendererProps) => JSX.Element;
 
-const CodeFileRenderer: FileRenderer = ({ path }) => {
-  return <CodeRenderer path={path} />;
+const toParams = (path: string, mime: string): FilePaneParams => ({ path, mime });
+
+const CodeFileRenderer: FileRenderer = ({ path, mime }) => {
+  return <CodeRenderer params={toParams(path, mime)} />;
 };
 
 const CsvFileRenderer: FileRenderer = ({ path }) => {
   return <CsvRenderer path={path} />;
 };
 
-const HtmlFileRenderer: FileRenderer = ({ path }) => {
-  return <HtmlRenderer path={path} />;
+const HtmlFileRenderer: FileRenderer = ({ path, mime }) => {
+  return <HtmlRenderer params={toParams(path, mime)} />;
 };
 
 const ImageFileRenderer: FileRenderer = ({ path }) => {
   return <ImageRenderer path={path} />;
 };
 
-const MarkdownFileRenderer: FileRenderer = ({ path, vaultRevision, onEdit }) => {
-  return (
-    <MarkdownRenderer
-      path={path}
-      vaultRevision={vaultRevision}
-      {...(onEdit ? { onEdit } : {})}
-    />
-  );
+const MarkdownFileRenderer: FileRenderer = ({ path, mime, vaultRevision }) => {
+  return <MarkdownRenderer params={toParams(path, mime)} vaultRevision={vaultRevision} />;
 };
 
 const MarkdownEditorFileRenderer: FileRenderer = ({ path, vaultRevision }) => {
@@ -111,6 +106,10 @@ type UnsupportedFilePaneProps = {
   mime: string;
 };
 
+export const openFileExternally = async (path: string): Promise<void> => {
+  await openExternal(path);
+};
+
 const UnsupportedFilePane = ({ path, mime }: UnsupportedFilePaneProps): JSX.Element => {
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
@@ -120,7 +119,7 @@ const UnsupportedFilePane = ({ path, mime }: UnsupportedFilePaneProps): JSX.Elem
     setError(null);
 
     try {
-      await openExternal(path);
+      await openFileExternally(path);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
@@ -155,23 +154,11 @@ const UnsupportedFilePane = ({ path, mime }: UnsupportedFilePaneProps): JSX.Elem
 };
 
 export const FilePane = ({ data, vaultRevision = 0 }: FilePaneProps): JSX.Element => {
-  const runtime = useFilePaneRuntime();
   const Renderer = mimeToRenderer[data.mime];
-  const resolvedVaultRevision = runtime?.vaultRevision ?? vaultRevision;
-  const onEdit =
-    runtime && data.mime === 'text/markdown'
-      ? () => runtime.openFile(data.path, { mime: MARKDOWN_EDITOR_MIME })
-      : undefined;
 
   if (!Renderer) {
     return <UnsupportedFilePane path={data.path} mime={data.mime} />;
   }
 
-  return (
-    <Renderer
-      path={data.path}
-      vaultRevision={resolvedVaultRevision}
-      {...(onEdit ? { onEdit } : {})}
-    />
-  );
+  return <Renderer path={data.path} mime={data.mime} vaultRevision={vaultRevision} />;
 };

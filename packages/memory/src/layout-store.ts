@@ -2,6 +2,7 @@ import {
   createDefaultWorkspacePreferences,
   type LayoutState,
   type LayoutStore,
+  type PersistedWorkspaceState,
   type WorkspacePreferences,
 } from '@tinker/shared-types';
 import { getDatabase } from './database.js';
@@ -15,30 +16,16 @@ export type LayoutRow = {
 export const CURRENT_LAYOUT_VERSION = 2 as const;
 
 type StoredLayoutPayload = {
-  workspace: LayoutState['workspace'];
+  workspaceState: unknown;
   preferences?: unknown;
 };
 
-const parseJsonObject = (raw: string | null): Record<string, unknown> | null => {
-  if (!raw) {
-    return null;
-  }
-
+const parseStoredLayout = (raw: string): unknown | null => {
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    return JSON.parse(raw) as unknown;
   } catch {
     return null;
   }
-};
-
-const isWorkspaceState = (value: unknown): value is LayoutState['workspace'] => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  return candidate.version === CURRENT_LAYOUT_VERSION && Array.isArray(candidate.tabs);
 };
 
 const normalizePreferences = (value: unknown): WorkspacePreferences => {
@@ -55,9 +42,22 @@ const normalizePreferences = (value: unknown): WorkspacePreferences => {
   };
 };
 
+const isWorkspaceState = (value: unknown): value is PersistedWorkspaceState => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.version === CURRENT_LAYOUT_VERSION &&
+    Array.isArray(candidate.tabs) &&
+    ('activeTabId' in candidate)
+  );
+};
+
 export const serializeLayoutState = (state: LayoutState): string => {
   const payload: StoredLayoutPayload = {
-    workspace: state.workspace,
+    workspaceState: state.workspaceState,
     preferences: state.preferences,
   };
 
@@ -76,23 +76,27 @@ export const hydrateLayoutRow = (row: LayoutRow | undefined, userId: string): La
     return null;
   }
 
-  const payload = parseJsonObject(row.workspace_state_json);
-  if (!payload) {
+  const payload = row.workspace_state_json ? parseStoredLayout(row.workspace_state_json) : null;
+  if (!payload || typeof payload !== 'object') {
     console.warn(`Ignoring stored layout for user ${userId}: payload was not valid JSON.`);
     return null;
   }
 
-  const workspaceCandidate = 'workspace' in payload ? payload.workspace : payload;
-  if (!isWorkspaceState(workspaceCandidate)) {
-    console.warn(`Ignoring stored layout for user ${userId}: payload was not valid JSON.`);
+  const candidate = payload as Record<string, unknown>;
+  const hasWrapper = 'workspaceState' in candidate;
+  const workspaceState = hasWrapper ? candidate.workspaceState : payload;
+  const preferences = hasWrapper ? normalizePreferences(candidate.preferences) : createDefaultWorkspacePreferences();
+
+  if (!isWorkspaceState(workspaceState)) {
+    console.warn(`Ignoring stored layout for user ${userId}: payload was not a WorkspaceState snapshot.`);
     return null;
   }
 
   return {
-    version: row.version,
-    workspace: workspaceCandidate,
+    version: CURRENT_LAYOUT_VERSION,
+    workspaceState,
     updatedAt: row.updated_at,
-    preferences: 'workspace' in payload ? normalizePreferences(payload.preferences) : createDefaultWorkspacePreferences(),
+    preferences,
   };
 };
 

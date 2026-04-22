@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
-import { Badge, Button } from '@tinker/design';
+import { Badge, Button, EmptyState } from '@tinker/design';
 import type { MemoryRunState } from '@tinker/memory';
 import type { Entity, MemoryStore, ScheduledJobStore, ScheduledTodayEntry } from '@tinker/shared-types';
 
@@ -112,12 +112,33 @@ export const Today = ({
         ) : null}
 
         {entities.length === 0 ? (
-          <div className="tinker-list-item">
-            <h3>No indexed notes yet</h3>
-            <p className="tinker-muted">
-              Connect a vault or create the default one. Tinker will surface recent notes and entities here.
-            </p>
-          </div>
+          <EmptyState
+            title="No indexed notes yet"
+            description="Connect a vault or create the default one. Tinker will surface recent notes and entities here."
+            icon={
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M6 4.5h9l3 3v12a1.5 1.5 0 0 1-1.5 1.5h-10.5A1.5 1.5 0 0 1 4.5 19.5v-13.5A1.5 1.5 0 0 1 6 4.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <path d="M8 12h8M8 15.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            }
+            action={
+              <Button
+                variant="secondary"
+                size="s"
+                onClick={() => {
+                  void onRunMemorySweep();
+                }}
+                disabled={!vaultPath || memorySweepBusy}
+              >
+                {memorySweepBusy ? 'Sweeping…' : 'Run memory sweep'}
+              </Button>
+            }
+          />
         ) : null}
 
         {entities.map((entity) => (

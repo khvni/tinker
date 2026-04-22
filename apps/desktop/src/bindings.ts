@@ -24,8 +24,17 @@ export type OpencodeConnection = {
   password: string;
 };
 
+export type AuthHandle = {
+  baseUrl: string;
+  pid: number;
+};
+
 export function openFolderPicker(): Promise<string> {
   return invoke<string>('open_folder_picker');
+}
+
+export function startAuthSidecar(): Promise<AuthHandle> {
+  return invoke<AuthHandle>('start_auth_sidecar');
 }
 
 export function saveRefreshToken(provider: RefreshTokenProvider, userId: string, token: string): Promise<void> {

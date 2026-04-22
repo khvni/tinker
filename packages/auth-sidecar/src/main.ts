@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { betterAuth } from 'better-auth';
 
-type DesktopProvider = 'google' | 'github';
+type DesktopProvider = 'google' | 'github' | 'microsoft';
 
 type SessionPayload = {
   provider: DesktopProvider;
@@ -89,11 +89,18 @@ const googleClientId = optionalEnv('GOOGLE_OAUTH_CLIENT_ID');
 const googleClientSecret = optionalEnv('GOOGLE_OAUTH_CLIENT_SECRET');
 const githubClientId = optionalEnv('GITHUB_OAUTH_CLIENT_ID');
 const githubClientSecret = optionalEnv('GITHUB_OAUTH_CLIENT_SECRET');
+const microsoftClientId = optionalEnv('MICROSOFT_OAUTH_CLIENT_ID');
+const microsoftClientSecret = optionalEnv('MICROSOFT_OAUTH_CLIENT_SECRET');
+const microsoftTenantId = optionalEnv('MICROSOFT_OAUTH_TENANT_ID');
 const configuredGoogleClientId =
   googleClientId && !isPlaceholderValue(googleClientId) && looksLikeGoogleClientId(googleClientId) ? googleClientId : null;
 const configuredGoogleClientSecret = googleClientSecret && !isPlaceholderValue(googleClientSecret) ? googleClientSecret : null;
 const configuredGithubClientId = githubClientId && !isPlaceholderValue(githubClientId) ? githubClientId : null;
 const configuredGithubClientSecret = githubClientSecret && !isPlaceholderValue(githubClientSecret) ? githubClientSecret : null;
+const configuredMicrosoftClientId = microsoftClientId && !isPlaceholderValue(microsoftClientId) ? microsoftClientId : null;
+const configuredMicrosoftClientSecret =
+  microsoftClientSecret && !isPlaceholderValue(microsoftClientSecret) ? microsoftClientSecret : null;
+const configuredMicrosoftTenantId = microsoftTenantId && !isPlaceholderValue(microsoftTenantId) ? microsoftTenantId : null;
 
 const authTickets = new Map<string, AuthTicketRecord>();
 
@@ -105,8 +112,9 @@ const socialProviders = {
           clientSecret: configuredGoogleClientSecret,
           redirectURI: `${baseURL}/api/auth/callback/google`,
           scope: ['openid', 'email', 'profile'],
+          disableDefaultScope: true,
           accessType: 'offline' as const,
-          prompt: 'select_account consent' as const,
+          prompt: 'select_account' as const,
         },
       }
     : {}),
@@ -117,18 +125,29 @@ const socialProviders = {
           clientSecret: configuredGithubClientSecret,
           redirectURI: `${baseURL}/api/auth/callback/github`,
           scope: ['read:user', 'user:email'],
+          disableDefaultScope: true,
+        },
+      }
+    : {}),
+  ...(configuredMicrosoftClientId
+    ? {
+        microsoft: {
+          clientId: configuredMicrosoftClientId,
+          clientSecret: configuredMicrosoftClientSecret ?? '',
+          redirectURI: `${baseURL}/api/auth/callback/microsoft`,
+          tenantId: configuredMicrosoftTenantId ?? 'common',
+          authority: 'https://login.microsoftonline.com',
+          scope: ['openid', 'email', 'profile', 'offline_access'],
+          disableDefaultScope: true,
+          prompt: 'select_account' as const,
         },
       }
     : {}),
 };
 
 const enabledProviders = new Set(Object.keys(socialProviders).filter((value): value is DesktopProvider => {
-  return value === 'google' || value === 'github';
+  return value === 'google' || value === 'github' || value === 'microsoft';
 }));
-
-if (enabledProviders.size === 0) {
-  throw new Error('At least one social provider must be configured for Better Auth.');
-}
 
 const auth = betterAuth({
   appName: 'Tinker',
@@ -153,7 +172,7 @@ const auth = betterAuth({
 });
 
 const isDesktopProvider = (value: string): value is DesktopProvider => {
-  return value === 'google' || value === 'github';
+  return value === 'google' || value === 'github' || value === 'microsoft';
 };
 
 const isConfiguredProvider = (provider: DesktopProvider): boolean => {
@@ -405,13 +424,17 @@ const readSessionPayload = async (request: Request, provider: DesktopProvider): 
     refreshScope = refresh.scope?.split(/[ ,]+/u).filter((scope) => scope.length > 0) ?? refreshScope;
     expiresAt = refresh.accessTokenExpiresAt ?? expiresAt;
   } catch (error) {
-    if (provider === 'google') {
+    if (provider === 'google' || provider === 'microsoft') {
       throw error;
     }
   }
 
   if (access.accessToken.length === 0) {
     throw new Error('missing_access_token');
+  }
+
+  if ((provider === 'google' || provider === 'microsoft') && refreshToken.length === 0) {
+    throw new Error('missing_refresh_token');
   }
 
   return {

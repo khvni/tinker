@@ -1,4 +1,9 @@
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+  fs,
+  io::ErrorKind,
+  path::{Path, PathBuf},
+  process::Command,
+};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use rand::{rngs::OsRng, RngCore};
@@ -13,6 +18,7 @@ const HEALTH_POLL_TIMEOUT: Duration = Duration::from_secs(10);
 const LISTEN_ANNOUNCE_TIMEOUT: Duration = Duration::from_secs(10);
 const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const PROCESS_POLL_INTERVAL: Duration = Duration::from_millis(50);
+const OPENCODE_SERVER_USERNAME: &str = "tinker";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +50,50 @@ pub(crate) fn manifests_dir(home: &PathBuf) -> Result<PathBuf, String> {
   let dir = home.join(".tinker").join("manifests");
   fs::create_dir_all(&dir).map_err(|e| format!("create manifests dir {dir:?}: {e}"))?;
   Ok(dir)
+}
+
+fn remove_manifest(path: &Path) -> Result<(), String> {
+  match fs::remove_file(path) {
+    Ok(()) => Ok(()),
+    Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+    Err(error) => Err(format!("remove manifest {path:?}: {error}")),
+  }
+}
+
+fn list_manifests(manifests_dir: &Path) -> Result<Vec<(PathBuf, OpencodeManifest)>, String> {
+  let entries = match fs::read_dir(manifests_dir) {
+    Ok(entries) => entries,
+    Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+    Err(error) => return Err(format!("read {manifests_dir:?}: {error}")),
+  };
+
+  let mut manifests = Vec::new();
+
+  for entry in entries {
+    let entry = entry.map_err(|error| format!("iter {manifests_dir:?}: {error}"))?;
+    let path = entry.path();
+    if path.extension().and_then(|value| value.to_str()) != Some("json") {
+      continue;
+    }
+
+    let content = match fs::read_to_string(&path) {
+      Ok(content) => content,
+      Err(error) => {
+        eprintln!("[opencode] could not read manifest {path:?}: {error}");
+        continue;
+      }
+    };
+
+    match serde_json::from_str::<OpencodeManifest>(&content) {
+      Ok(manifest) => manifests.push((path, manifest)),
+      Err(error) => {
+        eprintln!("[opencode] removing malformed manifest {path:?}: {error}");
+        let _ = remove_manifest(&path);
+      }
+    }
+  }
+
+  Ok(manifests)
 }
 
 pub(crate) fn extract_base_url(line: &[u8]) -> Option<String> {
@@ -124,7 +174,7 @@ pub async fn start_opencode(
   }
 
   let session_id = random_url_safe(16);
-  let username = format!("tinker-{}", random_url_safe(8));
+  let username = OPENCODE_SERVER_USERNAME.to_string();
   let secret = random_url_safe(24);
   let home = app
     .path()
@@ -270,27 +320,9 @@ fn send_kill(pid: u32) -> Result<(), String> {
 compile_error!("stop_opencode is unix-only for MVP (macOS + Linux). See decisions.md D25.");
 
 fn remove_manifest_for_pid(manifests_dir: &Path, pid: u32) -> Result<(), String> {
-  let entries = match fs::read_dir(manifests_dir) {
-    Ok(entries) => entries,
-    // No manifests dir yet = nothing to remove.
-    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-    Err(err) => return Err(format!("read {manifests_dir:?}: {err}")),
-  };
-
-  for entry in entries {
-    let entry = entry.map_err(|e| format!("iter {manifests_dir:?}: {e}"))?;
-    let path = entry.path();
-    if path.extension().and_then(|e| e.to_str()) != Some("json") {
-      continue;
-    }
-    let Ok(content) = fs::read_to_string(&path) else {
-      continue;
-    };
-    let Ok(manifest) = serde_json::from_str::<OpencodeManifest>(&content) else {
-      continue;
-    };
+  for (path, manifest) in list_manifests(manifests_dir)? {
     if manifest.pid == pid {
-      fs::remove_file(&path).map_err(|e| format!("remove manifest {path:?}: {e}"))?;
+      remove_manifest(&path)?;
       return Ok(());
     }
   }
@@ -319,6 +351,133 @@ async fn stop_opencode_inner(manifests_dir: PathBuf, pid: u32) -> Result<(), Str
   remove_manifest_for_pid(&manifests_dir, pid)?;
 
   Ok(())
+}
+
+#[cfg(unix)]
+fn listener_pid_for_port(port: u16) -> Result<Option<u32>, String> {
+  let port_arg = format!("-iTCP:{port}");
+
+  for binary in ["lsof", "/usr/sbin/lsof", "/usr/bin/lsof"] {
+    let output = match Command::new(binary)
+      .args(["-nP", &port_arg, "-sTCP:LISTEN", "-Fp"])
+      .output()
+    {
+      Ok(output) => output,
+      Err(error) if error.kind() == ErrorKind::NotFound => continue,
+      Err(error) => return Err(format!("run {binary}: {error}")),
+    };
+
+    if !output.status.success() && output.stdout.is_empty() {
+      if output.stderr.is_empty() {
+        return Ok(None);
+      }
+      return Err(format!(
+        "{binary} failed: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+      ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let pid = stdout
+      .lines()
+      .find_map(|line| line.strip_prefix('p'))
+      .and_then(|value| value.parse::<u32>().ok());
+    return Ok(pid);
+  }
+
+  Err("lsof not found while reconciling opencode manifests".to_string())
+}
+
+#[cfg(unix)]
+async fn reconcile_manifest_entry(manifests_dir: &Path, path: PathBuf, manifest: OpencodeManifest) -> Result<(), String> {
+  if manifest.pid == 0 || !process_alive(manifest.pid) {
+    return remove_manifest(&path);
+  }
+
+  match listener_pid_for_port(manifest.port) {
+    Ok(Some(pid)) if pid == manifest.pid => {
+      if let Err(error) = wait_for_health(&manifest.base_url, OPENCODE_SERVER_USERNAME, &manifest.secret).await {
+        eprintln!(
+          "[opencode:{}] orphan manifest health check failed: {error}",
+          manifest.pid
+        );
+      }
+
+      stop_opencode_inner(manifests_dir.to_path_buf(), manifest.pid)
+        .await
+        .map_err(|error| format!("stop unhealthy orphan {:?}: {error}", path))
+    }
+    Ok(_) => remove_manifest(&path),
+    Err(error) => {
+      eprintln!(
+        "[opencode:{}] could not verify port ownership for manifest {:?}: {error}",
+        manifest.pid, path
+      );
+      match wait_for_health(&manifest.base_url, OPENCODE_SERVER_USERNAME, &manifest.secret).await {
+        Ok(()) => stop_opencode_inner(manifests_dir.to_path_buf(), manifest.pid)
+          .await
+          .map_err(|stop_error| format!("stop adopted manifest {:?}: {stop_error}", path)),
+        Err(_) => remove_manifest(&path),
+      }
+    }
+  }
+}
+
+async fn reconcile_manifests_inner(manifests_dir: PathBuf) -> Result<(), String> {
+  let manifests = list_manifests(&manifests_dir)?;
+  let mut errors = Vec::new();
+
+  for (path, manifest) in manifests {
+    if let Err(error) = reconcile_manifest_entry(&manifests_dir, path.clone(), manifest).await {
+      let _ = remove_manifest(&path);
+      errors.push(error);
+    }
+  }
+
+  if errors.is_empty() {
+    Ok(())
+  } else {
+    Err(errors.join("\n"))
+  }
+}
+
+async fn stop_all_manifests_inner(manifests_dir: PathBuf) -> Result<(), String> {
+  let manifests = list_manifests(&manifests_dir)?;
+  let mut errors = Vec::new();
+
+  for (_, manifest) in manifests {
+    if manifest.pid == 0 {
+      continue;
+    }
+
+    if let Err(error) = stop_opencode_inner(manifests_dir.clone(), manifest.pid).await {
+      errors.push(format!("pid {}: {error}", manifest.pid));
+    }
+  }
+
+  if errors.is_empty() {
+    Ok(())
+  } else {
+    Err(errors.join("\n"))
+  }
+}
+
+pub async fn reconcile_opencode_manifests(app: &AppHandle) -> Result<(), String> {
+  let home = app
+    .path()
+    .home_dir()
+    .map_err(|error| format!("resolve home dir: {error}"))?;
+  let manifests = manifests_dir(&home)?;
+  reconcile_manifests_inner(manifests).await
+}
+
+pub async fn stop_all_opencodes(app: &AppHandle) -> Result<(), String> {
+  let home = app
+    .path()
+    .home_dir()
+    .map_err(|error| format!("resolve home dir: {error}"))?;
+  let manifests = manifests_dir(&home)?;
+  stop_all_manifests_inner(manifests).await
 }
 
 #[tauri::command]
@@ -449,7 +608,7 @@ mod tests {
   }
 
   #[test]
-  fn remove_manifest_for_pid_skips_malformed_files() {
+  fn remove_manifest_for_pid_cleans_malformed_files() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let bogus = tmp.path().join("bogus.json");
     fs::write(&bogus, "{not json").unwrap();
@@ -457,8 +616,71 @@ mod tests {
 
     remove_manifest_for_pid(tmp.path(), 7).expect("remove");
 
-    assert!(bogus.exists(), "malformed file untouched");
+    assert!(!bogus.exists(), "malformed file removed during scan");
     assert!(!target.exists());
+  }
+
+  #[cfg(unix)]
+  #[tokio::test]
+  async fn reconcile_manifests_inner_removes_dead_pid_manifest() {
+    use std::process::{Command, Stdio};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let mut child = Command::new("true")
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .spawn()
+      .expect("spawn true");
+    let pid = child.id();
+    let manifest_path = write_manifest(tmp.path(), "dead", pid);
+    child.wait().expect("reap");
+
+    reconcile_manifests_inner(tmp.path().to_path_buf())
+      .await
+      .expect("reconcile succeeds");
+
+    assert!(!manifest_path.exists(), "dead pid manifest removed");
+  }
+
+  #[cfg(unix)]
+  #[tokio::test]
+  async fn stop_all_manifests_inner_stops_every_manifest_pid() {
+    use std::process::{Command, Stdio};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+
+    let mut first = Command::new("sleep")
+      .arg("30")
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .spawn()
+      .expect("spawn first sleep");
+    let first_pid = first.id();
+    let first_manifest = write_manifest(tmp.path(), "first", first_pid);
+
+    let mut second = Command::new("sleep")
+      .arg("30")
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .spawn()
+      .expect("spawn second sleep");
+    let second_pid = second.id();
+    let second_manifest = write_manifest(tmp.path(), "second", second_pid);
+
+    stop_all_manifests_inner(tmp.path().to_path_buf())
+      .await
+      .expect("stop all manifests");
+
+    let _ = first.wait();
+    let _ = second.wait();
+
+    assert!(!process_alive(first_pid), "first process stopped");
+    assert!(!process_alive(second_pid), "second process stopped");
+    assert!(!first_manifest.exists(), "first manifest removed");
+    assert!(!second_manifest.exists(), "second manifest removed");
   }
 
   #[cfg(unix)]

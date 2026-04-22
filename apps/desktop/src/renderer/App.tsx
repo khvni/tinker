@@ -57,12 +57,31 @@ type ProviderMessageState = Record<AuthProvider, string | null>;
 const MODEL_CONNECT_POLL_INTERVAL_MS = 1_500;
 const MODEL_CONNECT_TIMEOUT_MS = 180_000;
 const VAULT_REINDEX_DEBOUNCE_MS = 300;
-const EMPTY_PROVIDER_BUSY: ProviderBusyState = { google: false, github: false };
-const EMPTY_PROVIDER_MESSAGES: ProviderMessageState = { google: null, github: null };
+const EMPTY_PROVIDER_BUSY: ProviderBusyState = { google: false, github: false, microsoft: false };
+const EMPTY_PROVIDER_MESSAGES: ProviderMessageState = { google: null, github: null, microsoft: null };
 const WEB_PREVIEW_CONNECTION: OpencodeConnection = {
   baseUrl: 'http://127.0.0.1:0',
   username: 'preview',
   password: 'preview',
+};
+
+const providerDisplayName = (provider: AuthProvider): string => {
+  switch (provider) {
+    case 'google':
+      return 'Google';
+    case 'github':
+      return 'GitHub';
+    case 'microsoft':
+      return 'Microsoft';
+  }
+};
+
+const providerNeedsRefreshToken = (provider: AuthProvider): boolean => {
+  return provider === 'google' || provider === 'microsoft';
+};
+
+const providerNeedsWorkspaceRefresh = (provider: AuthProvider): boolean => {
+  return provider === 'github';
 };
 
 const buildStoredUserId = (provider: User['provider'], providerUserId: string): string => {
@@ -88,6 +107,7 @@ const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSO
   return {
     google: status?.google ?? null,
     github: status?.github ?? null,
+    microsoft: status?.microsoft ?? null,
   };
 };
 
@@ -782,17 +802,17 @@ export const App = (): JSX.Element => {
 
   const handleProviderConnect = async (provider: AuthProvider): Promise<void> => {
     setProviderBusyValue(provider, true);
-    setProviderMessage(provider, provider === 'google' ? 'Waiting for Google sign-in…' : 'Waiting for GitHub sign-in…');
+    setProviderMessage(provider, `Waiting for ${providerDisplayName(provider)} sign-in…`);
 
     try {
-      requireNativeRuntime(`Connecting ${provider === 'google' ? 'Google' : 'GitHub'}`);
+      requireNativeRuntime(`Connecting ${providerDisplayName(provider)}`);
       const session = await invoke<SSOSession>('auth_sign_in', { provider });
       await upsertUser(toStoredUser(session));
-      if (provider === 'google' && session.refreshToken.length === 0) {
-        throw new Error('Google sign-in did not return refresh token. Try again.');
+      if (providerNeedsRefreshToken(provider) && session.refreshToken.length === 0) {
+        throw new Error(`${providerDisplayName(provider)} sign-in did not return refresh token. Try again.`);
       }
 
-      if (provider === 'github') {
+      if (providerNeedsWorkspaceRefresh(provider)) {
         await refreshWorkspaceConnection();
       } else {
         const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
@@ -807,7 +827,7 @@ export const App = (): JSX.Element => {
         );
       }
 
-      setProviderMessage(provider, `${provider === 'google' ? 'Google' : 'GitHub'} connected as ${session.email}.`);
+      setProviderMessage(provider, `${providerDisplayName(provider)} connected as ${session.email}.`);
     } catch (error) {
       setProviderMessage(provider, error instanceof Error ? error.message : String(error));
     } finally {
@@ -820,10 +840,10 @@ export const App = (): JSX.Element => {
     setProviderMessage(provider, null);
 
     try {
-      requireNativeRuntime(`Disconnecting ${provider === 'google' ? 'Google' : 'GitHub'}`);
+      requireNativeRuntime(`Disconnecting ${providerDisplayName(provider)}`);
       await invoke('auth_sign_out', { provider });
 
-      if (provider === 'github') {
+      if (providerNeedsWorkspaceRefresh(provider)) {
         await refreshWorkspaceConnection();
       } else {
         const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
@@ -838,7 +858,7 @@ export const App = (): JSX.Element => {
         );
       }
 
-      setProviderMessage(provider, `${provider === 'google' ? 'Google' : 'GitHub'} disconnected.`);
+      setProviderMessage(provider, `${providerDisplayName(provider)} disconnected.`);
     } catch (error) {
       setProviderMessage(provider, error instanceof Error ? error.message : String(error));
     } finally {
@@ -902,12 +922,15 @@ export const App = (): JSX.Element => {
           googleAuthMessage={providerMessages.google}
           githubAuthBusy={providerBusy.github}
           githubAuthMessage={providerMessages.github}
+          microsoftAuthBusy={providerBusy.microsoft}
+          microsoftAuthMessage={providerMessages.microsoft}
           sessions={state.sessions}
           mcpStatus={state.mcpStatus}
           vaultPath={state.vaultPath}
           onConnectModel={handleConnectModel}
           onConnectGoogle={() => handleProviderConnect('google')}
           onConnectGithub={() => handleProviderConnect('github')}
+          onConnectMicrosoft={() => handleProviderConnect('microsoft')}
           onCreateVault={handleCreateVault}
           onSelectVault={handlePickVault}
           onContinue={finishOnboarding}
@@ -927,6 +950,8 @@ export const App = (): JSX.Element => {
           googleAuthMessage={providerMessages.google}
           githubAuthBusy={providerBusy.github}
           githubAuthMessage={providerMessages.github}
+          microsoftAuthBusy={providerBusy.microsoft}
+          microsoftAuthMessage={providerMessages.microsoft}
           opencode={state.opencode}
           sessions={state.sessions}
           mcpStatus={state.mcpStatus}
@@ -939,6 +964,8 @@ export const App = (): JSX.Element => {
           onDisconnectGoogle={() => handleProviderDisconnect('google')}
           onConnectGithub={() => handleProviderConnect('github')}
           onDisconnectGithub={() => handleProviderDisconnect('github')}
+          onConnectMicrosoft={() => handleProviderConnect('microsoft')}
+          onDisconnectMicrosoft={() => handleProviderDisconnect('microsoft')}
           onConnectModel={handleConnectModel}
           onDisconnectModel={handleDisconnectModel}
           onCreateVault={handleCreateVault}

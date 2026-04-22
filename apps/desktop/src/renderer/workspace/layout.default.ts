@@ -1,35 +1,39 @@
 import type { WorkspaceState } from '@tinker/panes';
 import type { TinkerPaneData } from '@tinker/shared-types';
 
-const DEFAULT_CHAT_TAB_ID = 'chat';
-const DEFAULT_CHAT_PANE_ID = 'chat';
-const DEFAULT_CHAT_STACK_ID = 'stack-chat';
+const createId = (prefix: string): string => {
+  return `${prefix}-${crypto.randomUUID()}`;
+};
 
-export const createDefaultLayout = (): WorkspaceState<TinkerPaneData> => {
+export const createDefaultWorkspaceState = (): WorkspaceState<TinkerPaneData> => {
+  const tabId = createId('tab');
+  const stackId = createId('stack');
+  const paneId = createId('pane');
+
   return {
     version: 2,
-    activeTabId: DEFAULT_CHAT_TAB_ID,
     tabs: [
       {
-        id: DEFAULT_CHAT_TAB_ID,
-        title: 'Chat',
+        id: tabId,
         createdAt: Date.now(),
         layout: {
           kind: 'stack',
-          id: DEFAULT_CHAT_STACK_ID,
-          paneIds: [DEFAULT_CHAT_PANE_ID],
-          activePaneId: DEFAULT_CHAT_PANE_ID,
+          id: stackId,
+          paneIds: [paneId],
+          activePaneId: paneId,
         },
         panes: {
-          [DEFAULT_CHAT_PANE_ID]: {
-            id: DEFAULT_CHAT_PANE_ID,
+          [paneId]: {
+            id: paneId,
             kind: 'chat',
+            title: 'Chat',
             data: { kind: 'chat' },
           },
         },
-        activePaneId: DEFAULT_CHAT_PANE_ID,
-        activeStackId: DEFAULT_CHAT_STACK_ID,
+        activePaneId: paneId,
+        activeStackId: stackId,
       },
     ],
+    activeTabId: tabId,
   };
 };

@@ -13,15 +13,19 @@ type SettingsProps = {
   googleAuthMessage: string | null;
   githubAuthBusy: boolean;
   githubAuthMessage: string | null;
+  microsoftAuthBusy: boolean;
+  microsoftAuthMessage: string | null;
   sessions: SSOStatus;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
   onConnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
   onConnectGithub(): Promise<void>;
+  onConnectMicrosoft(): Promise<void>;
   onDisconnectModel(): Promise<void>;
   onDisconnectGoogle(): Promise<void>;
   onDisconnectGithub(): Promise<void>;
+  onDisconnectMicrosoft(): Promise<void>;
   onCreateVault(): Promise<void>;
   onSelectVault(): Promise<void>;
   workspacePreferences: WorkspacePreferences;
@@ -36,13 +40,17 @@ export const Settings = ({
   googleAuthMessage,
   githubAuthBusy,
   githubAuthMessage,
+  microsoftAuthBusy,
+  microsoftAuthMessage,
   mcpStatus,
   onConnectGithub,
   onConnectGoogle,
+  onConnectMicrosoft,
   onConnectModel,
   onCreateVault,
   onDisconnectGithub,
   onDisconnectGoogle,
+  onDisconnectMicrosoft,
   onDisconnectModel,
   onSelectVault,
   sessions,
@@ -114,6 +122,27 @@ export const Settings = ({
             ) : (
               <Button variant="primary" onClick={() => void onConnectGithub()} disabled={githubAuthBusy}>
                 {githubAuthBusy ? 'Signing in…' : 'Sign in with GitHub'}
+              </Button>
+            )}
+          </div>
+        </article>
+
+        <article className="tinker-list-item">
+          <h3>Microsoft</h3>
+          <p className="tinker-muted">
+            {sessions.microsoft
+              ? `Connected as ${sessions.microsoft.email}`
+              : 'Optional. Signs Tinker in with a personal Microsoft account.'}
+          </p>
+          {microsoftAuthMessage ? <p className="tinker-muted">{microsoftAuthMessage}</p> : null}
+          <div className="tinker-inline-actions">
+            {sessions.microsoft ? (
+              <Button variant="secondary" onClick={() => void onDisconnectMicrosoft()} disabled={microsoftAuthBusy}>
+                Disconnect Microsoft
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => void onConnectMicrosoft()} disabled={microsoftAuthBusy}>
+                {microsoftAuthBusy ? 'Signing in…' : 'Sign in with Microsoft'}
               </Button>
             )}
           </div>

@@ -1,16 +1,32 @@
+import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { isValidElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRenderer, resetPaneRegistry } from '../../workspace/pane-registry.js';
-import { FilePane, MARKDOWN_EDITOR_MIME, mimeToRenderer, registerFilePane } from './index.js';
+
+vi.mock('@tauri-apps/plugin-shell', () => ({
+  open: vi.fn(),
+}));
+
+import {
+  FilePane,
+  MARKDOWN_EDITOR_MIME,
+  mimeToRenderer,
+  openFileExternally,
+  registerFilePane,
+} from './index.js';
 
 describe('FilePane', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   afterEach(() => {
     resetPaneRegistry();
   });
 
   it('registers file pane kind with the dispatch component', () => {
-    registerFilePane();
+    registerFilePane({ vaultRevision: 7 });
 
     const element = getRenderer('file')({
       kind: 'file',
@@ -30,27 +46,40 @@ describe('FilePane', () => {
         path: '/tmp/note.md',
         mime: 'text/markdown',
       },
+      vaultRevision: 7,
     });
   });
 
   it('dispatches known MIME types through mimeToRenderer', () => {
-    const markup = renderToStaticMarkup(
-      <FilePane
-        data={{
-          kind: 'file',
-          path: '/tmp/table.csv',
-          mime: 'text/csv',
-        }}
-      />,
-    );
+    const element = FilePane({
+      data: {
+        kind: 'file',
+        path: '/tmp/table.csv',
+        mime: 'text/csv',
+      },
+    });
 
-    expect(mimeToRenderer['text/csv']).toBeDefined();
-    expect(markup).toContain('CSV');
-    expect(markup).toContain('table.csv');
+    expect(isValidElement(element)).toBe(true);
+    if (!isValidElement(element)) {
+      throw new Error('FilePane did not return a React element.');
+    }
+
+    expect(element.type).toBe(mimeToRenderer['text/csv']);
+    expect(element.props).toEqual({
+      mime: 'text/csv',
+      path: '/tmp/table.csv',
+      vaultRevision: 0,
+    });
   });
 
   it('supports the temporary markdown editor MIME until the editor flow is replaced', () => {
     expect(mimeToRenderer[MARKDOWN_EDITOR_MIME]).toBeDefined();
+  });
+
+  it('opens unsupported files through the OS shell helper', async () => {
+    await openFileExternally('/tmp/archive.bin');
+
+    expect(openExternal).toHaveBeenCalledWith('/tmp/archive.bin');
   });
 
   it('renders unsupported fallback UI for unknown MIME types', () => {
