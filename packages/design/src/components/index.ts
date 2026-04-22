@@ -11,6 +11,12 @@ export { SearchInput } from './SearchInput.js';
 export { Textarea } from './Textarea.js';
 export { Avatar, type AvatarProps, type AvatarSize } from './Avatar/index.js';
 export { Progress, type ProgressProps, type ProgressSpinnerSize } from './Progress/index.js';
+export { Skeleton, type SkeletonVariant, type SkeletonProps } from './Skeleton/index.js';
+export {
+  KeyboardHint,
+  type KeyboardHintProps,
+  type KeyboardHintOs,
+} from './KeyboardHint/index.js';
 export {
   ModelPicker,
   type ModelPickerItem,

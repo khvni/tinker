@@ -6,10 +6,12 @@ import {
   ClickableBadge,
   ContextBadge,
   IconButton,
+  KeyboardHint,
   ModelPicker,
   Progress,
   SearchInput,
   SegmentedControl,
+  Skeleton,
   StatusDot,
   TextInput,
   Textarea,
@@ -426,6 +428,62 @@ const ComponentsTab = (): JSX.Element => {
               onChange={(event) => setTextareaValue(event.target.value)}
             />
           </div>
+        </Row>
+      </Section>
+
+      <Section label="Skeleton">
+        <Row>
+          <span className="ds-status-item">
+            <Skeleton variant="text" width={160} />
+            <span className="ds-status-item__label">text</span>
+          </span>
+          <span className="ds-status-item">
+            <Skeleton variant="circle" width={32} />
+            <span className="ds-status-item__label">circle</span>
+          </span>
+          <span className="ds-status-item">
+            <Skeleton variant="rect" width={180} height={96} />
+            <span className="ds-status-item__label">rect</span>
+          </span>
+        </Row>
+        <div className="ds-skeleton-composed">
+          <Skeleton variant="circle" width={28} />
+          <div className="ds-skeleton-composed__lines">
+            <Skeleton variant="text" width="70%" />
+            <Skeleton variant="text" width="90%" />
+            <Skeleton variant="text" width="40%" />
+          </div>
+        </div>
+      </Section>
+
+      <Section label="KeyboardHint">
+        <Row>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Esc']} os="mac" />
+            <span className="ds-status-item__label">single</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Cmd', 'K']} os="mac" />
+            <span className="ds-status-item__label">two-key (mac)</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Cmd', 'Shift', 'P']} os="mac" />
+            <span className="ds-status-item__label">three-key (mac)</span>
+          </span>
+        </Row>
+        <Row>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Cmd', 'K']} os="other" />
+            <span className="ds-status-item__label">two-key (win/linux)</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Alt', 'T']} os="other" />
+            <span className="ds-status-item__label">toggle disclosures</span>
+          </span>
+          <span className="ds-status-item">
+            <KeyboardHint keys={['Ctrl', 'Shift', 'Enter']} os="other" />
+            <span className="ds-status-item__label">wide modifier</span>
+          </span>
         </Row>
       </Section>
     </div>
