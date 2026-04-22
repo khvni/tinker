@@ -1,4 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+// @vitest-environment jsdom
+
+// @ts-expect-error React uses this flag in tests.
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToastProvider } from '@tinker/design';
 import type {
@@ -9,6 +16,7 @@ import type {
   SkillSearchResult,
   SkillStore,
 } from '@tinker/shared-types';
+import { DEFAULT_SKILL_VERSION } from '@tinker/shared-types';
 import { SaveAsSkillModal } from './SaveAsSkillModal.js';
 
 // Silence the CSS import in jsdom.
@@ -136,5 +144,105 @@ describe('SaveAsSkillModal', () => {
     );
 
     expect(markup).not.toContain('Save conversation as skill');
+  });
+});
+
+// ----- DOM submit test -----
+
+const flushEffects = async (): Promise<void> => {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
+
+const fireInput = (element: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
+  const proto =
+    element instanceof HTMLTextAreaElement
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+  if (!setter) throw new Error('no value setter');
+  setter.call(element, value);
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+describe('SaveAsSkillModal — DOM submit', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      root.unmount();
+      await Promise.resolve();
+    });
+    container.remove();
+    vi.clearAllMocks();
+  });
+
+  it('invokes installFromDraft once with a slug-ified draft when Save skill is clicked', async () => {
+    const { store, installedDrafts } = createHarness();
+    const onPublished = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <SaveAsSkillModal
+            open
+            onClose={() => undefined}
+            skillStore={store}
+            skillsRootPath={null}
+            defaultBody=""
+            onPublished={onPublished}
+          />
+        </ToastProvider>,
+      );
+    });
+    await flushEffects();
+
+    const titleInput = container.querySelector<HTMLInputElement>('input[aria-label="Skill title"]');
+    const tagsInput = container.querySelector<HTMLInputElement>('input[aria-label="Skill tags"]');
+    const bodyTextarea = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Skill body"]',
+    );
+    if (!titleInput || !tagsInput || !bodyTextarea) {
+      throw new Error('required fields missing');
+    }
+
+    await act(async () => {
+      fireInput(titleInput, 'Gong Call Analysis');
+      fireInput(tagsInput, 'crm, sales , qbr');
+      fireInput(bodyTextarea, '# Steps\n\nSummarize the transcript.');
+    });
+    await flushEffects();
+
+    const saveButton = Array.from(container.querySelectorAll('button')).find(
+      (btn) => btn.textContent?.trim() === 'Save skill',
+    ) as HTMLButtonElement | undefined;
+    if (!saveButton) throw new Error('Save skill button missing');
+    expect(saveButton.disabled).toBe(false);
+
+    await act(async () => {
+      saveButton.click();
+    });
+    await flushEffects();
+
+    expect(installedDrafts).toHaveLength(1);
+    const draft = installedDrafts[0];
+    if (!draft) throw new Error('draft not captured');
+
+    expect(draft.slug).toBe('gong-call-analysis');
+    expect(draft.title).toBe('Gong Call Analysis');
+    expect(draft.tags).toEqual(['crm', 'sales', 'qbr']);
+    expect(draft.version).toBe(DEFAULT_SKILL_VERSION);
+    expect(draft.body.trim().length).toBeGreaterThan(0);
+
+    expect(onPublished).toHaveBeenCalledTimes(1);
   });
 });
