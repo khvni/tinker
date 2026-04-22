@@ -237,10 +237,14 @@ export const Playbook = ({ params }: PlaybookProps): JSX.Element => {
     }
     setDraft({
       slug: selected.slug,
+      title: selected.title,
       description: selected.description,
       body: selected.body,
       tools: selected.tools,
       tags: selected.tags,
+      ...(selected.role ? { role: selected.role } : {}),
+      ...(selected.version ? { version: selected.version } : {}),
+      ...(selected.author ? { author: selected.author } : {}),
     });
     setMode('author');
   };
