@@ -11,8 +11,16 @@ import {
 } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
 import { Badge, Button, EmptyState, ModelPicker, Textarea } from '@tinker/design';
-import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
-import { resolveRelevantEntities } from '@tinker/memory';
+import {
+  createChatHistoryWriter,
+  findLatestChatHistorySessionId,
+  injectActiveSkills,
+  injectMemoryContext,
+  readChatHistory,
+  streamSessionEvents,
+  type ChatHistoryWriter,
+} from '@tinker/bridge';
+import { createSession, findLatestSessionForFolder, resolveRelevantEntities, updateLastActive } from '@tinker/memory';
 import type { SkillStore } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../../bindings.js';
 import { captureConversationMemory } from '../../memory.js';
@@ -33,17 +41,14 @@ import {
 import { useSessionHistoryWindow } from '../useSessionHistoryWindow.js';
 import { messageTextFromBlocks, MessageBlock, partToBlock, type Block } from './Block.js';
 import { draftReducer } from './draftReducer.js';
-
-type ChatMessageRecord = {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  blocks: Block[];
-};
+import { replayChatHistory, type ChatMessageRecord } from './historyReplay.js';
 
 type ChatProps = {
   skillStore: SkillStore;
+  currentUserId: string;
   modelConnected: boolean;
   opencode: OpencodeConnection;
+  sessionFolderPath: string | null;
   vaultPath: string | null;
   activeSkillsRevision: number;
   onFileWritten?: (path: string) => void;
@@ -122,14 +127,17 @@ const syncComposerHeight = (textarea: HTMLTextAreaElement | null): void => {
 
 export const Chat = ({
   skillStore,
+  currentUserId,
   modelConnected,
   opencode,
+  sessionFolderPath,
   vaultPath,
   activeSkillsRevision,
   onFileWritten,
   onOpenNewChat,
   onMemoryCommitted,
 }: ChatProps): JSX.Element => {
+  const readyStatus = modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.';
   const client = useMemo(
     () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
     [opencode.baseUrl, opencode.password, opencode.username, vaultPath],
@@ -137,18 +145,20 @@ export const Chat = ({
   const [messages, setMessages] = useState<ChatMessageRecord[]>([]);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [hydratingHistory, setHydratingHistory] = useState(false);
   const [draftBlocks, dispatchDraft] = useReducer(draftReducer, []);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [modelOptions, setModelOptions] = useState<ReadonlyArray<WorkspaceModelOption>>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>();
   const [modelOptionsLoading, setModelOptionsLoading] = useState(true);
-  const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
+  const [status, setStatus] = useState(readyStatus);
   // Global default applied where no per-disclosure override exists. ⌥T flips this and clears overrides.
   const [defaultDisclosureOpen, setDefaultDisclosureOpen] = useState(false);
   const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
   const mountedRef = useRef(true);
   const sessionIDRef = useRef<string | null>(null);
+  const historyWriterRef = useRef<ChatHistoryWriter | null>(null);
   const memoryCommitRef = useRef<Promise<void>>(Promise.resolve());
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -161,6 +171,11 @@ export const Chat = ({
 
     return () => {
       mountedRef.current = false;
+      const writer = historyWriterRef.current;
+      historyWriterRef.current = null;
+      if (writer) {
+        void writer.dispose();
+      }
       const activeSessionID = sessionIDRef.current;
       sessionIDRef.current = null;
       if (activeSessionID) {
@@ -170,8 +185,10 @@ export const Chat = ({
   }, [client]);
 
   useEffect(() => {
-    setStatus(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
-  }, [modelConnected]);
+    if (!hydratingHistory) {
+      setStatus(readyStatus);
+    }
+  }, [hydratingHistory, readyStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,20 +235,118 @@ export const Chat = ({
     };
   }, [client, modelConnected]);
 
+  const activateSession = useCallback(
+    (sessionID: string): void => {
+      sessionIDRef.current = sessionID;
+
+      const previousWriter = historyWriterRef.current;
+      historyWriterRef.current = sessionFolderPath
+        ? createChatHistoryWriter({
+            folderPath: sessionFolderPath,
+            userId: currentUserId,
+            sessionId: sessionID,
+          })
+        : null;
+
+      if (previousWriter) {
+        void previousWriter.dispose();
+      }
+    },
+    [currentUserId, sessionFolderPath],
+  );
+
   useEffect(() => {
+    let cancelled = false;
+
     const existing = sessionIDRef.current;
     sessionIDRef.current = null;
     abortRequestedRef.current = false;
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
+
+    const previousWriter = historyWriterRef.current;
+    historyWriterRef.current = null;
+    if (previousWriter) {
+      void previousWriter.dispose();
+    }
+
     setMessages([]);
     dispatchDraft({ type: 'reset' });
     setHistoryCursor(null);
     setHistoryLoading(false);
     setDisclosureOverrides({});
     setDefaultDisclosureOpen(false);
-  }, [activeSkillsRevision, client]);
+
+    if (!sessionFolderPath) {
+      setHydratingHistory(false);
+      setStatus(readyStatus);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setHydratingHistory(true);
+    setStatus('Hydrating chat history…');
+
+    void (async () => {
+      try {
+        const existingSession = await findLatestSessionForFolder(currentUserId, sessionFolderPath);
+        const restoredSessionID =
+          existingSession?.id
+          ?? (await findLatestChatHistorySessionId({
+            folderPath: sessionFolderPath,
+            userId: currentUserId,
+          }));
+
+        if (!restoredSessionID || cancelled || !mountedRef.current) {
+          return;
+        }
+
+        activateSession(restoredSessionID);
+
+        if (!existingSession) {
+          const timestamp = new Date().toISOString();
+          try {
+            await createSession({
+              id: restoredSessionID,
+              userId: currentUserId,
+              folderPath: sessionFolderPath,
+              createdAt: timestamp,
+              lastActiveAt: timestamp,
+            });
+          } catch (error) {
+            console.warn('Failed to restore the session row from chat history.', error);
+          }
+        }
+
+        const records = await readChatHistory({
+          folderPath: sessionFolderPath,
+          userId: currentUserId,
+          sessionId: restoredSessionID,
+        });
+        if (cancelled || !mountedRef.current || sessionIDRef.current !== restoredSessionID) {
+          return;
+        }
+
+        setMessages(replayChatHistory(records));
+        void updateLastActive(restoredSessionID, new Date().toISOString()).catch((error) => {
+          console.warn('Failed to refresh the restored session timestamp.', error);
+        });
+      } catch (error) {
+        console.warn('Failed to hydrate chat history from disk.', error);
+      } finally {
+        if (!cancelled && mountedRef.current) {
+          setHydratingHistory(false);
+          setStatus(readyStatus);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activateSession, activeSkillsRevision, client, currentUserId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     draftBlocksRef.current = draftBlocks;
@@ -343,6 +458,10 @@ export const Chat = ({
 
   const ensureSession = async (): Promise<string> => {
     if (sessionIDRef.current) {
+      if (!historyWriterRef.current && sessionFolderPath) {
+        activateSession(sessionIDRef.current);
+      }
+
       return sessionIDRef.current;
     }
 
@@ -352,7 +471,23 @@ export const Chat = ({
       throw new Error('OpenCode did not return a session.');
     }
 
-    sessionIDRef.current = session.id;
+    activateSession(session.id);
+
+    if (sessionFolderPath) {
+      const timestamp = new Date().toISOString();
+
+      try {
+        await createSession({
+          id: session.id,
+          userId: currentUserId,
+          folderPath: sessionFolderPath,
+          createdAt: timestamp,
+          lastActiveAt: timestamp,
+        });
+      } catch (error) {
+        console.warn('Failed to persist the active chat session.', error);
+      }
+    }
 
     try {
       const activeSkills = await skillStore.getActive();
@@ -415,7 +550,7 @@ export const Chat = ({
   }, [busy, client]);
   const sendMessage = async (): Promise<void> => {
     const text = input.trim();
-    if (!text || busy || !modelConnected) {
+    if (!text || busy || hydratingHistory || !modelConnected) {
       return;
     }
 
@@ -436,23 +571,28 @@ export const Chat = ({
     try {
       const activeSessionID = await ensureSession();
       if (abortRequestedRef.current) {
-        setStatus('OpenCode is ready.');
+        setStatus(readyStatus);
         return;
       }
 
       const relevantEntities = await resolveRelevantEntities(text, 6);
       if (abortRequestedRef.current) {
-        setStatus('OpenCode is ready.');
+        setStatus(readyStatus);
         return;
       }
 
       await injectMemoryContext(client, activeSessionID, relevantEntities);
       if (abortRequestedRef.current) {
-        setStatus('OpenCode is ready.');
+        setStatus(readyStatus);
         return;
       }
 
-      const stream = streamSessionEvents(client, activeSessionID);
+      const historyWriter = historyWriterRef.current;
+      const stream = streamSessionEvents(client, activeSessionID, {
+        onEvent: (event) => {
+          historyWriter?.appendEvent(event);
+        },
+      });
       const consumeStream = (async () => {
         for await (const event of stream) {
           if (!mountedRef.current) {
@@ -470,9 +610,9 @@ export const Chat = ({
           } else if (event.type === 'file_written') {
             onFileWritten?.(event.path);
           } else if (event.type === 'error') {
-            setStatus(abortRequestedRef.current ? 'OpenCode is ready.' : event.message);
+            setStatus(abortRequestedRef.current ? readyStatus : event.message);
           } else if (event.type === 'done') {
-            setStatus('OpenCode is ready.');
+            setStatus(readyStatus);
           }
         }
       })();
@@ -498,6 +638,9 @@ export const Chat = ({
       if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
         return;
       }
+      void updateLastActive(activeSessionID, new Date().toISOString()).catch((error) => {
+        console.warn('Failed to refresh the active session timestamp.', error);
+      });
 
       if (aborted && partialText.length > 0) {
         const historyAlreadyHasPartial = historyPage?.messages.some(
@@ -629,11 +772,19 @@ export const Chat = ({
       >
         {messages.length === 0 ? (
           <EmptyState
-            title={modelConnected ? 'Start a conversation' : 'No model connected'}
+            title={
+              hydratingHistory
+                ? 'Restoring chat history'
+                : modelConnected
+                  ? 'Start a conversation'
+                  : 'No model connected'
+            }
             description={
-              modelConnected
-                ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
-                : 'Connect an AI model in Settings before sending a message.'
+              hydratingHistory
+                ? 'Loading prior messages from the session folder before OpenCode resumes streaming.'
+                : modelConnected
+                  ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+                  : 'Connect an AI model in Settings before sending a message.'
             }
             icon={
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -700,7 +851,7 @@ export const Chat = ({
           placeholder="Ask about the vault, your project, or the next change to make."
           onChange={(event) => setInput(event.currentTarget.value)}
           onKeyDown={handleComposerKeyDown}
-          disabled={busy || !modelConnected}
+          disabled={busy || hydratingHistory || !modelConnected}
         />
         <div className="tinker-inline-actions tinker-composer-actions">
           <ModelPicker
@@ -708,7 +859,7 @@ export const Chat = ({
             value={selectedModelId}
             onSelect={setSelectedModelId}
             loading={modelOptionsLoading}
-            disabled={busy}
+            disabled={busy || hydratingHistory}
             emptyLabel="No models available in OpenCode."
           />
           {busy ? (
@@ -716,7 +867,11 @@ export const Chat = ({
               Stop
             </Button>
           ) : (
-            <Button variant="primary" onClick={sendMessage} disabled={!modelConnected || input.trim().length === 0}>
+            <Button
+              variant="primary"
+              onClick={sendMessage}
+              disabled={hydratingHistory || !modelConnected || input.trim().length === 0}
+            >
               Send message
             </Button>
           )}

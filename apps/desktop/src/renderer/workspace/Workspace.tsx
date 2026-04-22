@@ -77,6 +77,15 @@ const createWorkspaceTabId = (): string => {
   return `workspace-${crypto.randomUUID()}`;
 };
 
+const buildStoredUserId = (provider: 'google' | 'github' | 'microsoft', providerUserId: string): string => {
+  return `${provider}:${providerUserId}`;
+};
+
+const resolveCurrentUserId = (sessions: SSOStatus): string => {
+  const activeSession = sessions.google ?? sessions.github ?? sessions.microsoft;
+  return activeSession ? buildStoredUserId(activeSession.provider, activeSession.userId) : DEFAULT_USER_ID;
+};
+
 const createUtilityPane = (kind: 'settings' | 'memory') => {
   return {
     id: `${kind}-${crypto.randomUUID()}`,
@@ -108,6 +117,7 @@ export const Workspace = ({
   activeSkillsRevision,
   onMemoryCommitted,
 }: WorkspaceProps): JSX.Element => {
+  const currentUserId = resolveCurrentUserId(sessions);
   const workspaceStoreRef = useRef<WorkspaceStore<TinkerPaneData> | null>(null);
   if (!workspaceStoreRef.current) {
     workspaceStoreRef.current = createWorkspaceStore<TinkerPaneData>({
@@ -297,8 +307,10 @@ export const Workspace = ({
   const chatPaneRuntime = useMemo(
     () => ({
       skillStore,
+      currentUserId,
       modelConnected,
       opencode,
+      sessionFolderPath: vaultPath,
       vaultPath,
       activeSkillsRevision,
       onFileWritten: handleAgentFileWritten,
@@ -307,13 +319,14 @@ export const Workspace = ({
     }),
     [
       activeSkillsRevision,
+      currentUserId,
       handleAgentFileWritten,
       modelConnected,
       onMemoryCommitted,
       openNewChatPane,
       opencode,
-      skillStore,
       vaultPath,
+      skillStore,
     ],
   );
 

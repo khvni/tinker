@@ -10,6 +10,10 @@ export type TinkerStreamEvent =
   | { type: 'done' }
   | { type: 'error'; message: string };
 
+type StreamSessionEventsOptions = {
+  onEvent?: (event: Event) => void;
+};
+
 const readSessionID = (event: Event): string | undefined => {
   const props = event.properties as { sessionID?: unknown; part?: { sessionID?: unknown } };
   if (typeof props.sessionID === 'string') {
@@ -81,6 +85,7 @@ const readErrorMessage = (event: Extract<Event, { type: 'session.error' }>): str
 export const streamSessionEvents = async function* (
   client: Pick<OpencodeClient, 'event'>,
   sessionID: string,
+  options: StreamSessionEventsOptions = {},
 ): AsyncIterable<TinkerStreamEvent> {
   const subscription = await client.event.subscribe();
   // Track which partIDs are reasoning parts so the matching delta events can
@@ -91,6 +96,12 @@ export const streamSessionEvents = async function* (
   for await (const event of subscription.stream) {
     if (readSessionID(event) !== sessionID) {
       continue;
+    }
+
+    try {
+      options.onEvent?.(event);
+    } catch (error) {
+      console.warn('Failed to process raw OpenCode event side effect.', error);
     }
 
     if (event.type === 'message.part.delta' && event.properties.field === 'text') {

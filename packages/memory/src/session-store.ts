@@ -68,6 +68,30 @@ export const listSessionsForUser = async (userId: Session['userId']): Promise<Se
   return rows.map((row) => hydrateSessionRow(row)).filter((session): session is Session => session !== null);
 };
 
+export const findLatestSessionForFolder = async (
+  userId: Session['userId'],
+  folderPath: Session['folderPath'],
+): Promise<Session | null> => {
+  const database = await getDatabase();
+  const rows = await database.select<SessionRow[]>(
+    `SELECT
+       id,
+       user_id,
+       folder_path,
+       created_at,
+       last_active_at,
+       model_id
+     FROM sessions
+     WHERE user_id = $1
+       AND folder_path = $2
+     ORDER BY last_active_at DESC, created_at DESC, id ASC
+     LIMIT 1`,
+    [userId, folderPath],
+  );
+
+  return hydrateSessionRow(rows[0]);
+};
+
 export const getSession = async (id: Session['id']): Promise<Session | null> => {
   const database = await getDatabase();
   const rows = await database.select<SessionRow[]>(
