@@ -18,7 +18,7 @@ import type { MCPStatus } from '../integrations.js';
 import { Chat } from '../panes/Chat.js';
 import { Playbook } from '../panes/Playbook.js';
 import { SchedulerPane } from '../panes/SchedulerPane.js';
-import { Settings } from '../panes/Settings.js';
+import { Settings } from '../panes/Settings/index.js';
 import { Today } from '../panes/Today.js';
 import { VaultBrowser } from '../panes/VaultBrowser.js';
 import { CodeRenderer } from '../renderers/CodeRenderer.js';

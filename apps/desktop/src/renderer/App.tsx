@@ -10,6 +10,8 @@ import {
   createScheduledJobStore,
   createSkillStore,
   createVaultService,
+  getActiveMemoryPath,
+  getMemoryRoot,
   indexVault,
   upsertUser,
   type MemoryRunState,
@@ -93,6 +95,15 @@ const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSO
 
 const readAuthStatus = async (): Promise<SSOStatus> => {
   return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
+};
+
+const ensureConnectedMemoryPaths = async (sessions: SSOStatus): Promise<void> => {
+  await getMemoryRoot();
+
+  const connectedSessions = Object.values(sessions).filter((session): session is SSOSession => session !== null);
+  await Promise.all(
+    connectedSessions.map((session) => getActiveMemoryPath(buildStoredUserId(session.provider, session.userId))),
+  );
 };
 
 const getDefaultVaultPath = async (): Promise<string> => {
@@ -301,6 +312,7 @@ export const App = (): JSX.Element => {
         }
 
         const [opencode, sessions] = await Promise.all([invoke<OpencodeConnection>('get_opencode_connection'), readAuthStatus()]);
+        await ensureConnectedMemoryPaths(sessions);
         const vaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         let vaultRevision = 0;
@@ -788,6 +800,7 @@ export const App = (): JSX.Element => {
       requireNativeRuntime(`Connecting ${provider === 'google' ? 'Google' : 'GitHub'}`);
       const session = await invoke<SSOSession>('auth_sign_in', { provider });
       await upsertUser(toStoredUser(session));
+      await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
       if (provider === 'google' && session.refreshToken.length === 0) {
         throw new Error('Google sign-in did not return refresh token. Try again.');
       }

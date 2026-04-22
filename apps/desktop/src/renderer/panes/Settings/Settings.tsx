@@ -1,9 +1,10 @@
 import type { JSX } from 'react';
 import { Button, Toggle } from '@tinker/design';
-import type { SSOStatus } from '@tinker/shared-types';
-import type { MCPStatus } from '../integrations.js';
-import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
-import type { WorkspacePreferences } from '@tinker/shared-types';
+import type { SSOStatus, WorkspacePreferences } from '@tinker/shared-types';
+import type { MCPStatus } from '../../integrations.js';
+import { IntegrationsStrip } from '../../components/IntegrationsStrip.js';
+import { useMemoryRootControls } from './useMemoryRootControls.js';
+import './Settings.css';
 
 type SettingsProps = {
   modelConnected: boolean;
@@ -28,6 +29,14 @@ type SettingsProps = {
   onWorkspacePreferencesChange(nextPreferences: WorkspacePreferences): void;
 };
 
+const getProgressPercent = (copiedFiles: number, totalFiles: number): number => {
+  if (totalFiles === 0) {
+    return 100;
+  }
+
+  return Math.min(100, Math.round((copiedFiles / totalFiles) * 100));
+};
+
 export const Settings = ({
   modelAuthBusy,
   modelAuthMessage,
@@ -50,14 +59,27 @@ export const Settings = ({
   workspacePreferences,
   onWorkspacePreferencesChange,
 }: SettingsProps): JSX.Element => {
+  const { changeMemoryRoot, memoryRoot, memoryRootBusy, moveProgress, notice } = useMemoryRootControls();
+  const progressPercent = moveProgress ? getProgressPercent(moveProgress.copiedFiles, moveProgress.totalFiles) : 0;
+
   return (
-    <section className="tinker-pane">
+    <section className="tinker-pane tinker-settings">
       <header className="tinker-pane-header">
         <div>
           <p className="tinker-eyebrow">Settings</p>
           <h2>Connections and storage</h2>
         </div>
       </header>
+
+      {notice ? (
+        <div
+          className={`tinker-settings__notice tinker-settings__notice--${notice.kind}`}
+          role={notice.kind === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <p>{notice.message}</p>
+        </div>
+      ) : null}
 
       <div className="tinker-list">
         <article className="tinker-list-item">
@@ -133,6 +155,26 @@ export const Settings = ({
         </article>
 
         <article className="tinker-list-item">
+          <div className="tinker-settings__memory-row">
+            <div className="tinker-settings__memory-copy">
+              <h3>Memory folder</h3>
+              <p className="tinker-muted">
+                Desktop-global markdown memory lives here. Tinker creates one subfolder per signed-in user under this root.
+              </p>
+            </div>
+            <Button variant="secondary" onClick={() => void changeMemoryRoot()} disabled={memoryRootBusy}>
+              {memoryRootBusy ? 'Moving…' : 'Change location…'}
+            </Button>
+          </div>
+          <div className="tinker-settings__path-shell">
+            <p className="tinker-settings__path-label">Current root</p>
+            <p className="tinker-settings__path-value" title={memoryRoot ?? 'Resolving memory folder…'}>
+              {memoryRoot ?? 'Resolving memory folder…'}
+            </p>
+          </div>
+        </article>
+
+        <article className="tinker-list-item">
           <h3>Workspace</h3>
           <p className="tinker-muted">Agent-written files open automatically by default. Turn it off if you want manual review first.</p>
           <div className="tinker-inline-actions" style={{ gap: 'var(--space-3)' }}>
@@ -153,6 +195,33 @@ export const Settings = ({
       </div>
 
       <IntegrationsStrip mcpStatus={mcpStatus} sessions={sessions} />
+
+      {moveProgress ? (
+        <div className="tinker-settings__move-backdrop">
+          <section className="tinker-settings__move-dialog" role="dialog" aria-modal="true" aria-labelledby="memory-move-title">
+            <p className="tinker-eyebrow">Moving memory</p>
+            <h3 id="memory-move-title">Updating memory folder</h3>
+            <p className="tinker-muted">
+              {moveProgress.totalFiles === 0
+                ? 'Preparing the new memory location.'
+                : `Moved ${moveProgress.copiedFiles} of ${moveProgress.totalFiles} files.`}
+            </p>
+            <div
+              className="tinker-settings__progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={moveProgress.totalFiles === 0 ? 100 : moveProgress.totalFiles}
+              aria-valuenow={moveProgress.totalFiles === 0 ? progressPercent : moveProgress.copiedFiles}
+            >
+              <div className="tinker-settings__progress-value" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <p className="tinker-settings__move-meta">{progressPercent}% complete</p>
+            {moveProgress.currentPath ? (
+              <p className="tinker-settings__move-current">Current file: {moveProgress.currentPath}</p>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 };
