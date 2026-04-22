@@ -23,6 +23,11 @@ topic: TIN-205 exact memory folder parity
 
 All green on `khvni/tin-205`.
 
+## Ship state
+
+- Commit: `64751c5` — `feat(memory): exact folder parity (TIN-205)`
+- PR: #123 — https://github.com/khvni/tinker/pull/123
+
 ## Notes
 
 - Memory sidebar/category discovery is now filesystem-first only. No slug aliasing remains.
