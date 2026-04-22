@@ -1,10 +1,37 @@
 export const SKILLS_VAULT_DIRECTORY = '.tinker/skills';
 
+export type SkillAuthor = {
+  name: string;
+  email?: string;
+  url?: string;
+};
+
+export type SkillRole = 'assistant' | 'system' | 'tool' | 'user' | (string & {});
+
+export type SkillSpecFrontmatter = {
+  id: string;
+  title: string;
+  role: SkillRole;
+  tools?: string[];
+  version: string;
+  author?: SkillAuthor;
+  [key: string]: unknown;
+};
+
+export type SkillSpec = SkillSpecFrontmatter & {
+  body: string;
+};
+
 export type SkillFrontmatter = {
   name: string;
   description: string;
   tools?: string[];
   tags?: string[];
+  id?: SkillSpecFrontmatter['id'];
+  title?: SkillSpecFrontmatter['title'];
+  role?: SkillSpecFrontmatter['role'];
+  version?: SkillSpecFrontmatter['version'];
+  author?: SkillSpecFrontmatter['author'];
   [key: string]: unknown;
 };
 
@@ -28,6 +55,10 @@ export type SkillDraft = {
   body: string;
   tools?: string[];
   tags?: string[];
+  title?: SkillSpecFrontmatter['title'];
+  role?: SkillSpecFrontmatter['role'];
+  version?: SkillSpecFrontmatter['version'];
+  author?: SkillSpecFrontmatter['author'];
 };
 
 export type SkillGitConfig = {

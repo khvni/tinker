@@ -44,11 +44,17 @@ Skills are markdown files that teach the agent how to perform a specific task. T
 
 Follow the SKILL.md pattern shared with OpenClaw/Hermes (see [[ai-agent-harnesses]]):
 
+Canonical frontmatter spec:
+
 ```markdown
 ---
-name: skill-name-kebab-case
-description: One-line description used by Coach for recommendation
+id: skill-name-kebab-case
+title: Skill Title
+role: assistant
 tools: [optional tool allowlist]
+version: 1
+author:
+  name: Tinker
 ---
 
 # Skill Title
@@ -62,6 +68,11 @@ tools: [optional tool allowlist]
 ## Examples
 <if helpful>
 ```
+
+Notes:
+- `body` is the markdown content after the YAML frontmatter, not a frontmatter key.
+- Current parser still accepts legacy `name` / `description` files so older skills continue to load.
+- Extra metadata like `description` / `tags` may remain for search and UI compatibility, but canonical authoring should use `id`, `title`, `role`, `tools`, `version`, `author`, and markdown `body`.
 
 ## Implementation Outline
 
