@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   ClickableBadge,
+  ConnectionGate,
   ContextBadge,
   EmptyState,
   IconButton,
@@ -22,6 +23,7 @@ import {
   useToast,
   type AvatarSize,
   type BadgeVariant,
+  type ConnectionService,
   type ModelPickerItem,
   type ProgressSpinnerSize,
   type StatusDotState,
@@ -119,6 +121,24 @@ const PROGRESS_SPINNER_SIZES: ReadonlyArray<{ size: ProgressSpinnerSize; label: 
   { size: 'xs', label: 'xs · 12' },
   { size: 'sm', label: 'sm · 16' },
   { size: 'md', label: 'md · 24' },
+];
+
+const CONNECTION_GATE_PENDING: ReadonlyArray<ConnectionService> = [
+  { id: 'qmd', label: 'qmd', status: 'pending' },
+  { id: 'smart-connections', label: 'smart-connections', status: 'pending' },
+  { id: 'exa', label: 'exa', status: 'pending' },
+];
+
+const CONNECTION_GATE_MIXED: ReadonlyArray<ConnectionService> = [
+  { id: 'qmd', label: 'qmd', status: 'connected' },
+  { id: 'smart-connections', label: 'smart-connections', status: 'pending' },
+  { id: 'exa', label: 'exa', status: 'error', detail: 'Network timeout' },
+];
+
+const CONNECTION_GATE_DONE: ReadonlyArray<ConnectionService> = [
+  { id: 'qmd', label: 'qmd', status: 'connected' },
+  { id: 'smart-connections', label: 'smart-connections', status: 'connected' },
+  { id: 'exa', label: 'exa', status: 'connected' },
 ];
 
 const PlusIcon = () => (
@@ -369,6 +389,14 @@ const ComponentsTab = (): JSX.Element => {
               <span className="ds-status-item__label">{item.label}</span>
             </span>
           ))}
+        </Row>
+      </Section>
+
+      <Section label="ConnectionGate">
+        <Row>
+          <ConnectionGate services={CONNECTION_GATE_PENDING} title="Connecting tools…" />
+          <ConnectionGate services={CONNECTION_GATE_MIXED} title="Connecting tools…" />
+          <ConnectionGate services={CONNECTION_GATE_DONE} title="Ready" />
         </Row>
       </Section>
 

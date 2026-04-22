@@ -3,6 +3,12 @@ export { IconButton } from './IconButton.js';
 export { Badge, type BadgeVariant } from './Badge.js';
 export { ClickableBadge } from './ClickableBadge.js';
 export { ContextBadge, type ContextBadgeProps } from './ContextBadge.js';
+export {
+  ConnectionGate,
+  type ConnectionGateProps,
+  type ConnectionService,
+  type ConnectionServiceStatus,
+} from './ConnectionGate/index.js';
 export { StatusDot, type StatusDotState } from './StatusDot.js';
 export { SegmentedControl, type SegmentedControlOption } from './SegmentedControl.js';
 export { Toggle } from './Toggle.js';
