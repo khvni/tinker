@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::Mutex};
+use std::{path::PathBuf, sync::Mutex, time::Instant};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use rand::{rngs::OsRng, RngCore};
@@ -9,12 +9,7 @@ use tauri_plugin_shell::{
   process::{CommandChild, CommandEvent},
   ShellExt,
 };
-use tokio::{
-  io::{AsyncReadExt, AsyncWriteExt},
-  net::TcpListener,
-  time::{sleep, timeout, Duration as TokioDuration},
-};
-use url::Url;
+use tokio::time::{sleep, Duration as TokioDuration};
 
 pub const KEYRING_SERVICE: &str = "tinker";
 pub const GOOGLE_SESSION_ACCOUNT: &str = "google-session";
@@ -23,6 +18,7 @@ pub const GITHUB_SESSION_ACCOUNT: &str = "github-session";
 const BETTER_AUTH_TIMEOUT: TokioDuration = TokioDuration::from_secs(180);
 const BETTER_AUTH_HEALTH_RETRY_COUNT: usize = 20;
 const BETTER_AUTH_HEALTH_RETRY_DELAY: TokioDuration = TokioDuration::from_millis(500);
+const BETTER_AUTH_SESSION_POLL_DELAY: TokioDuration = TokioDuration::from_millis(500);
 const BETTER_AUTH_SECRET_HEADER: &str = "x-tinker-bridge-secret";
 const BETTER_AUTH_PORT_ENV: &str = "TINKER_BETTER_AUTH_PORT";
 const DEFAULT_BETTER_AUTH_PORT: u16 = 3147;
@@ -112,6 +108,49 @@ pub struct AuthStatus {
   github: Option<SSOSession>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthStartResponse {
+  ticket: String,
+  authorization_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthSessionUser {
+  id: String,
+  provider_user_id: String,
+  email: String,
+  display_name: String,
+  avatar_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthSessionTokens {
+  access_token: String,
+  refresh_token: String,
+  expires_at: String,
+  scopes: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthSessionResponse {
+  authenticated: bool,
+  provider: Option<AuthProvider>,
+  user: Option<AuthSessionUser>,
+  tokens: Option<AuthSessionTokens>,
+  status: Option<String>,
+  error: Option<String>,
+}
+
+#[derive(Debug)]
+enum PollAuthSession {
+  Pending,
+  Ready(SSOSession),
+}
+
 fn random_url_safe(bytes: usize) -> String {
   let mut buffer = vec![0_u8; bytes];
   OsRng.fill_bytes(&mut buffer);
@@ -123,20 +162,6 @@ fn provider_account(provider: AuthProvider) -> &'static str {
     AuthProvider::Google => GOOGLE_SESSION_ACCOUNT,
     AuthProvider::Github => GITHUB_SESSION_ACCOUNT,
   }
-}
-
-fn parse_callback_request(request: &str) -> Result<HashMap<String, String>, String> {
-  let request_line = request
-    .lines()
-    .next()
-    .ok_or_else(|| "Missing OAuth callback request line.".to_string())?;
-  let path = request_line
-    .split_whitespace()
-    .nth(1)
-    .ok_or_else(|| "Missing OAuth callback path.".to_string())?;
-  let url = Url::parse(&format!("http://127.0.0.1{path}")).map_err(|error| error.to_string())?;
-
-  Ok(url.query_pairs().into_owned().collect())
 }
 
 pub(crate) fn keyring_error(error: impl std::fmt::Display) -> String {
@@ -262,6 +287,53 @@ fn require_provider_configuration(provider: AuthProvider) -> Result<(), String> 
   }
 
   Err(provider_configuration_message(provider, port))
+}
+
+fn parse_auth_session_response(
+  provider: AuthProvider,
+  response: AuthSessionResponse,
+) -> Result<PollAuthSession, String> {
+  if !response.authenticated {
+    if response.status.as_deref() == Some("pending") {
+      return Ok(PollAuthSession::Pending);
+    }
+
+    if let Some(error) = response.error.filter(|value| !value.trim().is_empty()) {
+      return Err(format!("{} sign-in failed: {error}", provider.display_name()));
+    }
+
+    let status = response.status.unwrap_or_else(|| "unknown".to_string());
+    return Err(format!("{} sign-in failed: {status}", provider.display_name()));
+  }
+
+  if response.provider != Some(provider) {
+    return Err("Better Auth returned session for wrong provider.".to_string());
+  }
+
+  let user = response
+    .user
+    .ok_or_else(|| "Better Auth session response was missing user details.".to_string())?;
+  let tokens = response
+    .tokens
+    .ok_or_else(|| "Better Auth session response was missing token details.".to_string())?;
+
+  let user_id = if user.provider_user_id.trim().is_empty() {
+    user.id
+  } else {
+    user.provider_user_id
+  };
+
+  Ok(PollAuthSession::Ready(SSOSession {
+    provider,
+    user_id,
+    email: user.email,
+    display_name: user.display_name,
+    avatar_url: user.avatar_url,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: tokens.expires_at,
+    scopes: tokens.scopes,
+  }))
 }
 
 fn auth_sidecar_script_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -417,52 +489,13 @@ async fn ensure_better_auth<R: Runtime>(app: &AppHandle<R>) -> Result<BetterAuth
   start_better_auth(app).await
 }
 
-fn callback_success_page(provider: AuthProvider) -> &'static [u8] {
-  match provider {
-    AuthProvider::Google | AuthProvider::Github => {
-      b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h1>Tinker</h1><p>Sign-in finished. You can close this window and return to the app.</p></body></html>"
-    }
-  }
-}
-
-fn callback_error_page() -> &'static [u8] {
-  b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><h1>Tinker</h1><p>Sign-in finished with an error. You can close this window and return to the app.</p></body></html>"
-}
-
-async fn await_callback(provider: AuthProvider, listener: TcpListener) -> Result<HashMap<String, String>, String> {
-  let (mut stream, _) = timeout(BETTER_AUTH_TIMEOUT, listener.accept())
-    .await
-    .map_err(|_| format!("Timed out waiting for {} sign-in callback.", provider.display_name()))?
-    .map_err(|error| error.to_string())?;
-
-  let mut buffer = [0_u8; 8192];
-  let bytes_read = stream.read(&mut buffer).await.map_err(|error| error.to_string())?;
-  let request = String::from_utf8_lossy(&buffer[..bytes_read]);
-  let params = parse_callback_request(&request)?;
-
-  let response = if params.contains_key("error") {
-    callback_error_page()
-  } else {
-    callback_success_page(provider)
-  };
-
-  stream.write_all(response).await.map_err(|error| error.to_string())?;
-  Ok(params)
-}
-
-fn callback_url(listener: &TcpListener) -> Result<String, String> {
-  Ok(format!(
-    "http://127.0.0.1:{}/callback",
-    listener.local_addr().map_err(|error| error.to_string())?.port()
-  ))
-}
-
-async fn fetch_transferred_session(runtime: &BetterAuthRuntime, ticket: &str) -> Result<SSOSession, String> {
-  let url = Url::parse_with_params(&format!("{}/desktop/session", runtime.base_url), &[("ticket", ticket)])
-    .map_err(|error| error.to_string())?;
+async fn start_auth_session(runtime: &BetterAuthRuntime, provider: AuthProvider) -> Result<AuthStartResponse, String> {
   let response = reqwest::Client::new()
-    .get(url)
+    .post(format!("{}/auth/start", runtime.base_url))
     .header(BETTER_AUTH_SECRET_HEADER, runtime.bridge_secret.clone())
+    .json(&serde_json::json!({
+      "provider": provider.as_str(),
+    }))
     .send()
     .await
     .map_err(|error| error.to_string())?;
@@ -470,80 +503,75 @@ async fn fetch_transferred_session(runtime: &BetterAuthRuntime, ticket: &str) ->
   if !response.status().is_success() {
     let body = response.text().await.unwrap_or_default();
     return Err(if body.is_empty() {
-      "Better Auth sidecar rejected session transfer.".to_string()
+      format!("{} sign-in could not be started.", provider.display_name())
     } else {
-      format!("Better Auth sidecar rejected session transfer: {body}")
+      format!("{} sign-in could not be started: {body}", provider.display_name())
     });
   }
 
-  response.json::<SSOSession>().await.map_err(|error| error.to_string())
+  response.json::<AuthStartResponse>().await.map_err(|error| error.to_string())
 }
 
-fn callback_error_message(provider: AuthProvider, params: &HashMap<String, String>) -> String {
-  let code = params
-    .get("error")
-    .cloned()
-    .unwrap_or_else(|| "oauth_failed".to_string());
-  let port = configured_better_auth_port().unwrap_or(DEFAULT_BETTER_AUTH_PORT);
+async fn poll_auth_session(
+  runtime: &BetterAuthRuntime,
+  provider: AuthProvider,
+  ticket: &str,
+) -> Result<SSOSession, String> {
+  let client = reqwest::Client::new();
+  let started_at = Instant::now();
 
-  if provider == AuthProvider::Google
-    && (code == "invalid_client"
-      || code == "redirect_uri_mismatch"
-      || params
-        .get("errorDescription")
-        .is_some_and(|value| value.contains("OAuth client was not found") || value.contains("redirect_uri_mismatch")))
-  {
-    let setup_hint = provider_configuration_message(provider, port);
-    if let Some(description) = params.get("errorDescription").filter(|value| !value.trim().is_empty()) {
-      return format!("{setup_hint} Google said: {description}");
+  while started_at.elapsed() < BETTER_AUTH_TIMEOUT {
+    let response = client
+      .get(format!("{}/auth/session", runtime.base_url))
+      .query(&[("ticket", ticket)])
+      .header(BETTER_AUTH_SECRET_HEADER, runtime.bridge_secret.clone())
+      .send()
+      .await
+      .map_err(|error| error.to_string())?;
+
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+      return Err(format!("{} sign-in session expired before completion.", provider.display_name()));
     }
 
-    return setup_hint;
+    if !response.status().is_success() {
+      let body = response.text().await.unwrap_or_default();
+      return Err(if body.is_empty() {
+        format!("{} sign-in session could not be read.", provider.display_name())
+      } else {
+        format!("{} sign-in session could not be read: {body}", provider.display_name())
+      });
+    }
+
+    match parse_auth_session_response(
+      provider,
+      response.json::<AuthSessionResponse>().await.map_err(|error| error.to_string())?,
+    )? {
+      PollAuthSession::Pending => sleep(BETTER_AUTH_SESSION_POLL_DELAY).await,
+      PollAuthSession::Ready(session) => return Ok(session),
+    }
   }
 
-  if let Some(description) = params.get("errorDescription").filter(|value| !value.trim().is_empty()) {
-    return format!("{} sign-in failed: {description}", provider.display_name());
-  }
-
-  format!("{} sign-in failed: {}", provider.display_name(), code.replace('_', " "))
+  Err(format!("Timed out waiting for {} sign-in to finish.", provider.display_name()))
 }
 
 async fn sign_in_with_better_auth<R: Runtime>(app: &AppHandle<R>, provider: AuthProvider) -> Result<SSOSession, String> {
   require_provider_configuration(provider)?;
 
   let runtime = ensure_better_auth(app).await?;
-  let listener = TcpListener::bind("127.0.0.1:0").await.map_err(|error| error.to_string())?;
-  let ticket = random_url_safe(24);
-  let callback = callback_url(&listener)?;
-  let sign_in_url = Url::parse_with_params(
-    &format!("{}/desktop/sign-in/{}", runtime.base_url, provider.as_str()),
-    &[("ticket", ticket.as_str()), ("appCallback", callback.as_str())],
-  )
-  .map_err(|error| error.to_string())?;
+  let start = start_auth_session(&runtime, provider).await?;
 
-  webbrowser::open(sign_in_url.as_str()).map_err(|error| error.to_string())?;
+  webbrowser::open(start.authorization_url.as_str()).map_err(|error| error.to_string())?;
 
-  let params = await_callback(provider, listener).await?;
-  if params.contains_key("error") {
-    return Err(callback_error_message(provider, &params));
-  }
-
-  let returned_ticket = params
-    .get("ticket")
-    .ok_or_else(|| format!("{} sign-in callback did not include transfer ticket.", provider.display_name()))?;
-  if returned_ticket != &ticket {
-    return Err(format!(
-      "{} sign-in callback returned mismatched transfer ticket.",
-      provider.display_name()
-    ));
-  }
-
-  let session = fetch_transferred_session(&runtime, &ticket).await?;
-  if session.provider != provider {
-    return Err("Better Auth returned session for wrong provider.".to_string());
-  }
-
+  let session = poll_auth_session(&runtime, provider, &start.ticket).await?;
   store_session(app, &session)?;
+  if !session.refresh_token.trim().is_empty() {
+    crate::commands::keychain::save_refresh_token(
+      app.clone(),
+      provider.as_str().to_string(),
+      session.user_id.clone(),
+      session.refresh_token.clone(),
+    )?;
+  }
   Ok(session)
 }
 
@@ -575,6 +603,10 @@ pub async fn auth_sign_in<R: Runtime>(app: AppHandle<R>, provider: AuthProvider)
 
 #[tauri::command]
 pub fn auth_sign_out<R: Runtime>(app: AppHandle<R>, provider: AuthProvider) -> Result<(), String> {
+  if let Some(session) = read_session(&app, provider)? {
+    crate::commands::keychain::clear_refresh_token(app.clone(), provider.as_str().to_string(), session.user_id.clone())?;
+  }
+
   clear_session(&app, provider)
 }
 
@@ -584,4 +616,76 @@ pub fn auth_status<R: Runtime>(app: AppHandle<R>) -> Result<AuthStatus, String> 
     google: read_session(&app, AuthProvider::Google)?,
     github: read_session(&app, AuthProvider::Github)?,
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn parse_auth_session_response_keeps_pending_sessions_pending() {
+    let response = AuthSessionResponse {
+      authenticated: false,
+      provider: None,
+      user: None,
+      tokens: None,
+      status: Some("pending".to_string()),
+      error: None,
+    };
+
+    assert!(matches!(
+      parse_auth_session_response(AuthProvider::Google, response).unwrap(),
+      PollAuthSession::Pending
+    ));
+  }
+
+  #[test]
+  fn parse_auth_session_response_maps_ready_session() {
+    let response = AuthSessionResponse {
+      authenticated: true,
+      provider: Some(AuthProvider::Google),
+      user: Some(AuthSessionUser {
+        id: "google-sub".to_string(),
+        provider_user_id: "provider-user".to_string(),
+        email: "ada@example.com".to_string(),
+        display_name: "Ada Lovelace".to_string(),
+        avatar_url: Some("https://example.com/avatar.png".to_string()),
+      }),
+      tokens: Some(AuthSessionTokens {
+        access_token: "access-token".to_string(),
+        refresh_token: "refresh-token".to_string(),
+        expires_at: "2026-04-22T03:00:00Z".to_string(),
+        scopes: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+      }),
+      status: None,
+      error: None,
+    };
+
+    let session = match parse_auth_session_response(AuthProvider::Google, response).unwrap() {
+      PollAuthSession::Ready(session) => session,
+      PollAuthSession::Pending => panic!("expected ready session"),
+    };
+
+    assert_eq!(session.provider, AuthProvider::Google);
+    assert_eq!(session.user_id, "provider-user");
+    assert_eq!(session.email, "ada@example.com");
+    assert_eq!(session.refresh_token, "refresh-token");
+  }
+
+  #[test]
+  fn parse_auth_session_response_surfaces_sidecar_errors() {
+    let response = AuthSessionResponse {
+      authenticated: false,
+      provider: None,
+      user: None,
+      tokens: None,
+      status: Some("error".to_string()),
+      error: Some("oauth_failed".to_string()),
+    };
+
+    assert_eq!(
+      parse_auth_session_response(AuthProvider::Github, response).unwrap_err(),
+      "GitHub sign-in failed: oauth_failed"
+    );
+  }
 }

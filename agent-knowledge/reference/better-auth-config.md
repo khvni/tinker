@@ -23,6 +23,18 @@ The existing `packages/auth-sidecar/src/main.ts` is a scaffold. It ships with:
 
 M8.4 / M8.5 / M8.6 replace that scaffold with the config in §5 + §6. Rust ownership of the loopback port + keychain lives in M8.7 / M8.8.
 
+### Implementation note — `2026-04-21`
+
+TIN-77 shipped a simpler interactive flow than the callback-port draft below:
+
+- `POST /auth/start` returns `{ ticket, authorizationUrl }`.
+- `authorizationUrl` is a local sidecar URL (`GET /auth/start?ticket=...`), not the provider URL directly.
+- The browser must hit the sidecar first so Better Auth can set its PKCE/state cookie before redirecting to Google/GitHub.
+- Better Auth still receives the provider redirect on `/api/auth/callback/<provider>`, then redirects to Tinker's public `GET /auth/callback/<provider>?ticket=...` endpoint.
+- Rust no longer binds a one-off callback listener for interactive sign-in; it opens the returned URL and polls `GET /auth/session?ticket=...` until `authenticated: true`.
+
+Use the shipped flow above as the source of truth for interactive sign-in. The older callback-port sketch remains useful background for the eventual silent-refresh work, but it is not how M8.4 landed.
+
 ## 2. Architecture in one picture
 
 ```

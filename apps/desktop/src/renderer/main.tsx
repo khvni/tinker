@@ -2,8 +2,11 @@ import { StrictMode, Suspense, lazy, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/host-grotesk';
 import { App } from './App.js';
+import { registerWorkspacePanes } from './workspace/register-panes.js';
 import { applyTheme, readTheme } from './theme.js';
 import './styles.css';
+
+registerWorkspacePanes();
 
 applyTheme(readTheme() ?? 'light');
 

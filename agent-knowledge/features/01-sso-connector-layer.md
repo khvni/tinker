@@ -86,7 +86,7 @@ Self-healing (feature 11)
 ## Out of Scope ([[decisions]])
 
 - `[2026-04-19]` **Enterprise-specific federation (Entra OBO, Okta XAA) — not in upstream. Fork's responsibility.** Documented in `docs/enterprise-fork-guide.md`
-- `[2026-04-14]` SAML 2.0 — BA SAML plugin in flight; OIDC sufficient for consumer
+- `[2026-04-14]` SAML 2.0 — OIDC sufficient for consumer. Enterprise forks needing SAML (ADFS, Shibboleth, legacy SAML SPs) follow `docs/saml-adapter.md` to swap the Better Auth sidecar for a `@node-saml/node-saml` sidecar while preserving the `IdentitySession` contract (TIN-107)
 - `[2026-04-14]` Multi-account-per-provider — one Google account per Tinker install, one GitHub account. Revisit on user ask.
 - `[2026-04-14]` Custom OAuth providers (Dropbox, Notion, Slack) — MCP only; each provider picks up its own MCP server
 - `[2026-04-19]` Cross-tenant integration (D9) — work login → work apps only; personal apps need separate OAuth

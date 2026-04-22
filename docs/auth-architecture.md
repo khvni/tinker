@@ -120,6 +120,7 @@ interface FederationAdapter {
 | `PerServiceOAuthAdapter` | Consumer default | `canFederate()` always false. Forces per-service OAuth flow. |
 | `EntraOBOAdapter` | Enterprise fork | `canFederate()` true for M365-federated services. Exchanges user's Entra access token via OBO flow for downstream service token. |
 | `OktaXAAAdapter` | Future enterprise fork | Same shape using Okta's ID-JAG / XAA protocol. |
+| _(none — sidecar swap)_ | SAML fork | SAML assertions aren't exchangeable bearer tokens, so no adapter shape fits. Forks replace the Better Auth sidecar wholesale while keeping the `IdentitySession` contract. See [SAML provider adapter](./saml-adapter.md). |
 
 **Why this matters:** The proxy and self-healing layers downstream don't care how a credential was obtained. They call `IntegrationCredentialStore.get(service)`. If the adapter produced it via OBO silently, great. If the user did full OAuth last week, also great. Credential source is abstracted away.
 
@@ -257,6 +258,7 @@ See [research in agent-knowledge](../agent-knowledge/reference/auth-vendor-evalu
 ## Related
 
 - [Enterprise fork guide](./enterprise-fork-guide.md)
+- [SAML provider adapter](./saml-adapter.md)
 - [Decisions log](./decisions.md)
 - [Feature 01 — SSO Connector Layer](../agent-knowledge/features/01-sso-connector-layer.md) (agent-facing WIP spec)
 - [Feature 08 — MCP Proxy Layer](../agent-knowledge/features/08-mcp-proxy-layer.md) (agent-facing WIP spec)

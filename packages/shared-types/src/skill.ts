@@ -1,22 +1,36 @@
 import type { RoleProfile } from './coach.js';
 
 export const SKILLS_VAULT_DIRECTORY = '.tinker/skills';
+export const DEFAULT_SKILL_VERSION = '1.0.0';
 
 export type SkillFrontmatter = {
-  name: string;
-  description: string;
+  id: string;
+  title: string;
+  role?: string;
   tools?: string[];
+  version?: string;
+  author?: string;
+  description?: string;
   tags?: string[];
+  name?: string;
   [key: string]: unknown;
 };
 
-export type Skill = {
-  slug: string;
+export type SkillDefinition = {
+  id: string;
   title: string;
-  description: string;
+  role: string | null;
   tools: string[];
-  tags: string[];
+  version: string;
+  author: string | null;
   body: string;
+};
+
+export type Skill = SkillDefinition & {
+  // `slug` remains as a legacy alias while existing callers migrate to `id`.
+  slug: string;
+  description: string;
+  tags: string[];
   relativePath: string;
   frontmatter: SkillFrontmatter;
   lastModified: string;
@@ -26,10 +40,14 @@ export type Skill = {
 
 export type SkillDraft = {
   slug: string;
+  title?: string;
+  role?: string;
   description: string;
   body: string;
   tools?: string[];
   tags?: string[];
+  version?: string;
+  author?: string;
 };
 
 export type SkillGitConfig = {

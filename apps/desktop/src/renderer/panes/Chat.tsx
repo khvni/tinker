@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { Badge, Button, Textarea } from '@tinker/design';
+import { Badge, Button, ModelPicker, Textarea } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities, slugify } from '@tinker/memory';
 import type { SkillDraft, SkillStore } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../bindings.js';
 import { captureConversationMemory } from '../memory.js';
-import { createWorkspaceClient, getOpencodeDirectory } from '../opencode.js';
+import {
+  buildModelPickerItems,
+  createWorkspaceClient,
+  findModelOptionById,
+  getOpencodeDirectory,
+  pickDefaultModelOptionId,
+  type WorkspaceModelOption,
+} from '../opencode.js';
 import { useDockviewApi } from '../workspace/DockviewContext.js';
+import { useSessionHistoryWindow } from './useSessionHistoryWindow.js';
 
 type ChatMessage = {
   id: string;
@@ -53,6 +61,20 @@ const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): Chat
   });
 };
 
+const mergeHistoryMessages = (olderMessages: readonly ChatMessage[], newerMessages: readonly ChatMessage[]): ChatMessage[] => {
+  const merged = new Map<string, ChatMessage>();
+
+  for (const message of olderMessages) {
+    merged.set(message.id, message);
+  }
+
+  for (const message of newerMessages) {
+    merged.set(message.id, message);
+  }
+
+  return [...merged.values()].sort((left, right) => left.id.localeCompare(right.id));
+};
+
 export const Chat = ({
   skillStore,
   modelConnected,
@@ -69,13 +91,19 @@ export const Chat = ({
   );
   const dockviewApi = useDockviewApi();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [draft, setDraft] = useState('');
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [modelOptions, setModelOptions] = useState<ReadonlyArray<WorkspaceModelOption>>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>();
+  const [modelOptionsLoading, setModelOptionsLoading] = useState(true);
   const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
   const mountedRef = useRef(true);
   const sessionIDRef = useRef<string | null>(null);
   const memoryCommitRef = useRef<Promise<void>>(Promise.resolve());
+  const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -95,12 +123,116 @@ export const Chat = ({
   }, [modelConnected]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    setModelOptionsLoading(true);
+
+    void client.config
+      .providers()
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        const providers = response.data?.providers ?? [];
+        const nextOptions = buildModelPickerItems(providers);
+        const nextSelectedId = pickDefaultModelOptionId(providers, response.data?.default ?? {}) ?? nextOptions[0]?.id;
+
+        setModelOptions(nextOptions);
+        setSelectedModelId((current) => {
+          if (current && nextOptions.some((option) => option.id === current)) {
+            return current;
+          }
+
+          return nextSelectedId;
+        });
+      })
+      .catch((error) => {
+        console.warn('Failed to load model picker options from OpenCode.', error);
+        if (cancelled) {
+          return;
+        }
+
+        setModelOptions([]);
+        setSelectedModelId(undefined);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setModelOptionsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, modelConnected]);
+
+  useEffect(() => {
     const existing = sessionIDRef.current;
     sessionIDRef.current = null;
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
+    setMessages([]);
+    setDraft('');
+    setHistoryCursor(null);
+    setHistoryLoading(false);
   }, [activeSkillsRevision, client]);
+
+  const loadHistoryPage = async (sessionID: string, before?: string): Promise<{ messages: ChatMessage[]; cursor: string | null }> => {
+    const history = await client.session.messages({
+      sessionID,
+      limit: 100,
+      ...(before ? { before } : {}),
+    });
+
+    return {
+      messages: formatMessages(history.data ?? []),
+      cursor: history.response.headers.get('x-next-cursor') ?? null,
+    };
+  };
+
+  const refreshHistory = async (sessionID: string): Promise<{ messages: ChatMessage[]; cursor: string | null } | null> => {
+    const page = await loadHistoryPage(sessionID);
+    if (!mountedRef.current || sessionIDRef.current !== sessionID) {
+      return null;
+    }
+
+    setMessages(page.messages);
+    setHistoryCursor(page.cursor);
+    return page;
+  };
+
+  const loadOlderHistory = async (before: string): Promise<void> => {
+    const activeSessionID = sessionIDRef.current;
+    if (!activeSessionID || historyLoading) {
+      return;
+    }
+
+    setHistoryLoading(true);
+
+    try {
+      const page = await loadHistoryPage(activeSessionID, before);
+      if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
+        return;
+      }
+
+      setMessages((current) => mergeHistoryMessages(page.messages, current));
+      setHistoryCursor(page.cursor);
+    } finally {
+      if (mountedRef.current && sessionIDRef.current === activeSessionID) {
+        setHistoryLoading(false);
+      }
+    }
+  };
+
+  const historyWindow = useSessionHistoryWindow({
+    sessionId: sessionIDRef.current,
+    messages,
+    cursor: historyCursor,
+    isLoading: historyLoading,
+    loadMore: loadOlderHistory,
+  });
 
   const ensureSession = async (): Promise<string> => {
     if (sessionIDRef.current) {
@@ -220,16 +352,23 @@ export const Chat = ({
       await client.session.prompt({
         sessionID: activeSessionID,
         parts: [{ type: 'text', text }],
+        ...(selectedModel
+          ? {
+              model: {
+                providerID: selectedModel.providerId,
+                modelID: selectedModel.modelId,
+              },
+            }
+          : {}),
       });
       await consumeStream;
 
-      const history = await client.session.messages({ sessionID: activeSessionID, limit: 24 });
+      const historyPage = await refreshHistory(activeSessionID);
       if (mountedRef.current) {
-        setMessages(formatMessages(history.data ?? []));
         setDraft('');
       }
 
-      const assistantMessage = formatMessages(history.data ?? [])
+      const assistantMessage = historyPage?.messages
         .filter((message) => message.role === 'assistant')
         .at(-1)?.text;
       if (assistantMessage && vaultPath) {
@@ -290,7 +429,7 @@ export const Chat = ({
         </div>
       </header>
 
-      <div className="tinker-chat-log">
+      <div className="tinker-chat-log" ref={historyWindow.setScroller} onScroll={historyWindow.handleScroll}>
         {messages.length === 0 ? (
           <div className="tinker-message tinker-message--system">
             {modelConnected
@@ -299,7 +438,7 @@ export const Chat = ({
           </div>
         ) : null}
 
-        {messages.map((message) => (
+        {historyWindow.renderedMessages.map((message) => (
           <div key={message.id} className={`tinker-message tinker-message--${message.role}`}>
             <p className="tinker-message-text">{message.text}</p>
             {message.role === 'assistant' && message.text.trim().length > 0 ? (
@@ -324,6 +463,14 @@ export const Chat = ({
           disabled={busy || !modelConnected}
         />
         <div className="tinker-inline-actions">
+          <ModelPicker
+            items={modelOptions}
+            value={selectedModelId}
+            onSelect={setSelectedModelId}
+            loading={modelOptionsLoading}
+            disabled={busy}
+            emptyLabel="No models available in OpenCode."
+          />
           <Button
             variant="primary"
             onClick={sendMessage}

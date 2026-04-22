@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { betterAuth } from 'better-auth';
 
@@ -15,14 +16,36 @@ type SessionPayload = {
   scopes: string[];
 };
 
-type TransferRecord = {
+type PendingTicketRecord = {
+  status: 'pending';
+  provider: DesktopProvider;
+  expiresAt: number;
+};
+
+type ReadyTicketRecord = {
+  status: 'ready';
+  provider: DesktopProvider;
   expiresAt: number;
   payload: SessionPayload;
+};
+
+type FailedTicketRecord = {
+  status: 'error';
+  provider: DesktopProvider;
+  expiresAt: number;
+  error: string;
+};
+
+type AuthTicketRecord = PendingTicketRecord | ReadyTicketRecord | FailedTicketRecord;
+
+type StartAuthRequest = {
+  provider: DesktopProvider;
 };
 
 const TRANSFER_TTL_MS = 5 * 60 * 1000;
 const SESSION_FALLBACK_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_BETTER_AUTH_PORT = 3147;
+const BRIDGE_SECRET_HEADER = 'x-tinker-bridge-secret';
 
 const requiredEnv = (name: string): string => {
   const value = process.env[name];
@@ -55,6 +78,10 @@ const parsePort = (value: string): number => {
   return port;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
 const authPort = parsePort(optionalEnv('TINKER_BETTER_AUTH_PORT') ?? String(DEFAULT_BETTER_AUTH_PORT));
 const bridgeSecret = requiredEnv('TINKER_BETTER_AUTH_BRIDGE_SECRET');
 const baseURL = `http://127.0.0.1:${authPort}`;
@@ -68,7 +95,7 @@ const configuredGoogleClientSecret = googleClientSecret && !isPlaceholderValue(g
 const configuredGithubClientId = githubClientId && !isPlaceholderValue(githubClientId) ? githubClientId : null;
 const configuredGithubClientSecret = githubClientSecret && !isPlaceholderValue(githubClientSecret) ? githubClientSecret : null;
 
-const transfers = new Map<string, TransferRecord>();
+const authTickets = new Map<string, AuthTicketRecord>();
 
 const socialProviders = {
   ...(configuredGoogleClientId && configuredGoogleClientSecret
@@ -77,14 +104,9 @@ const socialProviders = {
           clientId: configuredGoogleClientId,
           clientSecret: configuredGoogleClientSecret,
           redirectURI: `${baseURL}/api/auth/callback/google`,
-          scope: [
-            'openid',
-            'email',
-            'profile',
-            'https://www.googleapis.com/auth/gmail.readonly',
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/drive.readonly',
-          ],
+          scope: ['openid', 'email', 'profile'],
+          accessType: 'offline' as const,
+          prompt: 'select_account consent' as const,
         },
       }
     : {}),
@@ -94,13 +116,15 @@ const socialProviders = {
           clientId: configuredGithubClientId,
           clientSecret: configuredGithubClientSecret,
           redirectURI: `${baseURL}/api/auth/callback/github`,
-          scope: ['read:user', 'user:email', 'repo'],
+          scope: ['read:user', 'user:email'],
         },
       }
     : {}),
 };
 
-const enabledProviders = new Set(Object.keys(socialProviders));
+const enabledProviders = new Set(Object.keys(socialProviders).filter((value): value is DesktopProvider => {
+  return value === 'google' || value === 'github';
+}));
 
 if (enabledProviders.size === 0) {
   throw new Error('At least one social provider must be configured for Better Auth.');
@@ -138,9 +162,9 @@ const isConfiguredProvider = (provider: DesktopProvider): boolean => {
 
 const pruneTransfers = (): void => {
   const now = Date.now();
-  for (const [ticket, record] of transfers.entries()) {
+  for (const [ticket, record] of authTickets.entries()) {
     if (record.expiresAt <= now) {
-      transfers.delete(ticket);
+      authTickets.delete(ticket);
     }
   }
 };
@@ -230,72 +254,146 @@ const errorResponse = (status: number, message: string): Response => {
   return Response.json({ error: message }, { status });
 };
 
-const isLoopbackCallback = (value: string): boolean => {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
-  } catch {
-    return false;
-  }
+const authorizedBridgeRequest = (request: Request): boolean => {
+  return request.headers.get(BRIDGE_SECRET_HEADER) === bridgeSecret;
 };
 
-const appRedirect = (appCallback: string, params: Record<string, string | null>, headers?: Headers): Response => {
-  const url = new URL(appCallback);
-
-  for (const [key, value] of Object.entries(params)) {
-    if (value === null) {
-      continue;
-    }
-    url.searchParams.set(key, value);
+const parseStartAuthRequest = (value: unknown): StartAuthRequest | null => {
+  if (!isRecord(value) || typeof value.provider !== 'string' || !isDesktopProvider(value.provider)) {
+    return null;
   }
 
-  const responseHeaders = new Headers({ Location: url.toString() });
+  return { provider: value.provider };
+};
+
+const browserStartUrl = (ticket: string): string => {
+  const url = new URL('/auth/start', baseURL);
+  url.searchParams.set('ticket', ticket);
+  return url.toString();
+};
+
+const authCallbackUrl = (provider: DesktopProvider, ticket: string): string => {
+  const url = new URL(`/auth/callback/${provider}`, baseURL);
+  url.searchParams.set('ticket', ticket);
+  return url.toString();
+};
+
+const getActiveTicket = (ticket: string): AuthTicketRecord | null => {
+  const record = authTickets.get(ticket);
+  if (!record) {
+    return null;
+  }
+
+  if (record.expiresAt <= Date.now()) {
+    authTickets.delete(ticket);
+    return null;
+  }
+
+  return record;
+};
+
+const setTicketError = (ticket: string, provider: DesktopProvider, message: string): FailedTicketRecord => {
+  const record: FailedTicketRecord = {
+    status: 'error',
+    provider,
+    expiresAt: Date.now() + TRANSFER_TTL_MS,
+    error: message,
+  };
+  authTickets.set(ticket, record);
+  return record;
+};
+
+const pageResponse = (title: string, message: string, headers?: Headers): Response => {
+  const responseHeaders = new Headers({
+    'content-type': 'text/html; charset=utf-8',
+  });
+
   if (headers) {
     for (const setCookie of getSetCookieValues(headers)) {
       responseHeaders.append('set-cookie', setCookie);
     }
   }
 
-  return new Response(null, { status: 302, headers: responseHeaders });
+  const body = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #111827;
+        color: #f9fafb;
+        font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        max-width: 28rem;
+        padding: 2rem;
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.5rem;
+      }
+
+      p {
+        margin: 0;
+        color: #d1d5db;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>${title}</h1>
+      <p>${message}</p>
+    </main>
+  </body>
+</html>`;
+
+  return new Response(body, {
+    status: 200,
+    headers: responseHeaders,
+  });
 };
 
-const finishOAuth = async (request: Request): Promise<Response> => {
-  const url = new URL(request.url);
-  const appCallback = url.searchParams.get('appCallback');
-  const ticket = url.searchParams.get('ticket');
-  const provider = url.searchParams.get('provider');
+const readSessionPayload = async (request: Request, provider: DesktopProvider): Promise<SessionPayload> => {
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
 
-  if (!appCallback || !isLoopbackCallback(appCallback)) {
-    return errorResponse(400, 'Missing or invalid desktop callback URL.');
+  if (!session?.user) {
+    throw new Error('missing_session');
   }
 
-  if (!ticket || ticket.trim().length === 0) {
-    return appRedirect(appCallback, { error: 'missing_ticket' });
+  const accounts = await auth.api.listUserAccounts({
+    headers: request.headers,
+  });
+  const account = accounts.find((entry) => entry.providerId === provider);
+
+  if (!account) {
+    throw new Error('missing_account');
   }
 
-  if (!provider || !isDesktopProvider(provider)) {
-    return appRedirect(appCallback, { error: 'invalid_provider' });
-  }
+  const access = await auth.api.getAccessToken({
+    headers: request.headers,
+    body: {
+      providerId: provider,
+      accountId: account.accountId,
+    },
+  });
+
+  let refreshToken = '';
+  let refreshScope = access.scopes;
+  let expiresAt = access.accessTokenExpiresAt;
 
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return appRedirect(appCallback, { error: 'missing_session', ticket });
-    }
-
-    const accounts = await auth.api.listUserAccounts({
-      headers: request.headers,
-    });
-    const account = accounts.find((entry) => entry.providerId === provider);
-
-    if (!account) {
-      return appRedirect(appCallback, { error: 'missing_account', ticket });
-    }
-
-    const access = await auth.api.getAccessToken({
+    const refresh = await auth.api.refreshToken({
       headers: request.headers,
       body: {
         providerId: provider,
@@ -303,129 +401,206 @@ const finishOAuth = async (request: Request): Promise<Response> => {
       },
     });
 
-    let refreshToken = '';
-    let refreshScope = access.scopes;
-    let expiresAt = access.accessTokenExpiresAt;
-
-    try {
-      const refresh = await auth.api.refreshToken({
-        headers: request.headers,
-        body: {
-          providerId: provider,
-          accountId: account.accountId,
-        },
-      });
-
-      refreshToken = refresh.refreshToken;
-      refreshScope = refresh.scope?.split(/[ ,]+/u).filter((scope) => scope.length > 0) ?? refreshScope;
-      expiresAt = refresh.accessTokenExpiresAt ?? expiresAt;
-    } catch (error) {
-      if (provider === 'google') {
-        throw error;
-      }
-    }
-
-    if (access.accessToken.length === 0) {
-      return appRedirect(appCallback, { error: 'missing_access_token', ticket });
-    }
-
-    const signOut = await auth.api.signOut({
-      headers: request.headers,
-      returnHeaders: true,
-    });
-
-    transfers.set(ticket, {
-      expiresAt: Date.now() + TRANSFER_TTL_MS,
-      payload: {
-        provider,
-        userId: account.accountId,
-        email: session.user.email,
-        displayName: session.user.name,
-        avatarUrl: session.user.image ?? null,
-        accessToken: access.accessToken,
-        refreshToken,
-        expiresAt: (expiresAt ?? new Date(Date.now() + SESSION_FALLBACK_TTL_MS)).toISOString(),
-        scopes: refreshScope.length > 0 ? refreshScope : account.scopes,
-      },
-    });
-
-    return appRedirect(appCallback, { ticket }, signOut.headers);
+    refreshToken = refresh.refreshToken;
+    refreshScope = refresh.scope?.split(/[ ,]+/u).filter((scope) => scope.length > 0) ?? refreshScope;
+    expiresAt = refresh.accessTokenExpiresAt ?? expiresAt;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'oauth_failed';
-    return appRedirect(appCallback, { error: message, ticket });
+    if (provider === 'google') {
+      throw error;
+    }
   }
+
+  if (access.accessToken.length === 0) {
+    throw new Error('missing_access_token');
+  }
+
+  return {
+    provider,
+    userId: account.accountId,
+    email: session.user.email,
+    displayName: session.user.name,
+    avatarUrl: session.user.image ?? null,
+    accessToken: access.accessToken,
+    refreshToken,
+    expiresAt: (expiresAt ?? new Date(Date.now() + SESSION_FALLBACK_TTL_MS)).toISOString(),
+    scopes: refreshScope.length > 0 ? refreshScope : account.scopes,
+  };
 };
 
-const startSignIn = async (request: Request): Promise<Response> => {
+const startAuthSession = async (request: Request): Promise<Response> => {
+  if (!authorizedBridgeRequest(request)) {
+    return errorResponse(401, 'Unauthorized.');
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse(400, 'Invalid JSON body.');
+  }
+
+  const startRequest = parseStartAuthRequest(body);
+  if (!startRequest) {
+    return errorResponse(400, 'Missing or invalid provider.');
+  }
+
+  if (!isConfiguredProvider(startRequest.provider)) {
+    return errorResponse(503, `${startRequest.provider} is not configured.`);
+  }
+
+  const ticket = randomUUID();
+  authTickets.set(ticket, {
+    status: 'pending',
+    provider: startRequest.provider,
+    expiresAt: Date.now() + TRANSFER_TTL_MS,
+  });
+
+  return Response.json({
+    ticket,
+    authorizationUrl: browserStartUrl(ticket),
+  });
+};
+
+const continueAuthSession = async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
-  const provider = url.pathname.split('/').pop();
-  const appCallback = url.searchParams.get('appCallback');
   const ticket = url.searchParams.get('ticket');
 
-  if (!provider || !isDesktopProvider(provider)) {
-    return errorResponse(400, 'Unsupported provider.');
-  }
-
-  if (!isConfiguredProvider(provider)) {
-    return errorResponse(503, `${provider} is not configured.`);
-  }
-
-  if (!appCallback || !isLoopbackCallback(appCallback)) {
-    return errorResponse(400, 'Missing or invalid desktop callback URL.');
-  }
-
   if (!ticket || ticket.trim().length === 0) {
-    return errorResponse(400, 'Missing ticket.');
+    return pageResponse('Sign-in expired', 'Return to Tinker and start sign-in again.');
+  }
+
+  const record = getActiveTicket(ticket);
+  if (!record || record.status !== 'pending') {
+    return pageResponse('Sign-in expired', 'Return to Tinker and start sign-in again.');
   }
 
   return auth.api.signInSocial({
     asResponse: true,
     headers: request.headers,
     body: {
-      provider,
-      callbackURL: `${baseURL}/desktop/finish?provider=${provider}&ticket=${encodeURIComponent(ticket)}&appCallback=${encodeURIComponent(appCallback)}`,
-      errorCallbackURL: `${baseURL}/desktop/error?ticket=${encodeURIComponent(ticket)}&appCallback=${encodeURIComponent(appCallback)}`,
-      newUserCallbackURL: `${baseURL}/desktop/finish?provider=${provider}&ticket=${encodeURIComponent(ticket)}&appCallback=${encodeURIComponent(appCallback)}`,
+      provider: record.provider,
+      callbackURL: authCallbackUrl(record.provider, ticket),
+      errorCallbackURL: authCallbackUrl(record.provider, ticket),
+      newUserCallbackURL: authCallbackUrl(record.provider, ticket),
     },
   });
 };
 
-const handleErrorRedirect = (request: Request): Response => {
-  const url = new URL(request.url);
-  const appCallback = url.searchParams.get('appCallback');
-
-  if (!appCallback || !isLoopbackCallback(appCallback)) {
-    return errorResponse(400, 'Missing or invalid desktop callback URL.');
-  }
-
-  return appRedirect(appCallback, {
-    error: url.searchParams.get('error') ?? 'oauth_failed',
-    errorDescription: url.searchParams.get('error_description'),
-    ticket: url.searchParams.get('ticket'),
-  });
-};
-
-const readTransferSession = (request: Request): Response => {
+const completeAuthSession = async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
   const ticket = url.searchParams.get('ticket');
-  const header = request.headers.get('x-tinker-bridge-secret');
+  const providerValue = url.pathname.split('/').pop();
 
-  if (header !== bridgeSecret) {
+  if (!ticket || ticket.trim().length === 0) {
+    return pageResponse('Sign-in failed', 'Return to Tinker and try again.');
+  }
+
+  if (!providerValue || !isDesktopProvider(providerValue)) {
+    return pageResponse('Sign-in failed', 'Return to Tinker and try again.');
+  }
+
+  const record = getActiveTicket(ticket);
+  if (!record || record.provider !== providerValue) {
+    return pageResponse('Sign-in failed', 'Return to Tinker and try again.');
+  }
+
+  if (url.searchParams.get('error')) {
+    const errorDescription = url.searchParams.get('error_description');
+    const message = errorDescription && errorDescription.trim().length > 0 ? errorDescription : 'oauth_failed';
+    setTicketError(ticket, providerValue, message);
+    return pageResponse('Sign-in failed', 'Return to Tinker and retry sign-in.');
+  }
+
+  try {
+    const payload = await readSessionPayload(request, providerValue);
+    authTickets.set(ticket, {
+      status: 'ready',
+      provider: providerValue,
+      expiresAt: Date.now() + TRANSFER_TTL_MS,
+      payload,
+    });
+
+    let signOutHeaders: Headers | undefined;
+    try {
+      const signOut = await auth.api.signOut({
+        headers: request.headers,
+        returnHeaders: true,
+      });
+      signOutHeaders = signOut.headers;
+    } catch {
+      signOutHeaders = undefined;
+    }
+
+    return pageResponse('Sign-in complete', 'You can close this window and return to Tinker.', signOutHeaders);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'oauth_failed';
+    setTicketError(ticket, providerValue, message);
+    return pageResponse('Sign-in failed', 'Return to Tinker and retry sign-in.');
+  }
+};
+
+const readAuthSession = (request: Request): Response => {
+  if (!authorizedBridgeRequest(request)) {
     return errorResponse(401, 'Unauthorized.');
   }
+
+  const url = new URL(request.url);
+  const ticket = url.searchParams.get('ticket');
 
   if (!ticket || ticket.trim().length === 0) {
     return errorResponse(400, 'Missing ticket.');
   }
 
-  const record = transfers.get(ticket);
-  if (!record || record.expiresAt <= Date.now()) {
-    transfers.delete(ticket);
-    return errorResponse(404, 'Session transfer expired.');
+  const record = getActiveTicket(ticket);
+  if (!record) {
+    return Response.json({ authenticated: false, status: 'expired' }, { status: 401 });
   }
 
-  transfers.delete(ticket);
-  return Response.json(record.payload);
+  if (record.status === 'pending') {
+    return Response.json({ authenticated: false, status: 'pending' });
+  }
+
+  if (record.status === 'error') {
+    return Response.json({
+      authenticated: false,
+      status: 'error',
+      error: record.error,
+    });
+  }
+
+  authTickets.delete(ticket);
+  return Response.json({
+    authenticated: true,
+    provider: record.payload.provider,
+    user: {
+      id: record.payload.userId,
+      providerUserId: record.payload.userId,
+      email: record.payload.email,
+      displayName: record.payload.displayName,
+      avatarUrl: record.payload.avatarUrl,
+    },
+    tokens: {
+      accessToken: record.payload.accessToken,
+      refreshToken: record.payload.refreshToken,
+      expiresAt: record.payload.expiresAt,
+      scopes: record.payload.scopes,
+    },
+  });
+};
+
+const logoutAuthSession = async (request: Request): Promise<Response> => {
+  if (!authorizedBridgeRequest(request)) {
+    return errorResponse(401, 'Unauthorized.');
+  }
+
+  try {
+    const body = (await request.json()) as unknown;
+    if (isRecord(body) && typeof body.ticket === 'string' && body.ticket.trim().length > 0) {
+      authTickets.delete(body.ticket);
+    }
+  } catch {}
+
+  return new Response(null, { status: 204 });
 };
 
 const handleRequest = async (request: Request): Promise<Response> => {
@@ -441,45 +616,62 @@ const handleRequest = async (request: Request): Promise<Response> => {
     return auth.handler(request);
   }
 
-  if (url.pathname.startsWith('/desktop/sign-in/')) {
-    return startSignIn(request);
+  if (url.pathname === '/auth/start' && request.method === 'POST') {
+    return startAuthSession(request);
   }
 
-  if (url.pathname === '/desktop/finish') {
-    return finishOAuth(request);
+  if (url.pathname === '/auth/start' && request.method === 'GET') {
+    return continueAuthSession(request);
   }
 
-  if (url.pathname === '/desktop/error') {
-    return handleErrorRedirect(request);
+  if (url.pathname.startsWith('/auth/callback/')) {
+    return completeAuthSession(request);
   }
 
-  if (url.pathname === '/desktop/session') {
-    return readTransferSession(request);
+  if (url.pathname === '/auth/session') {
+    return readAuthSession(request);
+  }
+
+  if (url.pathname === '/auth/logout' && request.method === 'POST') {
+    return logoutAuthSession(request);
   }
 
   return errorResponse(404, 'Not found.');
 };
 
-const server = createServer(async (request, response) => {
-  try {
-    const webRequest = await toRequest(request);
-    const webResponse = await handleRequest(webRequest);
-    await sendResponse(webResponse, response);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unhandled auth sidecar error.';
-    await sendResponse(errorResponse(500, message), response);
-  }
-});
+let server:
+  | ReturnType<typeof createServer>
+  | null = null;
 
-server.listen(authPort, '127.0.0.1', () => {
-  process.stdout.write(`[better-auth] listening on ${baseURL}\n`);
-});
+if (process.env.VITEST !== 'true') {
+  server = createServer(async (request, response) => {
+    try {
+      const webRequest = await toRequest(request);
+      const webResponse = await handleRequest(webRequest);
+      await sendResponse(webResponse, response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unhandled auth sidecar error.';
+      await sendResponse(errorResponse(500, message), response);
+    }
+  });
+
+  server.listen(authPort, '127.0.0.1', () => {
+    process.stdout.write(`[better-auth] listening on ${baseURL}\n`);
+  });
+}
 
 const shutdown = (): void => {
+  if (!server) {
+    process.exit(0);
+    return;
+  }
+
   server.close(() => {
     process.exit(0);
   });
 };
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+if (server) {
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}

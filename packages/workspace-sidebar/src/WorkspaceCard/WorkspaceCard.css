@@ -1,0 +1,103 @@
+.tk-ws-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.tk-ws-card:hover {
+  background: var(--color-bg-hover);
+}
+
+.tk-ws-card:focus-visible {
+  outline: 2px solid var(--color-accent-ring);
+  outline-offset: 2px;
+}
+
+.tk-ws-card--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.tk-ws-card[data-dragging='true'] {
+  opacity: 0.4;
+}
+
+.tk-ws-card[data-drop-target='true'] {
+  border-color: var(--color-accent-strong);
+  box-shadow: 0 0 0 1px var(--color-accent-ring);
+}
+
+.tk-ws-card--flash-notification-blue {
+  box-shadow: 0 0 0 1px var(--color-info);
+}
+
+.tk-ws-card--flash-navigation-teal {
+  box-shadow: 0 0 0 1px var(--color-info-soft);
+}
+
+.tk-ws-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tk-ws-card__title {
+  flex: 1 1 auto;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-ws-card__pin {
+  color: var(--color-accent-strong);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+.tk-ws-card__unread {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-info);
+  flex-shrink: 0;
+}
+
+.tk-ws-card__entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-ws-card__entry {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.tk-ws-card__entry-key {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.tk-ws-card__entry-value {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

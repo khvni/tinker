@@ -1,0 +1,26 @@
+.tinker-empty-pane {
+  align-items: center;
+  justify-content: center;
+}
+
+.tinker-empty-pane__card {
+  width: min(420px, 100%);
+  padding: var(--space-6);
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.tinker-empty-pane__card h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.tinker-empty-pane__card p:last-child {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+}
