@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   ClickableBadge,
+  ComposerChip,
   ConnectionGate,
   ConnectionSplash,
   ContextBadge,
@@ -13,6 +14,7 @@ import {
   Modal,
   ModelPicker,
   Progress,
+  PromptComposer,
   SearchInput,
   SegmentedControl,
   SelectFolderButton,
@@ -37,9 +39,9 @@ import {
 } from '../workspace/components/SettingsShell/index.js';
 import { AccountPanel } from '../workspace/components/AccountPanel/index.js';
 import { Titlebar } from '../workspace/components/Titlebar/index.js';
-import { AttachmentIcon } from '../panes/Chat/AttachmentIcon.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
+import type { ReasoningLevel } from '@tinker/shared-types';
 import { SignIn } from './SignIn/index.js';
 import './design-system.css';
 
@@ -665,7 +667,7 @@ const MODEL_PICKER_ITEMS: ReadonlyArray<ModelPickerItem> = [
 const ModelPickerTab = (): JSX.Element => {
   const [openValue, setOpenValue] = useState<string | undefined>('anthropic:claude-sonnet-4');
   const [mode, setMode] = useState<'build' | 'plan'>('build');
-  const [reasoning, setReasoning] = useState<'low' | 'medium' | 'high'>('medium');
+  const [reasoning, setReasoning] = useState<ReasoningLevel>('medium');
 
   return (
     <div className="ds-sections">
@@ -1198,12 +1200,7 @@ const EmptyStateTab = (): JSX.Element => (
 
 /* -------------------------- Chat ------------------------- */
 
-const CHAT_MODE_OPTIONS = [
-  { value: 'chat', label: 'Chat' },
-  { value: 'plan', label: 'Plan' },
-] as const;
-
-type ChatMode = (typeof CHAT_MODE_OPTIONS)[number]['value'];
+type ChatMode = 'chat' | 'plan';
 
 const EmptyChatIcon = (): JSX.Element => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1239,12 +1236,6 @@ const ChatPaneChrome = ({
       <section className="tinker-pane tinker-pane--chat">
         <header className="tinker-chat-header">
           <div className="tinker-chat-header__left">
-            <ModelPicker
-              items={MODEL_PICKER_ITEMS}
-              value={modelId}
-              onSelect={() => undefined}
-              emptyLabel="No models available."
-            />
             <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
               ⌥T thinking
             </span>
@@ -1256,14 +1247,6 @@ const ChatPaneChrome = ({
               windowSize={windowSize}
               model={modelName}
             />
-            <div className="tinker-chat-header__slot">
-              <SegmentedControl
-                options={[...CHAT_MODE_OPTIONS]}
-                value={mode}
-                onChange={onModeChange}
-                label="Chat mode"
-              />
-            </div>
             <Badge variant="default" size="small">
               OpenCode is ready.
             </Badge>
@@ -1299,38 +1282,25 @@ const ChatPaneChrome = ({
         </div>
 
         <div className="tinker-composer-card__wrap">
-          <div className="tinker-composer-card">
-            <div className="tinker-composer-card__body">
-              <Textarea
-                rows={4}
-                resize="none"
-                placeholder="Ask about the vault, your project, or the next change to make."
-                value={message}
-                onChange={(event) => onMessageChange(event.target.value)}
-              />
-            </div>
-            <div className="tinker-composer-card__footer">
-              <div className="tinker-composer-card__footer-left">
-                <IconButton
-                  variant="ghost"
-                  size="s"
-                  icon={<AttachmentIcon />}
-                  label="Attachments coming soon"
-                  aria-disabled
-                  disabled
+          <PromptComposer
+            value={message}
+            onChange={onMessageChange}
+            onSubmit={() => undefined}
+            attachLabel="Attachments coming soon"
+            attachDisabled
+            controls={
+              <>
+                <ComposerChip label={mode === 'plan' ? 'Plan' : 'Build'} onClick={() => onModeChange(mode === 'plan' ? 'chat' : 'plan')} />
+                <ModelPicker
+                  items={MODEL_PICKER_ITEMS}
+                  value={modelId}
+                  onSelect={() => undefined}
+                  emptyLabel="No models available."
                 />
-              </div>
-              <div className="tinker-composer-card__footer-right">
-                <Button
-                  variant="primary"
-                  size="m"
-                  disabled={message.trim().length === 0}
-                >
-                  Send message
-                </Button>
-              </div>
-            </div>
-          </div>
+                <ComposerChip label="Default" />
+              </>
+            }
+          />
         </div>
       </section>
     </div>

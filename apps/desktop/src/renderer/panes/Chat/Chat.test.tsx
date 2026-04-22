@@ -106,7 +106,7 @@ const baseProps = {
 };
 
 describe('Chat chrome', () => {
-  it('renders the chat pane chrome classes — header, log, composer card', () => {
+  it('renders the chat pane chrome classes — header, log, composer', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(<Chat {...baseProps} />);
 
@@ -115,9 +115,9 @@ describe('Chat chrome', () => {
     expect(markup).toContain('tinker-chat-header__left');
     expect(markup).toContain('tinker-chat-header__right');
     expect(markup).toContain('tinker-chat-log');
-    expect(markup).toContain('tinker-composer-card');
-    expect(markup).toContain('tinker-composer-card__body');
-    expect(markup).toContain('tinker-composer-card__footer');
+    expect(markup).toContain('tk-prompt-composer');
+    expect(markup).toContain('tk-prompt-composer__card');
+    expect(markup).toContain('tk-prompt-composer__controls');
   });
 
   it('omits the ContextBadge when no model is selected', () => {
@@ -126,42 +126,37 @@ describe('Chat chrome', () => {
     expect(markup).not.toContain('tk-context-badge');
   });
 
-  it('renders the slot container (hidden via CSS `:empty` when no slot props are passed)', () => {
+  it('renders mode + model + thinking chips under the composer', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(<Chat {...baseProps} />);
-    expect(markup).toContain('tinker-chat-header__slot');
-  });
-
-  it('renders mode toggle + reasoning picker slots when passed', () => {
-    opencodeMocks.selectedModel = undefined;
-    const markup = renderToStaticMarkup(
-      <Chat
-        {...baseProps}
-        modeToggleSlot={<span data-testid="mode-toggle">mode</span>}
-        reasoningPickerSlot={<span data-testid="reasoning">reasoning</span>}
-      />,
-    );
-
-    expect(markup).toContain('data-testid="mode-toggle"');
-    expect(markup).toContain('data-testid="reasoning"');
+    expect(markup).toContain('tk-composer-chip');
+    expect(markup).toContain('tk-modelpicker');
+    expect(markup).toContain('>Build<');
+    expect(markup).toContain('>Default<');
   });
 
   it('renders the EmptyState inside the chat log', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(<Chat {...baseProps} />);
     expect(markup).toContain('No model connected');
-    // EmptyState lives inside the chat log wrapper.
     const logIdx = markup.indexOf('tinker-chat-log');
     const titleIdx = markup.indexOf('No model connected');
     expect(logIdx).toBeGreaterThan(-1);
     expect(titleIdx).toBeGreaterThan(logIdx);
   });
 
-  it('renders the attachment-slot placeholder button disabled inside the composer card footer', () => {
+  it('renders the attachment placeholder button disabled inside the composer', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(<Chat {...baseProps} />);
     expect(markup).toContain('Attachments coming soon');
     expect(markup).toContain('aria-label="Attachments coming soon"');
     expect(markup).toContain('disabled=""');
+  });
+
+  it('renders the send button with an arrow icon', () => {
+    opencodeMocks.selectedModel = undefined;
+    const markup = renderToStaticMarkup(<Chat {...baseProps} />);
+    expect(markup).toContain('tk-prompt-composer__send');
+    expect(markup).toContain('aria-label="Send message"');
   });
 });

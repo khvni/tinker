@@ -1,0 +1,114 @@
+.tk-prompt-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.tk-prompt-composer__notice {
+  display: flex;
+  padding: 0 var(--space-1);
+}
+
+.tk-prompt-composer__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-2) var(--space-3);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.tk-prompt-composer__card:focus-within {
+  border-color: var(--color-accent-ring);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.tk-prompt-composer__card--busy {
+  border-color: var(--color-border-strong);
+}
+
+.tk-prompt-composer__card--disabled {
+  opacity: 0.8;
+}
+
+.tk-prompt-composer__card > .tk-prompt-composer__textarea {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: var(--space-2) 0;
+  min-height: calc(var(--space-6) * 3);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  resize: none;
+}
+
+.tk-prompt-composer__card > .tk-prompt-composer__textarea:hover,
+.tk-prompt-composer__card > .tk-prompt-composer__textarea:focus {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.tk-prompt-composer__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.tk-prompt-composer__attach {
+  color: var(--color-text-muted);
+}
+
+.tk-prompt-composer__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.tk-prompt-composer__send:hover:not(.tk-prompt-composer__send--disabled) {
+  background: var(--color-accent-strong);
+  color: var(--color-accent-ink);
+}
+
+.tk-prompt-composer__send:active:not(.tk-prompt-composer__send--disabled) {
+  transform: scale(0.96);
+}
+
+.tk-prompt-composer__send--busy {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+.tk-prompt-composer__send--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tk-prompt-composer__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: 0 var(--space-1);
+}

@@ -1,0 +1,58 @@
+.tk-composer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.tk-composer-chip:hover:not(.tk-composer-chip--disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-subtle);
+}
+
+.tk-composer-chip--open {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+.tk-composer-chip--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tk-composer-chip__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.tk-composer-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tk-composer-chip__chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}

@@ -13,9 +13,9 @@ export const SESSION_MODES = ['build', 'plan'] as const;
 export type SessionMode = (typeof SESSION_MODES)[number];
 export const DEFAULT_SESSION_MODE: SessionMode = 'build';
 
-export const REASONING_LEVELS = ['low', 'medium', 'high'] as const;
+export const REASONING_LEVELS = ['default', 'low', 'medium', 'high', 'xhigh'] as const;
 export type ReasoningLevel = (typeof REASONING_LEVELS)[number];
-export const DEFAULT_REASONING_LEVEL: ReasoningLevel = 'medium';
+export const DEFAULT_REASONING_LEVEL: ReasoningLevel = 'default';
 
 export type Session = {
   id: string;
