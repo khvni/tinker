@@ -67,7 +67,7 @@ Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to cur
 | 2.2 | SQLite `sessions` table + migrations in `@tinker/memory/database.ts` (columns: `id, user_id, folder_path, created_at, last_active_at, model_id`; FK `user_id → users(id)` once M8.3 lands — add the FK in the same PR if possible, else gate behind a follow-up). CRUD helpers in new `packages/memory/src/session-store.ts`. | M | 2.1, 8.3 | not started | Mirrors existing `scheduler-store` shape. |
 | 2.3 | Rust Tauri command `open_folder_picker() -> Result<String, Error>` using `tauri-plugin-dialog`. | S | — | done | TIN-17 · PR #19 merged 2026-04-21. |
 | 2.4 | Rust Tauri command `start_opencode(folder_path, user_id, memory_subdir) -> Result<OpencodeHandle, Error>` that spawns `opencode serve --cwd <folder>` with `SMART_VAULT_PATH=<memory_subdir>`. Health-poll until ready. Returns `{ baseUrl, pid }`. | M | — | done | TIN-18 · PR #20 merged 2026-04-21. 0600 manifest + detached drain task for D17 unref. Follow-up: TIN-108 to delete legacy bootstrap path. |
-| 2.5 | Rust Tauri command `stop_opencode(pid: u32)` for session close. | S | 2.4 | not started | Clean shutdown. |
+| 2.5 | Rust Tauri command `stop_opencode(pid: u32)` for session close. | S | 2.4 | review | TIN-19 · PR #25. SIGTERM → 2s grace → SIGKILL → manifest removed. Idempotent. Legacy `stop_opencode(&AppHandle)` renamed to `terminate_legacy_opencode`; full replacement follow-up TIN-108. |
 | 2.6 | First-run screen (post-sign-in): full-window "Pick a folder to start" → `<Button>Choose folder…</Button>` → folder picker → creates session bound to current user → navigates into workspace. | M | 2.2, 2.3, 2.4, 8.5 | not started | Replaces existing FirstRun.tsx. Lives in `routes/first-run.tsx`. |
 | 2.7 | Session restore: on app launch (post-auth), list sessions from SQLite **filtered by `user_id = currentUser.id`** ordered by `lastActiveAt`. If ≥1, show session switcher; if 0, show folder picker. | M | 2.2, 8.5 | not started | Simple list UI using `@tinker/design`. |
 | 2.8 | "New session" button in session switcher → folder picker → spawn OpenCode → open new Chat pane tab. | S | 2.6 | not started | Same code path as first-run. |
@@ -241,6 +241,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | Task | Linear | Priority | Status | PR | Notes |
 |------|--------|----------|--------|----|-------|
 | M2.3 Tauri command `open_folder_picker` | TIN-17 | p1 | review | #19 | `apps/desktop/src-tauri/src/commands/dialog.rs`, typed wrapper in `apps/desktop/src/bindings.ts` |
+| M2.5 Tauri command `stop_opencode` | TIN-19 | p1 | review | #25 | SIGTERM → 2s grace → SIGKILL → manifest removed. Idempotent; rejects `pid == 0`. Legacy lib.rs helper renamed to `terminate_legacy_opencode`. |
 
 ## How to Update This File
 
