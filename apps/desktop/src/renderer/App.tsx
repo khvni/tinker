@@ -469,7 +469,6 @@ export const App = (): JSX.Element => {
     currentUserState.status === 'ready' ? currentUserState.sessions : EMPTY_AUTH_STATUS,
     nativeRuntime,
     state.status,
-    state.status === 'ready' ? state.opencode.baseUrl : null,
     state.status === 'ready' ? state.vaultPath : null,
   ]);
 
