@@ -1,25 +1,36 @@
 import { getRenderer, registerPane } from './pane-registry.js';
+import { registerFilePane } from '../panes/FilePane/index.js';
 import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
 
-const isMissingChatPaneError = (error: unknown): boolean => {
+const isMissingPaneError = (kind: 'chat' | 'file', error: unknown): boolean => {
   return (
     error instanceof Error &&
-    error.message.startsWith('getRenderer: no renderer registered for pane kind "chat".')
+    error.message.startsWith(`getRenderer: no renderer registered for pane kind "${kind}".`)
   );
 };
 
-export const registerWorkspacePanes = (): void => {
+const ensurePaneRegistered = (kind: 'chat' | 'file', register: () => void): void => {
   try {
-    getRenderer('chat');
+    getRenderer(kind);
     return;
   } catch (error) {
-    if (!isMissingChatPaneError(error)) {
+    if (!isMissingPaneError(kind, error)) {
       throw error;
     }
   }
 
-  registerPane('chat', (data) => {
-    void data;
-    return <RegisteredChatPane />;
+  register();
+};
+
+export const registerWorkspacePanes = (): void => {
+  ensurePaneRegistered('chat', () => {
+    registerPane('chat', (data) => {
+      void data;
+      return <RegisteredChatPane />;
+    });
+  });
+
+  ensurePaneRegistered('file', () => {
+    registerFilePane();
   });
 };
