@@ -2,6 +2,24 @@
   position: relative;
 }
 
+.tinker-settings__section {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.tinker-settings__section-header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tinker-settings__section-header h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
 .tinker-settings__memory-row {
   display: flex;
   align-items: flex-start;

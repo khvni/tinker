@@ -27,6 +27,11 @@ import {
   type MCPStatus,
 } from './integrations.js';
 import { FirstRun } from './panes/FirstRun.js';
+import {
+  SettingsConnectionProvider,
+  type AccountUser,
+  type SettingsConnectionValue,
+} from './panes/Settings/index.js';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
 import { SignIn } from './routes/SignIn/index.js';
 import { isTauriRuntime, WEB_PREVIEW_NOTICE } from './runtime.js';
@@ -104,11 +109,27 @@ const createLocalUser = (): User => {
   };
 };
 
+const pickCurrentSession = (sessions: SSOStatus): SSOSession | null => {
+  return sessions.google ?? sessions.github ?? sessions.microsoft;
+};
+
 const pickCurrentUserId = (sessions: SSOStatus): User['id'] => {
-  const activeSession = sessions.google ?? sessions.github ?? sessions.microsoft;
+  const activeSession = pickCurrentSession(sessions);
   return activeSession
     ? buildStoredUserId(activeSession.provider, activeSession.userId)
     : DEFAULT_USER_ID;
+};
+
+const toAccountUser = (session: SSOSession | null): AccountUser | null => {
+  if (!session) {
+    return null;
+  }
+  return {
+    displayName: session.displayName,
+    ...(session.email ? { email: session.email } : {}),
+    ...(session.avatarUrl ? { avatarUrl: session.avatarUrl } : {}),
+    provider: session.provider,
+  };
 };
 
 const toStoredUser = (session: SSOSession): User => {
@@ -296,6 +317,8 @@ export const App = (): JSX.Element => {
   const [providerMessages, setProviderMessages] = useState<ProviderMessageState>(EMPTY_PROVIDER_MESSAGES);
   const [memorySweepState, setMemorySweepState] = useState<MemoryRunState | null>(null);
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const [signOutMessage, setSignOutMessage] = useState<string | null>(null);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
 
   const requireNativeRuntime = (action: string): void => {
@@ -901,6 +924,52 @@ export const App = (): JSX.Element => {
     }
   };
 
+  const handleSignOut = async (): Promise<void> => {
+    if (state.status !== 'ready') {
+      return;
+    }
+
+    const connected = (['google', 'github', 'microsoft'] as const).filter(
+      (provider) => state.sessions[provider] !== null,
+    );
+
+    if (connected.length === 0) {
+      setSignOutMessage('No active session.');
+      return;
+    }
+
+    setSignOutBusy(true);
+    setSignOutMessage(null);
+
+    try {
+      requireNativeRuntime('Signing out');
+      for (const provider of connected) {
+        await invoke('auth_sign_out', { provider });
+      }
+
+      if (connected.includes('github')) {
+        await refreshWorkspaceConnection();
+      } else {
+        const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
+        setState((current) =>
+          current.status !== 'ready'
+            ? current
+            : {
+                ...current,
+                sessions: nextState.sessions,
+                modelConnected: nextState.modelConnected,
+              },
+        );
+      }
+
+      setProviderMessages(EMPTY_PROVIDER_MESSAGES);
+    } catch (error) {
+      setSignOutMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSignOutBusy(false);
+    }
+  };
+
   const handleCreateVault = async (): Promise<void> => {
     requireNativeRuntime('Creating the default vault');
     await setVaultPath({
@@ -949,6 +1018,36 @@ export const App = (): JSX.Element => {
   const signInGateVisible = nativeRuntime && !hasSignedIn;
   const workspaceAvailable = nativeRuntime && state.onboarded && hasSignedIn;
   const currentUserId = pickCurrentUserId(state.sessions);
+  const currentAccountUser = toAccountUser(pickCurrentSession(state.sessions));
+
+  const settingsConnectionValue: SettingsConnectionValue = {
+    modelConnected: state.modelConnected,
+    modelAuthBusy,
+    modelAuthMessage,
+    googleAuthBusy: providerBusy.google,
+    googleAuthMessage: providerMessages.google,
+    githubAuthBusy: providerBusy.github,
+    githubAuthMessage: providerMessages.github,
+    microsoftAuthBusy: providerBusy.microsoft,
+    microsoftAuthMessage: providerMessages.microsoft,
+    sessions: state.sessions,
+    mcpStatus: state.mcpStatus,
+    vaultPath: state.vaultPath,
+    currentUser: currentAccountUser,
+    signOutBusy,
+    signOutMessage,
+    onConnectModel: handleConnectModel,
+    onConnectGoogle: () => handleProviderConnect('google'),
+    onConnectGithub: () => handleProviderConnect('github'),
+    onConnectMicrosoft: () => handleProviderConnect('microsoft'),
+    onDisconnectModel: handleDisconnectModel,
+    onDisconnectGoogle: () => handleProviderDisconnect('google'),
+    onDisconnectGithub: () => handleProviderDisconnect('github'),
+    onDisconnectMicrosoft: () => handleProviderDisconnect('microsoft'),
+    onCreateVault: handleCreateVault,
+    onSelectVault: handlePickVault,
+    onSignOut: handleSignOut,
+  };
 
   if (signInGateVisible) {
     return (
@@ -989,6 +1088,7 @@ export const App = (): JSX.Element => {
           onContinue={finishOnboarding}
         />
       ) : (
+        <SettingsConnectionProvider value={settingsConnectionValue}>
         <Workspace
           key={currentUserId}
           currentUserId={currentUserId}
@@ -1030,6 +1130,7 @@ export const App = (): JSX.Element => {
           onRunMemorySweep={handleRunMemorySweep}
           onMemoryCommitted={handleMemoryCommitted}
         />
+        </SettingsConnectionProvider>
       )}
     </div>
   );

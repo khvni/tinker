@@ -1,8 +1,13 @@
-import type { JSX } from 'react';
-import { Button, Toggle } from '@tinker/design';
-import type { SSOStatus, WorkspacePreferences } from '@tinker/shared-types';
+import type { JSX, ReactNode } from 'react';
+import { Button } from '@tinker/design';
+import type { SSOStatus } from '@tinker/shared-types';
 import type { MCPStatus } from '../../integrations.js';
 import { IntegrationsStrip } from '../../components/IntegrationsStrip.js';
+import {
+  SettingsShell,
+  type SettingsShellSection,
+} from '../../workspace/components/SettingsShell/index.js';
+import { Account, type AccountUser } from './sections/Account/index.js';
 import { useMemoryRootControls } from './useMemoryRootControls.js';
 import './Settings.css';
 
@@ -19,6 +24,9 @@ type SettingsProps = {
   sessions: SSOStatus;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
+  currentUser: AccountUser | null;
+  signOutBusy: boolean;
+  signOutMessage: string | null;
   onConnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
   onConnectGithub(): Promise<void>;
@@ -29,8 +37,8 @@ type SettingsProps = {
   onDisconnectMicrosoft(): Promise<void>;
   onCreateVault(): Promise<void>;
   onSelectVault(): Promise<void>;
-  workspacePreferences: WorkspacePreferences;
-  onWorkspacePreferencesChange(nextPreferences: WorkspacePreferences): void;
+  onSignOut(): Promise<void> | void;
+  defaultActiveSectionId?: string;
 };
 
 const getProgressPercent = (copiedFiles: number, totalFiles: number): number => {
@@ -64,30 +72,21 @@ export const Settings = ({
   onSelectVault,
   sessions,
   vaultPath,
-  workspacePreferences,
-  onWorkspacePreferencesChange,
+  currentUser,
+  signOutBusy,
+  signOutMessage,
+  onSignOut,
+  defaultActiveSectionId,
 }: SettingsProps): JSX.Element => {
   const { changeMemoryRoot, memoryRoot, memoryRootBusy, moveProgress, notice } = useMemoryRootControls();
   const progressPercent = moveProgress ? getProgressPercent(moveProgress.copiedFiles, moveProgress.totalFiles) : 0;
 
-  return (
-    <section className="tinker-pane tinker-settings">
-      <header className="tinker-pane-header">
-        <div>
-          <p className="tinker-eyebrow">Settings</p>
-          <h2>Connections and storage</h2>
-        </div>
+  const connectionsContent: ReactNode = (
+    <div className="tinker-settings__section">
+      <header className="tinker-settings__section-header">
+        <p className="tinker-eyebrow">Connections</p>
+        <h2>Connections and storage</h2>
       </header>
-
-      {notice ? (
-        <div
-          className={`tinker-settings__notice tinker-settings__notice--${notice.kind}`}
-          role={notice.kind === 'error' ? 'alert' : 'status'}
-          aria-live="polite"
-        >
-          <p>{notice.message}</p>
-        </div>
-      ) : null}
 
       <div className="tinker-list">
         <article className="tinker-list-item">
@@ -202,28 +201,50 @@ export const Settings = ({
             </p>
           </div>
         </article>
-
-        <article className="tinker-list-item">
-          <h3>Workspace</h3>
-          <p className="tinker-muted">Agent-written files open automatically by default. Turn it off if you want manual review first.</p>
-          <div className="tinker-inline-actions" style={{ gap: 'var(--space-3)' }}>
-            <Toggle
-              checked={workspacePreferences.autoOpenAgentWrittenFiles}
-              onChange={(next) =>
-                onWorkspacePreferencesChange({
-                  autoOpenAgentWrittenFiles: next,
-                })
-              }
-              label="Auto-open agent-written files"
-            />
-            <span className="tinker-muted">
-              Auto-open agent-written files: {workspacePreferences.autoOpenAgentWrittenFiles ? 'On' : 'Off'}
-            </span>
-          </div>
-        </article>
       </div>
 
       <IntegrationsStrip mcpStatus={mcpStatus} sessions={sessions} />
+    </div>
+  );
+
+  const sections: ReadonlyArray<SettingsShellSection> = [
+    {
+      id: 'account',
+      label: 'Account',
+      content: (
+        <div className="tinker-settings__section">
+          <Account
+            user={currentUser}
+            onSignOut={onSignOut}
+            busy={signOutBusy}
+            message={signOutMessage}
+          />
+        </div>
+      ),
+    },
+    {
+      id: 'connections',
+      label: 'Connections',
+      content: connectionsContent,
+    },
+  ];
+
+  return (
+    <section className="tinker-pane tinker-settings">
+      {notice ? (
+        <div
+          className={`tinker-settings__notice tinker-settings__notice--${notice.kind}`}
+          role={notice.kind === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <p>{notice.message}</p>
+        </div>
+      ) : null}
+
+      <SettingsShell
+        sections={sections}
+        {...(defaultActiveSectionId ? { defaultActiveSectionId } : {})}
+      />
 
       {moveProgress ? (
         <div className="tinker-settings__move-backdrop">

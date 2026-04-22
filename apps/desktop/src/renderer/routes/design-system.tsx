@@ -37,8 +37,16 @@ import {
 import { AttachmentIcon } from '../panes/Chat/AttachmentIcon.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
+import { Account, type AccountUser } from '../panes/Settings/sections/Account/index.js';
 import { SignIn } from './SignIn/index.js';
 import './design-system.css';
+
+const DEMO_ACCOUNT_USER: AccountUser = {
+  displayName: 'Ada Lovelace',
+  email: 'ada@example.com',
+  avatarUrl: 'https://i.pravatar.cc/96?u=tinker-demo-ada',
+  provider: 'google',
+};
 
 type PlaygroundTab =
   | 'colors'
@@ -51,6 +59,7 @@ type PlaygroundTab =
   | 'empty'
   | 'chat'
   | 'settings-shell'
+  | 'account'
   | 'sign-in';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
@@ -64,6 +73,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
   { value: 'settings-shell', label: 'Settings Shell' },
+  { value: 'account', label: 'Account' },
   { value: 'sign-in', label: 'Sign In' },
 ];
 
@@ -1412,16 +1422,9 @@ const SETTINGS_SECTIONS: ReadonlyArray<SettingsShellSection> = [
     label: 'Account',
     icon: <UserIcon />,
     content: (
-      <SettingsSectionBody
-        eyebrow="Identity"
-        title="Account"
-        lede="Identity, providers, and sign-in handled by Better Auth."
-      >
-        <div className="ds-settings-card">
-          <p className="ds-settings-card__label">Signed in as</p>
-          <p className="ds-settings-card__value">khani@berkeley.edu</p>
-        </div>
-      </SettingsSectionBody>
+      <div className="ds-settings-body">
+        <Account user={DEMO_ACCOUNT_USER} onSignOut={() => undefined} />
+      </div>
     ),
   },
   {
@@ -1489,6 +1492,50 @@ const SettingsShellTab = (): JSX.Element => (
   </div>
 );
 
+const AccountTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="Signed in (Google)">
+      <div className="ds-settings-frame">
+        <div className="ds-settings-body">
+          <Account user={DEMO_ACCOUNT_USER} onSignOut={() => undefined} />
+        </div>
+      </div>
+    </Section>
+
+    <Section label="Signed in — signing out (busy)">
+      <div className="ds-settings-frame">
+        <div className="ds-settings-body">
+          <Account
+            user={DEMO_ACCOUNT_USER}
+            onSignOut={() => undefined}
+            busy
+            message="Clearing keychain…"
+          />
+        </div>
+      </div>
+    </Section>
+
+    <Section label="No avatar — initials fallback (GitHub)">
+      <div className="ds-settings-frame">
+        <div className="ds-settings-body">
+          <Account
+            user={{ displayName: 'Grace Hopper', email: 'grace@example.com', provider: 'github' }}
+            onSignOut={() => undefined}
+          />
+        </div>
+      </div>
+    </Section>
+
+    <Section label="Not signed in">
+      <div className="ds-settings-frame">
+        <div className="ds-settings-body">
+          <Account user={null} onSignOut={() => undefined} />
+        </div>
+      </div>
+    </Section>
+  </div>
+);
+
 const SignInTab = (): JSX.Element => (
   <div className="ds-sections">
     <Section label="Idle (provider picker)">
@@ -1537,6 +1584,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ChatTab />;
     case 'settings-shell':
       return <SettingsShellTab />;
+    case 'account':
+      return <AccountTab />;
     case 'sign-in':
       return <SignInTab />;
   }

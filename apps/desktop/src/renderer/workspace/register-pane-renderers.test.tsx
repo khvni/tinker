@@ -8,7 +8,7 @@ describe('registerWorkspacePaneRenderers', () => {
     resetPaneRegistry();
   });
 
-  it('registers friendly settings and memory placeholder panes', () => {
+  it('registers the connected settings pane and memory placeholder', () => {
     registerWorkspacePaneRenderers();
     expect(() => registerWorkspacePaneRenderers()).not.toThrow();
 
@@ -17,8 +17,7 @@ describe('registerWorkspacePaneRenderers', () => {
     );
     const memoryMarkup = renderToStaticMarkup(<>{getRenderer('memory')({ kind: 'memory' })}</>);
 
-    expect(settingsMarkup).toContain('Settings panel coming soon');
-    expect(settingsMarkup).toContain('workspace controls');
+    expect(settingsMarkup).toContain('Settings unavailable');
     expect(memoryMarkup).toContain('Memory view coming soon');
     expect(memoryMarkup).toContain('cross-session recall');
   });
