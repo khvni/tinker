@@ -58,10 +58,6 @@ const ImageFileRenderer: FileRenderer = ({ path }) => {
   return <ImageRenderer path={path} />;
 };
 
-const XlsxFileRenderer: FileRenderer = ({ path, mime }) => {
-  return <XlsxRenderer params={toParams(path, mime)} />;
-};
-
 const PdfFileRenderer: FileRenderer = ({ path }) => {
   return (
     <Suspense fallback={<FilePaneLoadingState label="Loading PDF preview…" path={path} />}>
@@ -128,7 +124,6 @@ const IMAGE_MIME_TYPES = [
   'image/webp',
 ] as const;
 
-const XLSX_MIME_TYPES = [XLSX_MIME] as const;
 const PPTX_MIME_TYPES = [
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',

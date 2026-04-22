@@ -1,6 +1,6 @@
 import { createContext, useContext, type ComponentProps } from 'react';
 import type { Session } from '@tinker/shared-types';
-import { Chat } from '../panes/Chat/index.js';
+import type { Chat } from '../panes/Chat/index.js';
 
 export type ChatPaneRuntime = Omit<
   ComponentProps<typeof Chat>,

@@ -187,7 +187,7 @@ const ensureLayoutTableShape = async (database: Database): Promise<void> => {
   await database.execute(`DROP TABLE ${LEGACY_LAYOUT_TABLE}`);
 
   if (dropped > 0) {
-    console.info(`Layout migration: dropped ${dropped} old ${LEGACY_LAYOUT_BRAND} snapshots`);
+    console.warn(`Layout migration: dropped ${dropped} old ${LEGACY_LAYOUT_BRAND} snapshots`);
   }
 };
 

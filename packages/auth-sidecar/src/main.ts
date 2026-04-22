@@ -621,7 +621,9 @@ const logoutAuthSession = async (request: Request): Promise<Response> => {
     if (isRecord(body) && typeof body.ticket === 'string' && body.ticket.trim().length > 0) {
       authTickets.delete(body.ticket);
     }
-  } catch {}
+  } catch {
+    // Malformed JSON body — treat as a no-op revoke, caller still gets 204.
+  }
 
   return new Response(null, { status: 204 });
 };

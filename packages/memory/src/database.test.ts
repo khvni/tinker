@@ -1,4 +1,5 @@
-import Database, { type QueryResult } from '@tauri-apps/plugin-sql';
+import type Database from '@tauri-apps/plugin-sql';
+import type { QueryResult } from '@tauri-apps/plugin-sql';
 import { describe, expect, it, vi } from 'vitest';
 import { DATABASE_SCHEMA, ensureSessionTableColumns } from './database.js';
 
