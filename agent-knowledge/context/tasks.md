@@ -230,6 +230,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 |--------|---------|-------|--------|-------|
 | TIN-112 | 02 | Playbook shared skill schema + markdown frontmatter spec | review | PR #46 |
 | TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
+| TIN-176 | UI.1 | Paper design source audit + tokens.css parity report | review | `agent-knowledge/reference/paper-design-audit.md`. Dark tokens 1:1 match; light surface tokens drift (D23 layer reversal inverted in code). Blocks downstream UI cleanup chain. |
 
 ## Rejected (not coming back)
 
