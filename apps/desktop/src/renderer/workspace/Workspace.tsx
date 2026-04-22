@@ -13,7 +13,8 @@ import {
   type WorkspacePreferences,
 } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, type OpencodeConnection } from '../../bindings.js';
-import { IntegrationsStrip, type MCPStatus } from '../components/IntegrationsStrip.js';
+import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
+import type { MCPStatus } from '../integrations.js';
 import { Chat } from '../panes/Chat.js';
 import { Playbook } from '../panes/Playbook.js';
 import { SchedulerPane } from '../panes/SchedulerPane.js';
@@ -27,6 +28,7 @@ import { ImageRenderer } from '../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../renderers/MarkdownEditor.js';
 import { MarkdownRenderer } from '../renderers/MarkdownRenderer.js';
 import { isAbsolutePath } from '../renderers/file-utils.js';
+import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
 import { DockviewApiContext } from './DockviewContext.js';
 import { openNewChatPanel } from './chat-panels.js';
 import { openWorkspaceFile } from './file-open.js';
@@ -382,6 +384,29 @@ export const Workspace = ({
     ],
   );
 
+  const chatPaneRuntime = useMemo(
+    () => ({
+      skillStore,
+      modelConnected,
+      opencode,
+      vaultPath,
+      activeSkillsRevision,
+      onFileWritten: handleAgentFileWritten,
+      onOpenNewChat: openNewChatPane,
+      onMemoryCommitted,
+    }),
+    [
+      activeSkillsRevision,
+      handleAgentFileWritten,
+      modelConnected,
+      onMemoryCommitted,
+      openNewChatPane,
+      opencode,
+      skillStore,
+      vaultPath,
+    ],
+  );
+
   const onReady = (event: DockviewReadyEvent): void => {
     dockviewApiRef.current = event.api;
 
@@ -524,9 +549,15 @@ export const Workspace = ({
         <IntegrationsStrip compact mcpStatus={mcpStatus} sessions={sessions} />
       </div>
 
-      <DockviewApiContext.Provider value={dockviewApi}>
-        <DockviewReact className="dockview-theme-abyss tinker-dockview" components={components} onReady={onReady} />
-      </DockviewApiContext.Provider>
+      <ChatPaneRuntimeContext.Provider value={chatPaneRuntime}>
+        <DockviewApiContext.Provider value={dockviewApi}>
+          <DockviewReact
+            className="dockview-theme-abyss tinker-dockview"
+            components={components}
+            onReady={onReady}
+          />
+        </DockviewApiContext.Provider>
+      </ChatPaneRuntimeContext.Provider>
     </main>
   );
 };

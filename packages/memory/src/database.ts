@@ -4,7 +4,7 @@ const DEFAULT_SQL_URL = 'sqlite:tinker.db';
 
 let databasePromise: Promise<Database> | null = null;
 
-const schema = [
+export const DATABASE_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS entities (
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL,
@@ -38,6 +38,18 @@ const schema = [
     value_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    provider_user_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    avatar_url TEXT,
+    email TEXT,
+    created_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS users_provider_provider_user_id_idx
+    ON users (provider, provider_user_id)`,
   `CREATE TABLE IF NOT EXISTS skills (
     slug TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -106,7 +118,7 @@ const schema = [
 export const getDatabase = async (sqlUrl = DEFAULT_SQL_URL): Promise<Database> => {
   if (!databasePromise) {
     databasePromise = Database.load(sqlUrl).then(async (database) => {
-      for (const statement of schema) {
+      for (const statement of DATABASE_SCHEMA) {
         await database.execute(statement);
       }
       return database;

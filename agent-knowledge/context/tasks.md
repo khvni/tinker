@@ -49,9 +49,9 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 |----|------|------|------------|--------|-------|
 | 1.1 | Define `TinkerPaneKind` union in `@tinker/shared-types`: `'chat' \| 'file' \| 'settings' \| 'memory'`. Typed `TinkerPaneData` discriminated union. | S | — | done | TIN-5 · PR #14 merged 2026-04-21. |
 | 1.2 | Create `workspace/pane-registry.ts` implementing `PaneRegistry<TinkerPaneKind>`. Export `registerPane(kind, render)` + `getRenderer(kind)`. | S | 1.1 | done | TIN-6 · PR #21 merged 2026-04-22. Legacy Dockview surface kept until M1.7/M1.8. |
-| 1.3 | Register `{ kind: 'chat' }` → existing `<Chat>` component. No Chat-component internals change. | S | 1.2 | not started | Pure registration. |
-| 1.4 | Register `{ kind: 'file', data: { path, mime } }` → single dispatch component that reads `mime` and picks renderer. | S | 1.2 | not started | Unifies 6 file-renderer panes. |
-| 1.5 | Register `{ kind: 'settings' }` + `{ kind: 'memory' }` placeholders (render empty `<EmptyPane/>` until filled by M5/M6). | S | 1.2 | not started | Clears registry surface. |
+| 1.3 | Register `{ kind: 'chat' }` → existing `<Chat>` component. No Chat-component internals change. | S | 1.2 | review | TIN-12 · PR #35. Boot-time registration via `register-panes.tsx`; `Chat.tsx` unchanged. |
+| 1.4 | Register `{ kind: 'file', data: { path, mime } }` → single dispatch component that reads `mime` and picks renderer. | S | 1.2 | review | TIN-13 · PR #38 |
+| 1.5 | Register `{ kind: 'settings' }` + `{ kind: 'memory' }` placeholders (render empty `<EmptyPane/>` until filled by M5/M6). | S | 1.2 | review | TIN-7 · PR #37 |
 | 1.6 | Rewrite `layout.default.ts` → returns `WorkspaceState<TinkerPaneData>` with a single Chat pane. No split, no secondary pane. | S | 1.3 | not started | MVP default = just Chat. |
 | 1.7 | Swap `Workspace.tsx` internals: replace `<DockviewReact>` with `<Workspace>` from `@tinker/panes/react`. Read + write `WorkspaceState` via `@tinker/memory/layout-store` (already exists). | M | 1.3, 1.4, 1.5, 1.6 | not started | Dockview gone from the render tree. |
 | 1.8 | Delete `workspace/DockviewContext.ts`, `workspace/chat-panels.ts` + callers. Delete Dockview CSS imports. | S | 1.7 | not started | Quarantine cleanup. |
@@ -105,7 +105,7 @@ Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
 | 4.5 | Tool-call blocks: parse OpenCode event stream for `tool.use` events. Render as collapsed `▸ used <tool-name>` disclosure. Expands on click. Hidden by default. | M | 4.2 | not started | Matches OpenCode Desktop behavior. |
 | 4.6 | Thinking/reasoning blocks: same disclosure pattern. Hidden by default. Keyboard shortcut `⌥T` toggles all. | S | 4.5 | not started | Parity feature. |
 | 4.7 | `<ModelPicker>` primitive in `@tinker/design` per 4.1 findings. Dropdown + search input + keyboard nav + provider/model/context-window rows. | L | 4.1 | done | TIN-44 · PR #32 merged 2026-04-22. Folder `ModelPicker/` (Trigger + Panel + CSS + tests). Substring filter; fuzzysort deferred. Follow-up tickets: Ctrl+N/P + click-outside scrollbar gap + ARIA combobox upgrade. |
-| 4.8 | Wire ModelPicker to `opencode.config.providers()` SDK call. Group by provider. | M | 4.7 | not started | Data binding. |
+| 4.8 | Wire ModelPicker to `opencode.config.providers()` SDK call. Group by provider. | M | 4.7 | review | TIN-45 · PR #43. Chat composer picker now loads from SDK, applies selected `{ providerID, modelID }` on prompt, and handles zero-provider empty state. |
 | 4.9 | Persist selected model per-session in SQLite `sessions.model_id`. New session inherits last-used model. | S | 4.8, 2.2 | not started | Cross-pillar touch. |
 | 4.10 | Parity verification: side-by-side with OpenCode Desktop from 4.1. Checklist in PR description. | S | 4.9 | not started | Review-as-task. |
 | 4.11 | Input box: multi-line `<Textarea>` (already shipped). `Enter` submits, `Shift+Enter` newline, disabled while streaming, `Escape` calls `session.abort()`. Auto-resize up to 10 lines. | M | 4.2 | not started | Composer. |
@@ -122,7 +122,7 @@ Spec: [[25-mvp-context-badge]] · Depends on: M4.2
 | 5.1 | **Research**: locate OpenCode SDK field for per-session token usage + model context window. Deliverable: 1-page `agent-knowledge/reference/opencode-sdk-usage.md` with exact field paths + example payload. | S | — | done | TIN-53 · PR #16 merged 2026-04-21. |
 | 5.2 | `<ContextBadge percent={n} tokens={used} windowSize={max} model={name} />` primitive in `@tinker/design`. Pill w/ percent. Color: green <50%, amber 50–80%, red >80%. Tooltip w/ exact counts. | M | 5.1 | done | TIN-54 · PR #22 merged 2026-04-22. Pure visual + playground. |
 | 5.3 | Wire badge into Chat pane header. Subscribes to same SSE stream as chat; recomputes on each message. | S | 5.2, 4.4 | not started | One call site. |
-| 5.4 | Playground entry in `routes/design-system.tsx` with three states (low/mid/high). Per D14 canonical rule. | S | 5.2 | not started | Design-system hygiene. |
+| 5.4 | Playground entry in `routes/design-system.tsx` with three states (low/mid/high). Per D14 canonical rule. | S | 5.2 | review | TIN-56 · PR #40. |
 
 ### M6 — Memory as desktop-native filesystem (per-user subdir)
 Spec: [[26-mvp-memory-filesystem]] · Depends on: M1.5, M8.3 (current user resolved)
@@ -145,7 +145,7 @@ Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | 7.1 | Strip `opencode.json` → only `qmd`, `smart-connections`, `exa`. Remove `github`, `linear` (additional MCP integrations deferred). Keep `better-auth` entry ONLY if the Better Auth sidecar needs it — otherwise remove (Better Auth in MVP is a local sidecar, not an MCP). | S | — | done | TIN-66 · PR #26 merged 2026-04-22. |
-| 7.2 | Ensure `exa` works zero-config: it's remote, no env needed. Add boot-time check that calls exa's health MCP. | S | 7.1 | not started | Verify. |
+| 7.2 | Ensure `exa` works zero-config: it's remote, no env needed. Add boot-time check that calls exa's health MCP. | S | 7.1 | review | TIN-67 · PR #42 opened 2026-04-21. |
 | 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` = `<memory_root>/<current-user-id>/` from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | not started | Env var injection at spawn. |
 | 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = same per-user subdir from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | not started | Mirror of 7.3. |
 | 7.5 | Settings pane: "Integrations" section lists 3 MCPs with status (connected/error). Calls OpenCode SDK `mcp.list()` on mount. | M | 7.1, 6.5 | not started | Status only, no config. |
@@ -160,8 +160,13 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 |----|------|------|------------|--------|-------|
 | 8.1 | **Research**: confirm Better Auth v1 config shape for Google + GitHub + Microsoft providers on a Tauri desktop app — loopback redirect URI format, PKCE flow, session/refresh-token handoff. Deliverable: `agent-knowledge/reference/better-auth-config.md` with exact config snippets + redirect URI registrations per provider. | M | — | done | TIN-74 · PR #23 merged 2026-04-22. Unblocks 8.2–8.4. |
 | 8.2 | Add `User` type in `@tinker/shared-types`: `{ id, provider, providerUserId, displayName, avatarUrl?: string, email?: string, createdAt, lastSeenAt }`. | S | — | done | TIN-75 · PR #27 merged 2026-04-22. |
-| 8.3 | SQLite `users` table in `@tinker/memory/database.ts` (columns mirror `User` type, unique composite index on `(provider, provider_user_id)`). CRUD helpers in new `packages/memory/src/user-store.ts`. | M | 8.2 | not started | Seeds on every successful sign-in (upsert). |
+<<<<<<< HEAD
+| 8.3 | SQLite `users` table in `@tinker/memory/database.ts` (columns mirror `User` type, unique composite index on `(provider, provider_user_id)`). CRUD helpers in new `packages/memory/src/user-store.ts`. | M | 8.2 | review | TIN-76 · PR #36 opened 2026-04-22. Seeds on every successful sign-in (upsert). |
 | 8.4 | `@tinker/auth-sidecar` wire Google provider per 8.1: provider config, loopback URI, PKCE flow, callback handler. Sidecar exposes HTTP endpoints `POST /auth/start`, `GET /auth/callback`, `POST /auth/logout`, `GET /auth/session`. | M | 8.1 | review | TIN-77 · PR #48. Sidecar now uses ticketed `/auth/*` polling flow; Rust callback listener deleted. |
+=======
+| 8.3 | SQLite `users` table in `@tinker/memory/database.ts` (columns mirror `User` type, unique composite index on `(provider, provider_user_id)`). CRUD helpers in new `packages/memory/src/user-store.ts`. | M | 8.2 | review | TIN-76 · PR #36 opened 2026-04-22. Seeds on every successful sign-in (upsert). |
+| 8.4 | `@tinker/auth-sidecar` wire Google provider per 8.1: provider config, loopback URI, PKCE flow, callback handler. Sidecar exposes HTTP endpoints `POST /auth/start`, `GET /auth/callback`, `POST /auth/logout`, `GET /auth/session`. | M | 8.1 | not started | Extend existing `packages/auth-sidecar/src/main.ts`. |
+>>>>>>> origin/main
 | 8.5 | `@tinker/auth-sidecar` wire GitHub provider per 8.1. | S | 8.4 | not started | Config-only once 8.4 lands. |
 | 8.6 | `@tinker/auth-sidecar` wire Microsoft (consumer) provider per 8.1. | S | 8.4 | not started | Consumer/personal only. No tenant federation. |
 | 8.7 | Rust Tauri command `start_auth_sidecar() -> Result<AuthHandle, Error>` spawns the auth sidecar + returns base URL. Rust binds OS-level loopback redirect URIs needed by the sidecar (Google, GitHub, Microsoft). | M | 8.4 | not started | Mirrors OpenCode sidecar lifecycle (coordinator pattern D22). |
@@ -221,6 +226,13 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | 13 | Vertical workspace sidebar | [[13-workspace-sidebar]] | Depends on multi-workspace UX which MVP doesn't have. |
 | 14 | Session history windowing | [[14-session-history-windowing]] | Perf feature. Revisit at >1000 messages/session. |
 | 15 | Connection gate (full splash + retry) | [[15-connection-gate]] | Minimal variant in M7.8 covers MVP. |
+
+### Post-MVP active slices
+
+| Ticket | Feature | Scope | Status | Notes |
+|--------|---------|-------|--------|-------|
+| TIN-112 | 02 | Playbook shared skill schema + markdown frontmatter spec | review | PR #46 |
+| TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
 
 ## Rejected (not coming back)
 

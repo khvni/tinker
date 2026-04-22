@@ -1,16 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Skill } from '@tinker/shared-types';
+import { DEFAULT_SKILL_VERSION, type Skill } from '@tinker/shared-types';
 import { buildSkillContext, injectActiveSkills } from './skill-injector.js';
 
 const makeSkill = (overrides: Partial<Skill>): Skill => ({
+  id: 'example',
   slug: 'example',
   title: 'Example',
+  role: null,
   description: 'Describes example',
   tools: [],
   tags: [],
+  version: DEFAULT_SKILL_VERSION,
+  author: null,
   body: '# Example\n\nDo the thing.',
   relativePath: '.tinker/skills/example.md',
-  frontmatter: { name: 'example', description: 'Describes example' },
+  frontmatter: { id: 'example', title: 'Example', version: DEFAULT_SKILL_VERSION, description: 'Describes example' },
   lastModified: '2026-04-15T00:00:00.000Z',
   active: false,
   installedAt: '2026-04-15T00:00:00.000Z',

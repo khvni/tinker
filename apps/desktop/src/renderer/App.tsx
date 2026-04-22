@@ -11,15 +11,21 @@ import {
   createSkillStore,
   createVaultService,
   indexVault,
+  upsertUser,
   type MemoryRunState,
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
-import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, VaultConfig } from '@tinker/shared-types';
+import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User, VaultConfig } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, ONBOARDING_KEY, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
-import type { MCPStatus } from './components/IntegrationsStrip.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
+import {
+  checkExaBootHealth,
+  EXA_CHECKING_STATUS,
+  EXA_MCP_NAME,
+  type MCPStatus,
+} from './integrations.js';
 import { FirstRun } from './panes/FirstRun.js';
-import { createWorkspaceClient, getOpencodeDirectory, OPENCODE_OPENAI_PROVIDER_ID } from './opencode.js';
+import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
 import { isTauriRuntime, WEB_PREVIEW_NOTICE } from './runtime.js';
 import { Workspace } from './workspace/Workspace.js';
 
@@ -51,13 +57,31 @@ type ProviderMessageState = Record<AuthProvider, string | null>;
 const MODEL_CONNECT_POLL_INTERVAL_MS = 1_500;
 const MODEL_CONNECT_TIMEOUT_MS = 180_000;
 const VAULT_REINDEX_DEBOUNCE_MS = 300;
-const OPENCODE_AUTH_HOST = 'auth.openai.com';
 const EMPTY_PROVIDER_BUSY: ProviderBusyState = { google: false, github: false };
 const EMPTY_PROVIDER_MESSAGES: ProviderMessageState = { google: null, github: null };
 const WEB_PREVIEW_CONNECTION: OpencodeConnection = {
   baseUrl: 'http://127.0.0.1:0',
   username: 'preview',
   password: 'preview',
+};
+
+const buildStoredUserId = (provider: User['provider'], providerUserId: string): string => {
+  return `${provider}:${providerUserId}`;
+};
+
+const toStoredUser = (session: SSOSession): User => {
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: buildStoredUserId(session.provider, session.userId),
+    provider: session.provider,
+    providerUserId: session.userId,
+    displayName: session.displayName,
+    email: session.email,
+    createdAt: timestamp,
+    lastSeenAt: timestamp,
+    ...(session.avatarUrl ? { avatarUrl: session.avatarUrl } : {}),
+  };
 };
 
 const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSOStatus => {
@@ -118,9 +142,7 @@ const syncConnectorState = async (
   connection: OpencodeConnection,
   vaultPath: string | null,
   sessions: SSOStatus,
-): Promise<Record<string, MCPStatus>> => {
-  const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
-
+): Promise<void> => {
   if (sessions.google) {
     await forwardGoogleAuth(connection, vaultPath, sessions.google);
   } else {
@@ -130,34 +152,12 @@ const syncConnectorState = async (
       console.warn('Could not clear Google auth from OpenCode.', error);
     }
   }
-
-  if (sessions.github) {
-    try {
-      await client.mcp.connect({ name: 'github' });
-    } catch (error) {
-      console.warn('Could not connect GitHub MCP server.', error);
-    }
-  } else {
-    try {
-      await client.mcp.disconnect({ name: 'github' });
-    } catch (error) {
-      console.warn('Could not disconnect GitHub MCP server.', error);
-    }
-  }
-
-  try {
-    const response = await client.mcp.status();
-    return response.data ?? {};
-  } catch (error) {
-    console.warn('Could not read MCP status from OpenCode.', error);
-    return {};
-  }
 };
 
 const isModelConnected = async (connection: OpencodeConnection, vaultPath: string | null): Promise<boolean> => {
   const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
   const response = await client.provider.list();
-  return response.data?.connected.includes(OPENCODE_OPENAI_PROVIDER_ID) ?? false;
+  return (response.data?.connected.length ?? 0) > 0;
 };
 
 const probeModelConnection = async (connection: OpencodeConnection, vaultPath: string | null): Promise<boolean> => {
@@ -187,43 +187,47 @@ const waitForModelConnection = async (connection: OpencodeConnection, vaultPath:
 
 const connectModelProvider = async (connection: OpencodeConnection, vaultPath: string | null): Promise<void> => {
   const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
-  const authResponse = await client.provider.auth();
-  const methods = authResponse.data?.[OPENCODE_OPENAI_PROVIDER_ID] ?? [];
-  const methodIndex = methods.findIndex((method) => method.type === 'oauth');
+  const [providersResponse, authResponse] = await Promise.all([client.provider.list(), client.provider.auth()]);
+  const target = pickFirstOauthProvider(providersResponse.data?.all ?? [], authResponse.data ?? {});
 
-  if (methodIndex < 0) {
-    throw new Error('OpenCode did not expose an OAuth method for OpenAI provider.');
+  if (!target) {
+    throw new Error('OpenCode did not expose an OAuth-capable AI provider.');
   }
 
   const authorizeResponse = await client.provider.oauth.authorize({
-    providerID: OPENCODE_OPENAI_PROVIDER_ID,
-    method: methodIndex,
+    providerID: target.providerId,
+    method: target.methodIndex,
   });
   const authorization = authorizeResponse.data;
 
   if (!authorization?.url) {
-    throw new Error('OpenCode did not return an authorization URL for OpenAI provider.');
+    throw new Error(`OpenCode did not return an authorization URL for provider "${target.providerId}".`);
   }
 
   const authorizationUrl = new URL(authorization.url);
-  if (
-    authorizationUrl.protocol !== 'https:' ||
-    authorizationUrl.hostname !== OPENCODE_AUTH_HOST ||
-    !/^\/(?:oauth|codex)\//u.test(authorizationUrl.pathname)
-  ) {
-    throw new Error('OpenCode returned an unexpected authorization URL for OpenAI provider.');
+  if (authorizationUrl.protocol !== 'https:') {
+    throw new Error(`OpenCode returned a non-HTTPS authorization URL for provider "${target.providerId}".`);
   }
 
   await openExternal(authorizationUrl.toString());
 
   if (!(await waitForModelConnection(connection, vaultPath))) {
-    throw new Error('OpenCode did not finish connecting the AI model before authorization timed out.');
+    throw new Error(`OpenCode did not finish connecting provider "${target.providerId}" before authorization timed out.`);
   }
 };
 
 const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath: string | null): Promise<void> => {
   const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
-  await client.auth.remove({ providerID: OPENCODE_OPENAI_PROVIDER_ID });
+  const [providersResponse, authResponse] = await Promise.all([client.provider.list(), client.provider.auth()]);
+  const removableProviders = (providersResponse.data?.connected ?? []).filter((providerId) => providerId in (authResponse.data ?? {}));
+
+  if (removableProviders.length === 0) {
+    throw new Error('OpenCode did not expose a removable OAuth-backed model connection.');
+  }
+
+  for (const providerId of removableProviders) {
+    await client.auth.remove({ providerID: providerId });
+  }
 };
 
 export const App = (): JSX.Element => {
@@ -309,13 +313,10 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
-        const [mcpStatus, modelConnected] = await Promise.all([
-          syncConnectorState(opencode, vaultPath, sessions).catch((error) => {
-            console.warn('Could not restore connector state on boot.', error);
-            return {};
-          }),
-          probeModelConnection(opencode, vaultPath),
-        ]);
+        await syncConnectorState(opencode, vaultPath, sessions).catch((error) => {
+          console.warn('Could not restore connector state on boot.', error);
+        });
+        const modelConnected = await probeModelConnection(opencode, vaultPath);
 
         if (!active) {
           return;
@@ -329,7 +330,7 @@ export const App = (): JSX.Element => {
           schedulerStore,
           opencode,
           sessions,
-          mcpStatus,
+          mcpStatus: {},
           vaultPath,
           onboarded: window.localStorage.getItem(ONBOARDING_KEY) === '1',
           modelConnected,
@@ -553,6 +554,61 @@ export const App = (): JSX.Element => {
     state.status === 'ready' ? state.vaultPath : null,
   ]);
 
+  useEffect(() => {
+    if (!nativeRuntime || state.status !== 'ready') {
+      return;
+    }
+
+    const connection = state.opencode;
+    const directory = getOpencodeDirectory(state.vaultPath);
+    let active = true;
+
+    setState((current) =>
+      current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl
+        ? current
+        : {
+            ...current,
+            mcpStatus: {
+              ...current.mcpStatus,
+              [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
+            },
+          },
+    );
+
+    void (async () => {
+      const status = await checkExaBootHealth(() => {
+        const client = createWorkspaceClient(connection, directory);
+        return client.mcp.status();
+      });
+
+      if (!active) {
+        return;
+      }
+
+      setState((current) =>
+        current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl
+          ? current
+          : {
+              ...current,
+              mcpStatus: {
+                ...current.mcpStatus,
+                [EXA_MCP_NAME]: status,
+              },
+            },
+      );
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    nativeRuntime,
+    state.status,
+    state.status === 'ready' ? state.opencode.baseUrl : null,
+    state.status === 'ready' ? state.opencode.username : null,
+    state.status === 'ready' ? state.opencode.password : null,
+  ]);
+
   if (state.status === 'loading') {
     return (
       <div className="tinker-app">
@@ -583,12 +639,10 @@ export const App = (): JSX.Element => {
 
   const reloadConnectionState = async (connection: OpencodeConnection, vaultPath: string | null) => {
     const sessions = await readAuthStatus();
-    const [mcpStatus, modelConnected] = await Promise.all([
-      syncConnectorState(connection, vaultPath, sessions),
-      probeModelConnection(connection, vaultPath),
-    ]);
+    await syncConnectorState(connection, vaultPath, sessions);
+    const modelConnected = await probeModelConnection(connection, vaultPath);
 
-    return { sessions, mcpStatus, modelConnected };
+    return { sessions, modelConnected };
   };
 
   const refreshWorkspaceConnection = async (): Promise<void> => {
@@ -603,7 +657,10 @@ export const App = (): JSX.Element => {
             ...current,
             opencode,
             sessions: nextState.sessions,
-            mcpStatus: nextState.mcpStatus,
+            mcpStatus: {
+              ...current.mcpStatus,
+              [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
+            },
             modelConnected: nextState.modelConnected,
           },
     );
@@ -617,13 +674,10 @@ export const App = (): JSX.Element => {
     await skillStore.reindex();
     window.localStorage.setItem(VAULT_PATH_KEY, config.path);
 
-    const [modelConnected, mcpStatus] = await Promise.all([
-      probeModelConnection(state.opencode, config.path),
-      syncConnectorState(state.opencode, config.path, state.sessions).catch((error) => {
-        console.warn('Could not refresh connector state after vault change.', error);
-        return state.mcpStatus;
-      }),
-    ]);
+    await syncConnectorState(state.opencode, config.path, state.sessions).catch((error) => {
+      console.warn('Could not refresh connector state after vault change.', error);
+    });
+    const modelConnected = await probeModelConnection(state.opencode, config.path);
 
     setState((current) =>
       current.status !== 'ready'
@@ -632,7 +686,6 @@ export const App = (): JSX.Element => {
             ...current,
             vaultPath: config.path,
             modelConnected,
-            mcpStatus,
             vaultRevision: current.vaultRevision + 1,
             activeSkillsRevision: current.activeSkillsRevision + 1,
           },
@@ -734,6 +787,7 @@ export const App = (): JSX.Element => {
     try {
       requireNativeRuntime(`Connecting ${provider === 'google' ? 'Google' : 'GitHub'}`);
       const session = await invoke<SSOSession>('auth_sign_in', { provider });
+      await upsertUser(toStoredUser(session));
       if (provider === 'google' && session.refreshToken.length === 0) {
         throw new Error('Google sign-in did not return refresh token. Try again.');
       }
@@ -748,7 +802,6 @@ export const App = (): JSX.Element => {
             : {
                 ...current,
                 sessions: nextState.sessions,
-                mcpStatus: nextState.mcpStatus,
                 modelConnected: nextState.modelConnected,
               },
         );
@@ -780,7 +833,6 @@ export const App = (): JSX.Element => {
             : {
                 ...current,
                 sessions: nextState.sessions,
-                mcpStatus: nextState.mcpStatus,
                 modelConnected: nextState.modelConnected,
               },
         );

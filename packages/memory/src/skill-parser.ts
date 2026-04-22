@@ -1,5 +1,5 @@
 import type { Skill, SkillDraft, SkillFrontmatter } from '@tinker/shared-types';
-import { SKILLS_VAULT_DIRECTORY } from '@tinker/shared-types';
+import { DEFAULT_SKILL_VERSION, SKILLS_VAULT_DIRECTORY } from '@tinker/shared-types';
 import { parseFrontmatter, serializeFrontmatter } from './vault-utils.js';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
@@ -35,6 +35,10 @@ const readString = (value: unknown): string | null => {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 };
 
+const readHeading = (body: string): string | null => {
+  return body.match(H1_PATTERN)?.[1]?.trim() ?? null;
+};
+
 export const skillRelativePath = (slug: string): string => {
   return `${SKILLS_VAULT_DIRECTORY}/${slug}.md`;
 };
@@ -54,35 +58,71 @@ export const slugFromRelativePath = (relativePath: string): string => {
 export type ParsedSkillFile = {
   frontmatter: SkillFrontmatter;
   body: string;
+  id: string;
   slug: string;
   title: string;
+  role: string | null;
   description: string;
   tools: string[];
   tags: string[];
+  version: string;
+  author: string | null;
 };
 
 export const parseSkillFile = (text: string, fallbackSlug: string): ParsedSkillFile => {
   const { frontmatter: rawFrontmatter, body } = parseFrontmatter(text);
-  const declaredName = readString(rawFrontmatter.name);
+  const declaredId = readString(rawFrontmatter.id) ?? readString(rawFrontmatter.name);
+  const declaredTitle = readString(rawFrontmatter.title);
+  const role = readString(rawFrontmatter.role);
   const description = readString(rawFrontmatter.description) ?? '';
   const tools = readStringArray(rawFrontmatter.tools);
   const tags = readStringArray(rawFrontmatter.tags);
-  const headingMatch = body.match(H1_PATTERN);
-  const heading = headingMatch?.[1]?.trim();
+  const version = readString(rawFrontmatter.version) ?? DEFAULT_SKILL_VERSION;
+  const author = readString(rawFrontmatter.author);
+  const heading = readHeading(body);
 
-  const candidateSlug = declaredName && isValidSkillSlug(declaredName) ? declaredName : slugify(declaredName ?? fallbackSlug);
+  const candidateSlug = declaredId && isValidSkillSlug(declaredId) ? declaredId : slugify(declaredId ?? fallbackSlug);
   const slug = isValidSkillSlug(candidateSlug) ? candidateSlug : slugify(fallbackSlug);
-  const title = heading && heading.length > 0 ? heading : (declaredName ?? slug);
+  const title = declaredTitle ?? heading ?? declaredId ?? slug;
+
+  const {
+    id: _rawId,
+    name: _legacyName,
+    title: _rawTitle,
+    role: _rawRole,
+    tools: _rawTools,
+    version: _rawVersion,
+    author: _rawAuthor,
+    description: _rawDescription,
+    tags: _rawTags,
+    ...frontmatterRest
+  } = rawFrontmatter;
 
   const frontmatter: SkillFrontmatter = {
-    ...rawFrontmatter,
-    name: slug,
-    description,
+    ...frontmatterRest,
+    id: slug,
+    title,
+    ...(role ? { role } : {}),
     ...(tools.length > 0 ? { tools } : {}),
+    version,
+    ...(author ? { author } : {}),
+    ...(description.length > 0 ? { description } : {}),
     ...(tags.length > 0 ? { tags } : {}),
   };
 
-  return { frontmatter, body, slug, title, description, tools, tags };
+  return {
+    frontmatter,
+    body,
+    id: slug,
+    slug,
+    title,
+    role,
+    description,
+    tools,
+    tags,
+    version,
+    author,
+  };
 };
 
 export const serializeSkill = (frontmatter: SkillFrontmatter, body: string): string => {
@@ -91,14 +131,25 @@ export const serializeSkill = (frontmatter: SkillFrontmatter, body: string): str
 
 export const draftToSkillContent = (draft: SkillDraft): { frontmatter: SkillFrontmatter; body: string; slug: string } => {
   const slug = isValidSkillSlug(draft.slug) ? draft.slug : slugify(draft.slug);
+  const title = readString(draft.title) ?? readHeading(draft.body) ?? readString(draft.slug) ?? slug;
+  const role = readString(draft.role);
+  const description = draft.description.trim();
+  const tools = readStringArray(draft.tools);
+  const tags = readStringArray(draft.tags);
+  const version = readString(draft.version) ?? DEFAULT_SKILL_VERSION;
+  const author = readString(draft.author);
   const frontmatter: SkillFrontmatter = {
-    name: slug,
-    description: draft.description.trim(),
-    ...(draft.tools && draft.tools.length > 0 ? { tools: draft.tools } : {}),
-    ...(draft.tags && draft.tags.length > 0 ? { tags: draft.tags } : {}),
+    id: slug,
+    title,
+    ...(role ? { role } : {}),
+    ...(description.length > 0 ? { description } : {}),
+    ...(tools.length > 0 ? { tools } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
+    version,
+    ...(author ? { author } : {}),
   };
 
-  return { frontmatter, body: draft.body.trim().length > 0 ? draft.body : `# ${slug}\n\n`, slug };
+  return { frontmatter, body: draft.body.trim().length > 0 ? draft.body : `# ${title}\n\n`, slug };
 };
 
 export const toPersistedSkill = (
@@ -109,11 +160,15 @@ export const toPersistedSkill = (
   installedAt: string,
 ): Skill => {
   return {
+    id: parsed.id,
     slug: parsed.slug,
     title: parsed.title,
+    role: parsed.role,
     description: parsed.description,
     tools: parsed.tools,
     tags: parsed.tags,
+    version: parsed.version,
+    author: parsed.author,
     body: parsed.body,
     relativePath,
     frontmatter: parsed.frontmatter,

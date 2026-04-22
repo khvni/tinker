@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { Badge, Button, Textarea } from '@tinker/design';
+import { Badge, Button, ModelPicker, Textarea } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities, slugify } from '@tinker/memory';
 import type { SkillDraft, SkillStore } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../bindings.js';
 import { captureConversationMemory } from '../memory.js';
-import { createWorkspaceClient, getOpencodeDirectory } from '../opencode.js';
+import {
+  buildModelPickerItems,
+  createWorkspaceClient,
+  findModelOptionById,
+  getOpencodeDirectory,
+  pickDefaultModelOptionId,
+  type WorkspaceModelOption,
+} from '../opencode.js';
 import { useDockviewApi } from '../workspace/DockviewContext.js';
 
 type ChatMessage = {
@@ -72,10 +79,14 @@ export const Chat = ({
   const [draft, setDraft] = useState('');
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [modelOptions, setModelOptions] = useState<ReadonlyArray<WorkspaceModelOption>>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>();
+  const [modelOptionsLoading, setModelOptionsLoading] = useState(true);
   const [status, setStatus] = useState(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
   const mountedRef = useRef(true);
   const sessionIDRef = useRef<string | null>(null);
   const memoryCommitRef = useRef<Promise<void>>(Promise.resolve());
+  const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -93,6 +104,51 @@ export const Chat = ({
   useEffect(() => {
     setStatus(modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.');
   }, [modelConnected]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setModelOptionsLoading(true);
+
+    void client.config
+      .providers()
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        const providers = response.data?.providers ?? [];
+        const nextOptions = buildModelPickerItems(providers);
+        const nextSelectedId = pickDefaultModelOptionId(providers, response.data?.default ?? {}) ?? nextOptions[0]?.id;
+
+        setModelOptions(nextOptions);
+        setSelectedModelId((current) => {
+          if (current && nextOptions.some((option) => option.id === current)) {
+            return current;
+          }
+
+          return nextSelectedId;
+        });
+      })
+      .catch((error) => {
+        console.warn('Failed to load model picker options from OpenCode.', error);
+        if (cancelled) {
+          return;
+        }
+
+        setModelOptions([]);
+        setSelectedModelId(undefined);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setModelOptionsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, modelConnected]);
 
   useEffect(() => {
     const existing = sessionIDRef.current;
@@ -220,6 +276,14 @@ export const Chat = ({
       await client.session.prompt({
         sessionID: activeSessionID,
         parts: [{ type: 'text', text }],
+        ...(selectedModel
+          ? {
+              model: {
+                providerID: selectedModel.providerId,
+                modelID: selectedModel.modelId,
+              },
+            }
+          : {}),
       });
       await consumeStream;
 
@@ -324,6 +388,14 @@ export const Chat = ({
           disabled={busy || !modelConnected}
         />
         <div className="tinker-inline-actions">
+          <ModelPicker
+            items={modelOptions}
+            value={selectedModelId}
+            onSelect={setSelectedModelId}
+            loading={modelOptionsLoading}
+            disabled={busy}
+            emptyLabel="No models available in OpenCode."
+          />
           <Button
             variant="primary"
             onClick={sendMessage}
