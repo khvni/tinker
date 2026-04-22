@@ -4,6 +4,7 @@ import { getDatabase } from './database.js';
 import {
   createSession,
   deleteSession,
+  findLatestSessionForFolder,
   getSession,
   hydrateSessionRow,
   listSessionsForUser,
@@ -97,6 +98,27 @@ const createFakeDatabase = (): FakeDatabase => {
         const [id] = (bindValues ?? []) as [string];
         const session = sessions.get(id);
         return (session ? [session] : []) as TRow;
+      }
+
+      if (query.includes('WHERE user_id = $1') && query.includes('folder_path = $2')) {
+        const [userId, folderPath] = (bindValues ?? []) as [Session['userId'], Session['folderPath']];
+        const rows = Array.from(sessions.values())
+          .filter((session) => session.user_id === userId && session.folder_path === folderPath)
+          .sort((left, right) => {
+            const byLastActive = right.last_active_at.localeCompare(left.last_active_at);
+            if (byLastActive !== 0) {
+              return byLastActive;
+            }
+
+            const byCreatedAt = right.created_at.localeCompare(left.created_at);
+            if (byCreatedAt !== 0) {
+              return byCreatedAt;
+            }
+
+            return left.id.localeCompare(right.id);
+          });
+
+        return rows.slice(0, 1) as TRow;
       }
 
       if (query.includes('WHERE user_id = $1')) {
@@ -198,6 +220,33 @@ describe('session-store helpers', () => {
       ...BASE_SESSION,
       lastActiveAt: '2026-04-23T00:00:00.000Z',
     });
+  });
+
+  it('finds the most recent session for one user + folder pair', async () => {
+    const olderSession: Session = {
+      ...BASE_SESSION,
+      id: 'session-older',
+      lastActiveAt: '2026-04-20T01:00:00.000Z',
+    };
+    const newerSameFolder: Session = {
+      ...BASE_SESSION,
+      id: 'session-newer',
+      lastActiveAt: '2026-04-22T01:00:00.000Z',
+    };
+    const newerOtherFolder: Session = {
+      ...BASE_SESSION,
+      id: 'session-other-folder',
+      folderPath: '/tmp/beta',
+      lastActiveAt: '2026-04-23T01:00:00.000Z',
+    };
+
+    await createSession(olderSession);
+    await createSession(newerSameFolder);
+    await createSession(newerOtherFolder);
+
+    await expect(findLatestSessionForFolder(BASE_SESSION.userId, BASE_SESSION.folderPath)).resolves.toEqual(
+      newerSameFolder,
+    );
   });
 
   it('deletes a session by id', async () => {
