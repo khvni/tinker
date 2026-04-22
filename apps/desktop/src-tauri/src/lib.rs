@@ -30,6 +30,29 @@ struct OpencodeState {
     connection: Mutex<Option<OpencodeConnection>>,
 }
 
+#[derive(Clone, Debug)]
+struct BootstrapOpencodeConfig {
+    user_id: String,
+    memory_subdir: String,
+}
+
+impl BootstrapOpencodeConfig {
+    fn new(user_id: impl Into<String>, memory_subdir: impl Into<String>) -> Self {
+        Self {
+            user_id: user_id.into(),
+            memory_subdir: memory_subdir.into(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.user_id.trim().is_empty() {
+            return Err("user_id must not be empty".to_string());
+        }
+
+        Ok(())
+    }
+}
+
 fn clone_opencode_connection(state: &OpencodeState) -> Result<OpencodeConnection, String> {
     state
         .connection
@@ -100,6 +123,28 @@ fn opencode_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Err("Could not locate the bundled opencode.json configuration.".to_string())
 }
 
+fn bootstrap_opencode_env(
+    config_path: &PathBuf,
+    username: &str,
+    password: &str,
+    memory_subdir: &str,
+) -> Vec<(String, String)> {
+    let mut envs = vec![
+        (
+            "OPENCODE_CONFIG".to_string(),
+            config_path.to_string_lossy().into_owned(),
+        ),
+        ("OPENCODE_SERVER_USERNAME".to_string(), username.to_string()),
+        ("OPENCODE_SERVER_PASSWORD".to_string(), password.to_string()),
+    ];
+
+    if !memory_subdir.trim().is_empty() {
+        envs.push(("SMART_VAULT_PATH".to_string(), memory_subdir.to_string()));
+    }
+
+    envs
+}
+
 fn main_window_config(
     app: &tauri::AppHandle,
 ) -> Result<&tauri::utils::config::WindowConfig, String> {
@@ -128,9 +173,18 @@ fn ensure_main_window(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn restart_opencode(app: tauri::AppHandle) -> Result<OpencodeConnection, String> {
+async fn restart_opencode(
+    app: tauri::AppHandle,
+    user_id: String,
+    memory_subdir: String,
+) -> Result<OpencodeConnection, String> {
+    if memory_subdir.trim().is_empty() {
+        return Err("memory_subdir must not be empty".to_string());
+    }
+
     terminate_legacy_opencode(&app);
-    bootstrap_opencode(&app).await?;
+    let config = BootstrapOpencodeConfig::new(user_id, memory_subdir);
+    bootstrap_opencode(&app, &config).await?;
     let state = app.state::<OpencodeState>();
     clone_opencode_connection(&state)
 }
@@ -214,7 +268,12 @@ async fn wait_for_opencode_connection(
     }
 }
 
-async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
+async fn bootstrap_opencode(
+    app: &tauri::AppHandle,
+    config: &BootstrapOpencodeConfig,
+) -> Result<(), String> {
+    config.validate()?;
+
     let state = app.state::<OpencodeState>();
     if state
         .child
@@ -241,14 +300,12 @@ async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
         .sidecar("opencode")
         .map_err(|error| error.to_string())?
         .args(["serve", "--hostname", "127.0.0.1", "--port", "0"])
-        .envs([
-            (
-                "OPENCODE_CONFIG",
-                config_path.to_string_lossy().into_owned(),
-            ),
-            ("OPENCODE_SERVER_USERNAME", username.clone()),
-            ("OPENCODE_SERVER_PASSWORD", password.clone()),
-        ])
+        .envs(bootstrap_opencode_env(
+            &config_path,
+            &username,
+            &password,
+            &config.memory_subdir,
+        ))
         .current_dir(working_dir);
 
     if !github_token.is_empty() {
@@ -356,12 +413,20 @@ pub fn run() {
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 if let Err(error) = commands::auth::start_auth_sidecar(app.handle().clone()).await {
-                    eprintln!("[better-auth] sidecar warm-start failed (will retry on demand): {error}");
+                    eprintln!(
+                        "[better-auth] sidecar warm-start failed (will retry on demand): {error}"
+                    );
                 }
-                if let Err(error) = commands::opencode::reconcile_opencode_manifests(&app.handle()).await {
+                if let Err(error) =
+                    commands::opencode::reconcile_opencode_manifests(&app.handle()).await
+                {
                     eprintln!("[opencode] orphan manifest cleanup failed: {error}");
                 }
-                bootstrap_opencode(&app.handle()).await?;
+                bootstrap_opencode(
+                    &app.handle(),
+                    &BootstrapOpencodeConfig::new("local-user", String::new()),
+                )
+                .await?;
                 ensure_main_window(&app.handle())?;
                 Ok::<(), String>(())
             })
@@ -381,4 +446,45 @@ pub fn run() {
             terminate_legacy_opencode(&handle);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bootstrap_opencode_env_includes_smart_vault_path_when_present() {
+        let envs = bootstrap_opencode_env(
+            &PathBuf::from("/tmp/opencode.json"),
+            "tinker-user",
+            "secret",
+            "/tmp/memory/local-user",
+        );
+
+        assert!(envs.contains(&(
+            "OPENCODE_CONFIG".to_string(),
+            "/tmp/opencode.json".to_string()
+        )));
+        assert!(envs.contains(&(
+            "OPENCODE_SERVER_USERNAME".to_string(),
+            "tinker-user".to_string()
+        )));
+        assert!(envs.contains(&("OPENCODE_SERVER_PASSWORD".to_string(), "secret".to_string())));
+        assert!(envs.contains(&(
+            "SMART_VAULT_PATH".to_string(),
+            "/tmp/memory/local-user".to_string()
+        )));
+    }
+
+    #[test]
+    fn bootstrap_opencode_env_omits_smart_vault_path_when_empty() {
+        let envs = bootstrap_opencode_env(
+            &PathBuf::from("/tmp/opencode.json"),
+            "tinker-user",
+            "secret",
+            "",
+        );
+
+        assert!(!envs.iter().any(|(key, _value)| key == "SMART_VAULT_PATH"));
+    }
 }
