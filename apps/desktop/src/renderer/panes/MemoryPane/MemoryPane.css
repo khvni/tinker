@@ -1,0 +1,123 @@
+.tinker-memory-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-4);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+.tinker-memory-pane__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tinker-memory-pane__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.tinker-memory-pane__eyebrow {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.tinker-memory-pane__title {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.tinker-memory-pane__description {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.tinker-memory-pane__content {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.tinker-memory-pane__list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+}
+
+.tinker-memory-pane__file-button {
+  width: 100%;
+  min-height: 64px;
+  height: auto;
+  justify-content: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
+.tinker-memory-pane__file-button .tk-button__label {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.tinker-memory-pane__file-title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.tinker-memory-pane__file-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 100%;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.tinker-memory-pane__file-path {
+  min-width: 0;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+
+.tinker-memory-pane__file-time {
+  color: var(--color-text-muted);
+}
+
+.tinker-memory-pane__state {
+  width: 100%;
+}
+
+.tinker-memory-pane__loading {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+}
