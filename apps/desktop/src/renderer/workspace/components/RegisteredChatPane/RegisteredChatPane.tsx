@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { Chat } from '../../../panes/Chat.js';
+import { Chat } from '../../../panes/Chat/index.js';
 import { useChatPaneRuntime } from '../../chat-pane-runtime.js';
 
 export const RegisteredChatPane = (): JSX.Element => {

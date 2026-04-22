@@ -15,7 +15,7 @@ import {
 import { DEFAULT_USER_ID, type OpencodeConnection } from '../../bindings.js';
 import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
 import type { MCPStatus } from '../integrations.js';
-import { Chat } from '../panes/Chat.js';
+import { Chat } from '../panes/Chat/index.js';
 import { Playbook } from '../panes/Playbook.js';
 import { SchedulerPane } from '../panes/SchedulerPane.js';
 import { Settings } from '../panes/Settings.js';

@@ -1,9 +1,11 @@
 import type { Event, OpencodeClient, Part, ToolPart } from '@opencode-ai/sdk/v2/client';
 
 export type TinkerStreamEvent =
-  | { type: 'token'; text: string }
-  | { type: 'tool_call'; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; name: string; output: string }
+  | { type: 'token'; partID: string; text: string }
+  | { type: 'reasoning'; partID: string; text: string }
+  | { type: 'tool_call'; partID: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; partID: string; name: string; output: string }
+  | { type: 'tool_error'; partID: string; name: string; message: string }
   | { type: 'file_written'; path: string }
   | { type: 'done' }
   | { type: 'error'; message: string };
@@ -19,10 +21,13 @@ const readSessionID = (event: Event): string | undefined => {
   return undefined;
 };
 
-const asToolCall = (part: ToolPart): TinkerStreamEvent | null => {
+// SDK part discriminator: `'reasoning'` is the literal name in
+// @opencode-ai/sdk@1.4.3 (`ReasoningPart` in dist/v2/gen/types.gen.d.ts).
+const asToolEvent = (part: ToolPart): TinkerStreamEvent | null => {
   if (part.state.status === 'pending' || part.state.status === 'running') {
     return {
       type: 'tool_call',
+      partID: part.id,
       name: part.tool,
       input: part.state.input,
     };
@@ -31,15 +36,22 @@ const asToolCall = (part: ToolPart): TinkerStreamEvent | null => {
   if (part.state.status === 'completed') {
     return {
       type: 'tool_result',
+      partID: part.id,
       name: part.tool,
       output: part.state.output,
     };
   }
 
-  return {
-    type: 'error',
-    message: part.state.error,
-  };
+  if (part.state.status === 'error') {
+    return {
+      type: 'tool_error',
+      partID: part.id,
+      name: part.tool,
+      message: part.state.error,
+    };
+  }
+
+  return null;
 };
 
 const asFileWrites = (part: Part): TinkerStreamEvent[] => {
@@ -71,6 +83,10 @@ export const streamSessionEvents = async function* (
   sessionID: string,
 ): AsyncIterable<TinkerStreamEvent> {
   const subscription = await client.event.subscribe();
+  // Track which partIDs are reasoning parts so the matching delta events can
+  // be surfaced as `reasoning` rather than `token` (delta events lack the
+  // discriminator and only carry partID).
+  const reasoningPartIDs = new Set<string>();
 
   for await (const event of subscription.stream) {
     if (readSessionID(event) !== sessionID) {
@@ -78,15 +94,28 @@ export const streamSessionEvents = async function* (
     }
 
     if (event.type === 'message.part.delta' && event.properties.field === 'text') {
-      yield { type: 'token', text: event.properties.delta };
+      const { partID, delta } = event.properties;
+      if (reasoningPartIDs.has(partID)) {
+        yield { type: 'reasoning', partID, text: delta };
+      } else {
+        yield { type: 'token', partID, text: delta };
+      }
       continue;
     }
 
     if (event.type === 'message.part.updated') {
       const { part } = event.properties;
 
+      if (part.type === 'reasoning') {
+        // Mark this partID so the streaming text deltas (which carry no type
+        // discriminator) get classified as reasoning. The delta stream owns
+        // text propagation; we don't re-emit `part.text` here to avoid
+        // duplicating chunks.
+        reasoningPartIDs.add(part.id);
+      }
+
       if (part.type === 'tool') {
-        const toolEvent = asToolCall(part);
+        const toolEvent = asToolEvent(part);
         if (toolEvent) {
           yield toolEvent;
         }
