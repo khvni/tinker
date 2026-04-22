@@ -1,20 +1,5 @@
-type WorkspacePanel = {
-  id: string;
-};
-
-type WorkspaceDockviewApi = {
-  activePanel: { id: string } | null | undefined;
-  panels: WorkspacePanel[];
-  addPanel(panel: {
-    id: string;
-    component: 'chat';
-    title: string;
-    position?: {
-      referencePanel: string;
-      direction: 'within';
-    };
-  }): void;
-};
+import type { WorkspaceStore } from '@tinker/panes';
+import type { TinkerPaneData } from '@tinker/shared-types';
 
 const CHAT_PANEL_PATTERN = /^chat(?:-(\d+))?$/u;
 
@@ -27,8 +12,17 @@ const getChatPanelIndex = (panelId: string): number | null => {
   return match[1] ? Number(match[1]) : 1;
 };
 
-const getReferencePanelId = (api: WorkspaceDockviewApi): string | null => {
-  return api.panels.find((panel) => getChatPanelIndex(panel.id) !== null)?.id ?? api.activePanel?.id ?? api.panels[0]?.id ?? null;
+const createWorkspaceTabId = (): string => {
+  return `workspace-${crypto.randomUUID()}`;
+};
+
+const createChatPane = (panelId: string) => {
+  return {
+    id: panelId,
+    kind: 'chat',
+    title: getChatPanelTitle(panelId),
+    data: { kind: 'chat' } as const,
+  };
 };
 
 export const getNextChatPanelId = (panelIds: string[]): string => {
@@ -45,21 +39,19 @@ export const getChatPanelTitle = (panelId: string): string => {
   return index && index > 1 ? `Chat ${index}` : 'Chat';
 };
 
-export const openNewChatPanel = (api: WorkspaceDockviewApi): void => {
-  const panelId = getNextChatPanelId(api.panels.map((panel) => panel.id));
-  const referencePanelId = getReferencePanelId(api);
+export const openNewChatPanel = (store: WorkspaceStore<TinkerPaneData>): void => {
+  const state = store.getState();
+  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
+  const panelId = getNextChatPanelId(state.tabs.flatMap((tab) => Object.keys(tab.panes)));
+  const pane = createChatPane(panelId);
 
-  api.addPanel({
-    id: panelId,
-    component: 'chat',
-    title: getChatPanelTitle(panelId),
-    ...(referencePanelId
-      ? {
-          position: {
-            referencePanel: referencePanelId,
-            direction: 'within' as const,
-          },
-        }
-      : {}),
-  });
+  if (!activeTab) {
+    state.actions.openTab({
+      id: createWorkspaceTabId(),
+      pane,
+    });
+    return;
+  }
+
+  state.actions.addPane(activeTab.id, pane, { activate: true });
 };

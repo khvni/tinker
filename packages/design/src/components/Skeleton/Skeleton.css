@@ -1,0 +1,53 @@
+.tk-skeleton {
+  display: inline-block;
+  background: var(--color-bg-hover);
+  background-image: linear-gradient(
+    90deg,
+    var(--color-bg-hover) 0%,
+    var(--color-bg-elevated) 50%,
+    var(--color-bg-hover) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: tk-skeleton-shimmer 1.6s var(--ease-standard) infinite;
+  will-change: background-position;
+}
+
+.tk-skeleton--text {
+  display: block;
+  width: 100%;
+  height: 1em;
+  border-radius: var(--radius-xs);
+  vertical-align: middle;
+}
+
+.tk-skeleton--circle {
+  border-radius: var(--radius-pill);
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.tk-skeleton--rect {
+  display: block;
+  border-radius: var(--radius-sm);
+  width: 100%;
+  height: 16px;
+}
+
+@keyframes tk-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-skeleton {
+    animation: none;
+    background-image: none;
+    background: var(--color-bg-hover);
+  }
+}

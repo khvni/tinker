@@ -2,6 +2,7 @@ import {
   createDefaultWorkspacePreferences,
   type LayoutState,
   type LayoutStore,
+  type PersistedWorkspaceState,
   type WorkspacePreferences,
 } from '@tinker/shared-types';
 import { getDatabase } from './database.js';
@@ -12,14 +13,14 @@ export type LayoutRow = {
   updated_at: string;
 };
 
-export const CURRENT_LAYOUT_VERSION = 1 as const;
+export const CURRENT_LAYOUT_VERSION = 2 as const;
 
 type StoredLayoutPayload = {
-  dockviewModel: unknown;
+  workspaceState: unknown;
   preferences?: unknown;
 };
 
-const parseDockviewModel = (raw: string): unknown | null => {
+const parseStoredLayout = (raw: string): unknown | null => {
   try {
     return JSON.parse(raw) as unknown;
   } catch {
@@ -41,9 +42,22 @@ const normalizePreferences = (value: unknown): WorkspacePreferences => {
   };
 };
 
+const isWorkspaceState = (value: unknown): value is PersistedWorkspaceState => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.version === CURRENT_LAYOUT_VERSION &&
+    Array.isArray(candidate.tabs) &&
+    ('activeTabId' in candidate)
+  );
+};
+
 export const serializeLayoutState = (state: LayoutState): string => {
   const payload: StoredLayoutPayload = {
-    dockviewModel: state.dockviewModel,
+    workspaceState: state.workspaceState,
     preferences: state.preferences,
   };
 
@@ -62,25 +76,25 @@ export const hydrateLayoutRow = (row: LayoutRow | undefined, userId: string): La
     return null;
   }
 
-  const model = parseDockviewModel(row.dockview_model_json);
-  if (!model || typeof model !== 'object') {
+  const payload = parseStoredLayout(row.dockview_model_json);
+  if (!payload || typeof payload !== 'object') {
     console.warn(`Ignoring stored layout for user ${userId}: payload was not valid JSON.`);
     return null;
   }
 
-  const candidate = model as Record<string, unknown>;
-  const hasWrapper = 'dockviewModel' in candidate;
-  const dockviewModel = hasWrapper ? candidate.dockviewModel : model;
+  const candidate = payload as Record<string, unknown>;
+  const hasWrapper = 'workspaceState' in candidate;
+  const workspaceState = hasWrapper ? candidate.workspaceState : payload;
   const preferences = hasWrapper ? normalizePreferences(candidate.preferences) : createDefaultWorkspacePreferences();
 
-  if (!dockviewModel || typeof dockviewModel !== 'object') {
-    console.warn(`Ignoring stored layout for user ${userId}: payload was not valid JSON.`);
+  if (!isWorkspaceState(workspaceState)) {
+    console.warn(`Ignoring stored layout for user ${userId}: payload was not a WorkspaceState snapshot.`);
     return null;
   }
 
   return {
-    version: row.version,
-    dockviewModel,
+    version: CURRENT_LAYOUT_VERSION,
+    workspaceState,
     updatedAt: row.updated_at,
     preferences,
   };

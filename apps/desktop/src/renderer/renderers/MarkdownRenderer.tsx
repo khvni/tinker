@@ -1,11 +1,9 @@
 import { useEffect, useState, type JSX } from 'react';
-import { Button } from '@tinker/design';
 import DOMPurify from 'dompurify';
 import { Renderer, marked, type Tokens } from 'marked';
 import type { IDockviewPanelProps } from 'dockview-react';
 import { parseFrontmatter } from '@tinker/memory';
-import { getPanelIdForPath, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
-import { useDockviewApi } from '../workspace/DockviewContext.js';
+import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { highlightCode } from './code-highlighter.js';
 
@@ -71,8 +69,8 @@ type MarkdownRendererProps = IDockviewPanelProps<FilePaneParams> & {
 };
 
 export const MarkdownRenderer = ({ api, params, vaultRevision }: MarkdownRendererProps): JSX.Element => {
+  void api;
   const path = params?.path;
-  const dockviewApi = useDockviewApi();
   const [html, setHtml] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -106,31 +104,6 @@ export const MarkdownRenderer = ({ api, params, vaultRevision }: MarkdownRendere
     };
   }, [path, vaultRevision]);
 
-  const openEditor = (): void => {
-    if (!dockviewApi || !path) {
-      return;
-    }
-
-    const panelId = getPanelIdForPath('markdown-editor', path);
-    const existingPanel = dockviewApi.panels.find((panel) => panel.id === panelId);
-    if (existingPanel) {
-      existingPanel.api.setActive();
-      existingPanel.api.updateParameters({ path });
-      return;
-    }
-
-    dockviewApi.addPanel({
-      id: panelId,
-      component: 'markdown-editor',
-      title: `${getPanelTitleForPath(path)} (Edit)`,
-      params: { path },
-      position: {
-        referencePanel: api.id,
-        direction: 'right',
-      },
-    });
-  };
-
   return (
     <section className="tinker-pane tinker-renderer-pane">
       <header className="tinker-pane-header">
@@ -138,11 +111,6 @@ export const MarkdownRenderer = ({ api, params, vaultRevision }: MarkdownRendere
           <p className="tinker-eyebrow">Markdown</p>
           <h2>{path ? getPanelTitleForPath(path) : 'Untitled note'}</h2>
         </div>
-        {path ? (
-          <Button variant="secondary" size="s" onClick={openEditor}>
-            Edit note
-          </Button>
-        ) : null}
       </header>
 
       {error ? <p className="tinker-muted">{error}</p> : null}

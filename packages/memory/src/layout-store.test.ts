@@ -19,7 +19,7 @@ describe('hydrateLayoutRow', () => {
   it('returns null and warns when the stored version is incompatible', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION + 1,
-      dockview_model_json: '{"grid":{}}',
+      dockview_model_json: '{"tabs":[],"activeTabId":null,"version":2}',
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
@@ -53,7 +53,11 @@ describe('hydrateLayoutRow', () => {
       version: CURRENT_LAYOUT_VERSION,
       dockview_model_json: serializeLayoutState({
         version: CURRENT_LAYOUT_VERSION,
-        dockviewModel: { grid: { height: 1, width: 1 } },
+        workspaceState: {
+          version: CURRENT_LAYOUT_VERSION,
+          tabs: [],
+          activeTabId: null,
+        },
         updatedAt: '2026-04-15T00:00:00.000Z',
         preferences: { autoOpenAgentWrittenFiles: false },
       }),
@@ -62,22 +66,30 @@ describe('hydrateLayoutRow', () => {
 
     expect(hydrateLayoutRow(row, 'user')).toEqual({
       version: CURRENT_LAYOUT_VERSION,
-      dockviewModel: { grid: { height: 1, width: 1 } },
+      workspaceState: {
+        version: CURRENT_LAYOUT_VERSION,
+        tabs: [],
+        activeTabId: null,
+      },
       updatedAt: '2026-04-15T00:00:00.000Z',
       preferences: { autoOpenAgentWrittenFiles: false },
     });
   });
 
-  it('defaults auto-open on when loading a legacy dockview payload', () => {
+  it('defaults auto-open on when loading a raw workspace payload', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION,
-      dockview_model_json: '{"grid":{"height":1,"width":1}}',
+      dockview_model_json: '{"version":2,"tabs":[],"activeTabId":null}',
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
     expect(hydrateLayoutRow(row, 'user')).toEqual({
       version: CURRENT_LAYOUT_VERSION,
-      dockviewModel: { grid: { height: 1, width: 1 } },
+      workspaceState: {
+        version: CURRENT_LAYOUT_VERSION,
+        tabs: [],
+        activeTabId: null,
+      },
       updatedAt: '2026-04-15T00:00:00.000Z',
       preferences: { autoOpenAgentWrittenFiles: true },
     });
