@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { act } from 'react';
+import { createAttentionStore } from '@tinker/attention';
 import { createWorkspaceStore } from '../../core/store/store.js';
 import { isStack } from '../../core/utils/layout.js';
 import type { PaneRegistry } from '../types.js';
@@ -139,6 +140,86 @@ describe('<Workspace>', () => {
     const p1Tab = screen.getAllByRole('tab').find((el) => el.getAttribute('data-pane-id') === 'p1')!;
     fireEvent.click(p1Tab);
     expect(store.getState().tabs[0]!.activePaneId).toBe('p1');
+  });
+
+  it('renders an attention ring on an unread pane frame in an inactive split stack', () => {
+    const store = createWorkspaceStore<Data>();
+    const attentionStore = createAttentionStore();
+
+    act(() => {
+      store.getState().actions.openTab({
+        id: 't1',
+        pane: { id: 'p1', kind: 'chat', data: { label: 'a' } },
+      });
+      store.getState().actions.splitPane('t1', 'p1', 'right', {
+        id: 'p2',
+        kind: 'today',
+        data: { label: 'b' },
+      });
+      store.getState().actions.focusPane('t1', 'p1');
+      attentionStore.getState().actions.signal({
+        workspaceId: 'workspace-under-test',
+        paneId: 'p2',
+        reason: 'notification-arrival',
+      });
+    });
+
+    const { container } = render(
+      <Workspace
+        store={store}
+        registry={registry}
+        attention={{ store: attentionStore, workspaceId: 'workspace-under-test' }}
+      />,
+    );
+
+    expect(
+      container.querySelector(
+        '[data-active-pane-id="p2"][data-attention-accent="notification-blue"]',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('clears a pane tab attention dot when that pane receives focus', () => {
+    const store = createWorkspaceStore<Data>();
+    const attentionStore = createAttentionStore();
+
+    act(() => {
+      store.getState().actions.openTab({
+        id: 't1',
+        pane: { id: 'p1', kind: 'chat', data: { label: 'a' } },
+      });
+      store.getState().actions.addPane('t1', {
+        id: 'p2',
+        kind: 'today',
+        data: { label: 'b' },
+      });
+      store.getState().actions.focusPane('t1', 'p1');
+      attentionStore.getState().actions.signal({
+        workspaceId: 'workspace-under-test',
+        paneId: 'p2',
+        reason: 'notification-arrival',
+      });
+    });
+
+    const { container } = render(
+      <Workspace
+        store={store}
+        registry={registry}
+        attention={{ store: attentionStore, workspaceId: 'workspace-under-test' }}
+      />,
+    );
+
+    const p2Tab = screen.getAllByRole('tab').find((el) => el.getAttribute('data-pane-id') === 'p2')!;
+    expect(
+      p2Tab.querySelector('[data-attention-accent="notification-blue"]'),
+    ).toBeTruthy();
+
+    fireEvent.click(p2Tab);
+
+    expect(store.getState().tabs[0]!.activePaneId).toBe('p2');
+    expect(
+      container.querySelector('[data-pane-id="p2"] [data-attention-accent="notification-blue"]'),
+    ).toBeFalsy();
   });
 });
 

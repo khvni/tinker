@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import type { DropTarget, StackId } from '../../types.js';
 import { useWorkspaceActions, useWorkspaceSelector } from '../hooks/useWorkspaceStore.js';
 import type { WorkspaceProps } from '../types.js';
@@ -13,7 +13,33 @@ export const Workspace = <TData,>(props: WorkspaceProps<TData>): ReactNode => {
 
   const activeTab = useMemo(() => tabs.find((tab) => tab.id === activeTabId) ?? null, [tabs, activeTabId]);
 
-  const handleActivateTab = useCallback((tabId: string) => actions.activateTab(tabId), [actions]);
+  useEffect(() => {
+    if (!props.attention) return;
+
+    const attentionActions = props.attention.store.getState().actions;
+    attentionActions.activateWorkspace(props.attention.workspaceId);
+    attentionActions.focusPane({
+      workspaceId: props.attention.workspaceId,
+      paneId: activeTab?.activePaneId ?? null,
+    });
+    attentionActions.clearFlash(props.attention.workspaceId);
+  }, [activeTab?.activePaneId, activeTab?.id, props.attention]);
+
+  const handleActivateTab = useCallback(
+    (tabId: string) => {
+      actions.activateTab(tabId);
+      if (!props.attention) return;
+
+      const nextActiveTab = tabs.find((tab) => tab.id === tabId) ?? null;
+      const attentionActions = props.attention.store.getState().actions;
+      attentionActions.focusPane({
+        workspaceId: props.attention.workspaceId,
+        paneId: nextActiveTab?.activePaneId ?? null,
+      });
+      attentionActions.clearFlash(props.attention.workspaceId);
+    },
+    [actions, props.attention, tabs],
+  );
   const handleCloseTab = useCallback((tabId: string) => actions.closeTab(tabId), [actions]);
   const handleMoveTab = useCallback((tabId: string, toIndex: number) => actions.moveTab(tabId, toIndex), [actions]);
 
@@ -21,8 +47,16 @@ export const Workspace = <TData,>(props: WorkspaceProps<TData>): ReactNode => {
     (_stackId: StackId, paneId: string) => {
       if (!activeTab) return;
       actions.focusPane(activeTab.id, paneId);
+      if (!props.attention) return;
+
+      const attentionActions = props.attention.store.getState().actions;
+      attentionActions.focusPane({
+        workspaceId: props.attention.workspaceId,
+        paneId,
+      });
+      attentionActions.clearFlash(props.attention.workspaceId);
     },
-    [actions, activeTab],
+    [actions, activeTab, props.attention],
   );
 
   const handleClosePane = useCallback(
@@ -86,6 +120,7 @@ export const Workspace = <TData,>(props: WorkspaceProps<TData>): ReactNode => {
           <SplitTree
             tab={activeTab}
             registry={registry}
+            {...(props.attention ? { attention: props.attention } : {})}
             onFocusPane={handleFocusPane}
             onClosePane={handleClosePane}
             onReorderPaneInStack={handleReorderPane}

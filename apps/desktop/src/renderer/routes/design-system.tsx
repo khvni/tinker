@@ -35,6 +35,7 @@ import {
   type SettingsShellSection,
 } from '../workspace/components/SettingsShell/index.js';
 import { AccountPanel } from '../workspace/components/AccountPanel/index.js';
+import { Titlebar } from '../workspace/components/Titlebar/index.js';
 import { AttachmentIcon } from '../panes/Chat/AttachmentIcon.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
@@ -52,7 +53,8 @@ type PlaygroundTab =
   | 'empty'
   | 'chat'
   | 'settings-shell'
-  | 'sign-in';
+  | 'sign-in'
+  | 'titlebar';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
@@ -66,6 +68,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'chat', label: 'Chat' },
   { value: 'settings-shell', label: 'Settings Shell' },
   { value: 'sign-in', label: 'Sign In' },
+  { value: 'titlebar', label: 'Titlebar' },
 ];
 
 const BADGE_VARIANTS: ReadonlyArray<{ variant: BadgeVariant; label: string }> = [
@@ -1553,6 +1556,39 @@ const SignInTab = (): JSX.Element => (
   </div>
 );
 
+const TitlebarTab = (): JSX.Element => (
+  <div className="ds-sections">
+    <Section label="No session — bare brand">
+      <Titlebar
+        sessionFolderPath={null}
+        onNewSession={() => undefined}
+        onOpenMemory={() => undefined}
+        onOpenSettings={() => undefined}
+      />
+    </Section>
+
+    <Section label="With session folder crumb">
+      <Titlebar
+        sessionFolderPath="/Users/khani/Desktop/projects/tinker"
+        onNewSession={() => undefined}
+        onOpenMemory={() => undefined}
+        onOpenSettings={() => undefined}
+      />
+    </Section>
+
+    <Section label="Dark theme preview">
+      <div data-theme="dark" style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-4)' }}>
+        <Titlebar
+          sessionFolderPath="/Users/khani/Desktop/projects/tinker"
+          onNewSession={() => undefined}
+          onOpenMemory={() => undefined}
+          onOpenSettings={() => undefined}
+        />
+      </div>
+    </Section>
+  </div>
+);
+
 /* ----------------------- Router ------------------------- */
 
 const renderTab = (tab: PlaygroundTab): JSX.Element => {
@@ -1579,6 +1615,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <SettingsShellTab />;
     case 'sign-in':
       return <SignInTab />;
+    case 'titlebar':
+      return <TitlebarTab />;
   }
 };
 
