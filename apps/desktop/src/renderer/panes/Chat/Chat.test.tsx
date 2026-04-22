@@ -100,7 +100,7 @@ const baseProps = {
 };
 
 describe('Chat chrome', () => {
-  it('renders the chat pane chrome classes — header, frame, composer card', () => {
+  it('renders the chat pane chrome classes — header, log, composer card', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(<Chat {...baseProps} />);
 
@@ -108,7 +108,6 @@ describe('Chat chrome', () => {
     expect(markup).toContain('tinker-chat-header');
     expect(markup).toContain('tinker-chat-header__left');
     expect(markup).toContain('tinker-chat-header__right');
-    expect(markup).toContain('tinker-chat-frame');
     expect(markup).toContain('tinker-chat-log');
     expect(markup).toContain('tinker-composer-card');
     expect(markup).toContain('tinker-composer-card__body');
@@ -121,14 +120,13 @@ describe('Chat chrome', () => {
     expect(markup).not.toContain('tk-context-badge');
   });
 
-  it('slot container is aria-hidden when neither slot prop is provided', () => {
+  it('renders the slot container (hidden via CSS `:empty` when no slot props are passed)', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(<Chat {...baseProps} />);
     expect(markup).toContain('tinker-chat-header__slot');
-    expect(markup).toContain('aria-hidden="true"');
   });
 
-  it('renders mode toggle + reasoning picker slots when passed, and drops aria-hidden', () => {
+  it('renders mode toggle + reasoning picker slots when passed', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(
       <Chat
@@ -140,11 +138,9 @@ describe('Chat chrome', () => {
 
     expect(markup).toContain('data-testid="mode-toggle"');
     expect(markup).toContain('data-testid="reasoning"');
-    // The slot container should NOT be marked aria-hidden when content exists.
-    expect(markup).toContain('tinker-chat-header__slot" aria-hidden="false"');
   });
 
-  it('renders the empty-state EmptyState inside the framed log', () => {
+  it('renders the EmptyState inside the chat log', () => {
     opencodeMocks.selectedModel = undefined;
     const markup = renderToStaticMarkup(<Chat {...baseProps} />);
     expect(markup).toContain('No model connected');

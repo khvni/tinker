@@ -31,6 +31,7 @@ import {
   SettingsShell,
   type SettingsShellSection,
 } from '../workspace/components/SettingsShell/index.js';
+import { AttachmentIcon } from '../panes/Chat/AttachmentIcon.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -1100,18 +1101,6 @@ const CHAT_MODE_OPTIONS = [
 
 type ChatMode = (typeof CHAT_MODE_OPTIONS)[number]['value'];
 
-const AttachmentIcon = (): JSX.Element => (
-  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path
-      d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.8-8.8a3.5 3.5 0 0 1 5 5L10.5 17a2 2 0 0 1-2.8-2.8l7.5-7.5"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
 const EmptyChatIcon = (): JSX.Element => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
@@ -1180,31 +1169,29 @@ const ChatPaneChrome = ({
           </div>
         </header>
 
-        <div className="tinker-chat-frame">
-          <div className="tinker-chat-log" tabIndex={-1}>
-            {showHistory ? (
-              <>
-                <div className="tinker-message tinker-message--user">
-                  Pull yesterday&apos;s spend anomalies from Ramp, draft a Slack summary.
-                </div>
-                <div className="tinker-message tinker-message--assistant">
-                  <p className="tinker-message-text">
-                    Found 4 anomalies over $2k. Top offender: vendor &ldquo;Acme Cloud&rdquo;
-                    (+312% vs 7d avg). Drafting summary.
-                  </p>
-                </div>
-                <div className="tinker-message tinker-message--system">
-                  Scheduling daily sweep at 08:00 · see Today pane
-                </div>
-              </>
-            ) : (
-              <EmptyState
-                title="Start a conversation"
-                description="Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE."
-                icon={<EmptyChatIcon />}
-              />
-            )}
-          </div>
+        <div className="tinker-chat-log" tabIndex={-1}>
+          {showHistory ? (
+            <>
+              <div className="tinker-message tinker-message--user">
+                Pull yesterday&apos;s spend anomalies from Ramp, draft a Slack summary.
+              </div>
+              <div className="tinker-message tinker-message--assistant">
+                <p className="tinker-message-text">
+                  Found 4 anomalies over $2k. Top offender: vendor &ldquo;Acme Cloud&rdquo;
+                  (+312% vs 7d avg). Drafting summary.
+                </p>
+              </div>
+              <div className="tinker-message tinker-message--system">
+                Scheduling daily sweep at 08:00 · see Today pane
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              title="Start a conversation"
+              description="Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE."
+              icon={<EmptyChatIcon />}
+            />
+          )}
         </div>
 
         <div className="tinker-composer-card__wrap">

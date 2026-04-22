@@ -195,13 +195,6 @@ textarea {
   display: none;
 }
 
-.tinker-chat-frame {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 .tinker-chat-log {
   display: flex;
   flex-direction: column;
