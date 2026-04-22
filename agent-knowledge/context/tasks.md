@@ -220,7 +220,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | 10 | `@tinker/panes` workspace layout | [[10-tinker-panes]] | MVP scope folded into M1 (registration + Dockview retirement). |
 | 11 | Device ↔ host-service split | [[11-host-service]] | Premature abstraction for single-user MVP. Revisit when headless mode becomes real scope. |
 | 12 | Workspace attention coordinator | [[12-attention-coordinator]] | Multi-pane UX polish. MVP = one pane. |
-| 13 | Vertical workspace sidebar | [[13-workspace-sidebar]] | Depends on multi-workspace UX which MVP doesn't have. Package scaffold landed via TIN-149 — PR #45 review — not wired into `App.tsx`; dead code per D25. |
+| 13 | Vertical workspace sidebar | [[13-workspace-sidebar]] | **Promoted to MVP `[2026-04-22]`** — Paper 9I-0 rail + titlebar shipping via TIN-101 + TIN-151 (see Post-MVP active slices). Original card-based `packages/workspace-sidebar` scaffold from TIN-149 (PR #45) remains unwired and stays post-MVP. |
 | 14 | Session history windowing | [[14-session-history-windowing]] | review — TIN-152 · PR #51. Perf feature. Revisit at >1000 messages/session. |
 | 15 | Connection gate (full splash + retry) | [[15-connection-gate]] | Minimal variant in M7.8 covers MVP. |
 
@@ -237,6 +237,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | TIN-177 + TIN-178 + TIN-181 | 09 | UI trio: `<Modal>` + `<Toast>` provider + `<EmptyState>` primitives in `@tinker/design`; `EmptyState` adopted by Chat / Today / IntegrationsStrip | review | Branch `khvni/ui-design-trio`. One bundled PR. Session: [[2026-04-21-2146-ui-trio]]. Folder-per-component (D21), tokens-only (D14/D23), dual-theme verified. 31 new tests. |
 | TIN-172 | 15 / M7.8 | `<ConnectionGate>` primitive (minimal MCP variant) | review | PR #50. Ships the atom TIN-155 generalizes. |
 | TIN-155 | 15 | `<ConnectionSplash>` full-window splash (generalizes TIN-172) | review | PR stacks on #50. Composes ConnectionGate + Tinker wordmark + spinner + 4 service categories. |
+| TIN-101 + TIN-151 | 13 | Shell composition — Titlebar (36px) + WorkspaceSidebar rail (52px) + ContentArea per Paper 9I-0. Drops old header + IntegrationsStrip chrome. macOS titleBarStyle overlay + hiddenTitle. Folder-per-component + tokens-only. | review | Branch `khvni/tin-101-151`. Paper rail includes visually-disabled placeholders for deferred categories (Explorer / Skills / Agents / Connections / Analytics). Follow-ups filed: shell geometry tokens, cross-platform titlebar on Win/Linux, titlebar panel-toggle wiring. |
 
 ## Rejected (not coming back)
 
