@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 import DOMPurify from 'dompurify';
-import { readTextFile } from '@tauri-apps/plugin-fs';
-import { Badge, Button, EmptyState, IconButton } from '@tinker/design';
+import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { Badge, Button, EmptyState, IconButton, Textarea } from '@tinker/design';
 import {
   MEMORY_CATEGORY_LABELS,
   type MemoryCategoryId,
@@ -18,8 +18,9 @@ export type MemoryDetailProps = {
   diffLoading: boolean;
   onApprove: () => void;
   onDismiss: () => void;
-  onOpenInTab?: (file: MemoryMarkdownFile) => void;
+  onSaved?: (filePath: string) => void;
   isBusy: boolean;
+  allowEditing?: boolean;
   previewMarkdown?: string | null;
 };
 
@@ -47,17 +48,6 @@ const formatRelative = (value: string, formatter: Intl.RelativeTimeFormat): stri
   const divisor = index === 0 ? 1 : RELATIVE_THRESHOLDS[index - 1]!.seconds;
   return formatter.format(Math.round(deltaSeconds / divisor), threshold.unit);
 };
-
-const FolderIcon = (): JSX.Element => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V4.5z"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 const PencilIcon = (): JSX.Element => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -115,8 +105,15 @@ const DetailSection = ({ label, children }: SectionProps): JSX.Element => (
 type PreviewState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; html: string }
+  | { status: 'ready'; html: string; markdown: string }
   | { status: 'error'; message: string };
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return 'Could not update this memory file.';
+};
 
 const useFilePreview = (file: MemoryMarkdownFile | null, previewMarkdown?: string | null): PreviewState => {
   const [state, setState] = useState<PreviewState>({ status: 'idle' });
@@ -131,7 +128,7 @@ const useFilePreview = (file: MemoryMarkdownFile | null, previewMarkdown?: strin
       void (async () => {
         const rendered = await renderMarkdown(previewMarkdown);
         const safeHtml = DOMPurify.sanitize(rendered);
-        setState({ status: 'ready', html: safeHtml });
+        setState({ status: 'ready', html: safeHtml, markdown: previewMarkdown });
       })();
       return;
     }
@@ -147,7 +144,7 @@ const useFilePreview = (file: MemoryMarkdownFile | null, previewMarkdown?: strin
         if (cancelled) {
           return;
         }
-        setState({ status: 'ready', html: safeHtml });
+        setState({ status: 'ready', html: safeHtml, markdown: text });
       } catch (error) {
         if (cancelled) {
           return;
@@ -183,12 +180,50 @@ export const MemoryDetail = ({
   diffLoading,
   onApprove,
   onDismiss,
-  onOpenInTab,
+  onSaved,
   isBusy,
+  allowEditing = true,
   previewMarkdown,
 }: MemoryDetailProps): JSX.Element => {
   const relativeFormatter = useMemo(() => new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }), []);
   const preview = useFilePreview(file, previewMarkdown);
+  const [mode, setMode] = useState<'read' | 'edit'>('read');
+  const [draft, setDraft] = useState('');
+  const [savedDraft, setSavedDraft] = useState('');
+  const [optimisticPreview, setOptimisticPreview] = useState<Extract<PreviewState, { status: 'ready' }> | null>(
+    null,
+  );
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setMode('read');
+    setSaveError(null);
+    setOptimisticPreview(null);
+  }, [file?.absolutePath]);
+
+  const effectivePreview = optimisticPreview ?? preview;
+
+  useEffect(() => {
+    if (effectivePreview.status !== 'ready') {
+      return;
+    }
+
+    setSavedDraft(effectivePreview.markdown);
+    if (mode === 'read') {
+      setDraft(effectivePreview.markdown);
+    }
+  }, [effectivePreview, mode]);
+
+  useEffect(() => {
+    if (optimisticPreview === null || preview.status !== 'ready') {
+      return;
+    }
+
+    if (preview.markdown === optimisticPreview.markdown) {
+      setOptimisticPreview(null);
+    }
+  }, [optimisticPreview, preview]);
 
   if (file === null || bucket === null) {
     return (
@@ -202,7 +237,46 @@ export const MemoryDetail = ({
   }
 
   const showActions = bucket === 'pending';
+  const controlsBusy = isBusy || isSaving;
+  const isEditing = mode === 'edit';
+  const isDirty = draft !== savedDraft;
+  const canStartEditing = allowEditing && effectivePreview.status === 'ready' && !controlsBusy;
   const diffEmpty = !diffLoading && diffText.trim().length === 0;
+
+  const handleSave = async (): Promise<void> => {
+    if (file === null || !allowEditing || isSaving) {
+      return;
+    }
+
+    if (!isDirty) {
+      setMode('read');
+      setSaveError(null);
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await writeTextFile(file.absolutePath, draft);
+      const rendered = await renderMarkdown(draft);
+      const safeHtml = DOMPurify.sanitize(rendered);
+      const nextPreview: Extract<PreviewState, { status: 'ready' }> = {
+        status: 'ready',
+        html: safeHtml,
+        markdown: draft,
+      };
+
+      setSavedDraft(draft);
+      setOptimisticPreview(nextPreview);
+      setMode('read');
+      onSaved?.(file.absolutePath);
+    } catch (error) {
+      setSaveError(getErrorMessage(error));
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="tinker-memory-detail">
@@ -216,10 +290,10 @@ export const MemoryDetail = ({
         </div>
         {showActions ? (
           <div className="tinker-memory-detail__actions">
-            <Button variant="primary" size="m" disabled={isBusy} onClick={onApprove}>
+            <Button variant="primary" size="m" disabled={controlsBusy || isEditing} onClick={onApprove}>
               Approve
             </Button>
-            <Button variant="secondary" size="m" disabled={isBusy} onClick={onDismiss}>
+            <Button variant="secondary" size="m" disabled={controlsBusy || isEditing} onClick={onDismiss}>
               Dismiss
             </Button>
           </div>
@@ -235,37 +309,71 @@ export const MemoryDetail = ({
                 <span className="tinker-memory-detail__file-path">{file.absolutePath}</span>
               </div>
               <div className="tinker-memory-detail__file-card-actions">
-                <IconButton
-                  size="s"
-                  variant="ghost"
-                  label="Open as tab"
-                  icon={<FolderIcon />}
-                  onClick={() => {
-                    onOpenInTab?.(file);
-                  }}
-                />
-                <IconButton
-                  size="s"
-                  variant="ghost"
-                  label="Edit (coming soon)"
-                  icon={<PencilIcon />}
-                  disabled
-                />
+                {isEditing ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="s"
+                      disabled={controlsBusy}
+                      onClick={() => {
+                        setDraft(savedDraft);
+                        setSaveError(null);
+                        setMode('read');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button variant="primary" size="s" disabled={controlsBusy} onClick={() => void handleSave()}>
+                      Save
+                    </Button>
+                  </>
+                ) : (
+                  <IconButton
+                    size="s"
+                    variant="ghost"
+                    label="Edit"
+                    icon={<PencilIcon />}
+                    disabled={!canStartEditing}
+                    onClick={() => {
+                      setDraft(savedDraft);
+                      setSaveError(null);
+                      setMode('edit');
+                    }}
+                  />
+                )}
               </div>
             </div>
             <div className="tinker-memory-detail__file-card-body">
-              {preview.status === 'loading' ? (
+              {saveError ? <p className="tinker-memory-detail__muted">{saveError}</p> : null}
+              {effectivePreview.status === 'loading' ? (
                 <p className="tinker-memory-detail__muted">Loading preview…</p>
               ) : null}
-              {preview.status === 'error' ? (
-                <p className="tinker-memory-detail__muted">Could not load file: {preview.message}</p>
+              {effectivePreview.status === 'error' ? (
+                <p className="tinker-memory-detail__muted">Could not load file: {effectivePreview.message}</p>
               ) : null}
-              {preview.status === 'ready' ? <MarkdownPreview sanitizedHtml={preview.html} /> : null}
+              {effectivePreview.status === 'ready' && isEditing ? (
+                <Textarea
+                  className="tinker-memory-detail__editor"
+                  resize="none"
+                  value={draft}
+                  onChange={(event) => {
+                    setDraft(event.currentTarget.value);
+                    setSaveError(null);
+                  }}
+                  spellCheck={false}
+                  placeholder="Write your note in Markdown."
+                />
+              ) : null}
+              {effectivePreview.status === 'ready' && !isEditing ? (
+                <MarkdownPreview sanitizedHtml={effectivePreview.html} />
+              ) : null}
             </div>
             <div className="tinker-memory-detail__file-card-footer">
               <span className="tinker-memory-detail__footer-eyebrow">Markdown</span>
               <span className="tinker-memory-detail__footer-dot" aria-hidden="true" />
-              <span className="tinker-memory-detail__footer-mode">Read mode</span>
+              <span className="tinker-memory-detail__footer-mode">
+                {isSaving ? 'Saving…' : isEditing ? 'Edit mode' : 'Read mode'}
+              </span>
             </div>
           </div>
         </DetailSection>
