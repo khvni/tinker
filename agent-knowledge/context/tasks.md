@@ -57,6 +57,7 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 | 1.8 | Delete `workspace/DockviewContext.ts`, `workspace/chat-panels.ts` + callers. Delete Dockview CSS imports. | S | 1.7 | review | TIN-9 · PR #62 (cleanup finish after PR #61 swap). |
 | 1.9 | Remove `dockview-react` from `apps/desktop/package.json`. Run `pnpm install`. Verify `pnpm typecheck` passes. | S | 1.8 | review | TIN-10 · PR #62. |
 | 1.10 | Layout snapshot migration: detect old Dockview-shaped JSON in SQLite `layouts` table → delete + re-seed default. Log once. | S | 1.9 | review | TIN-11 · PR #62. One-shot schema migration drops incompatible pre-v1 snapshots. |
+| 1.11 | Workspace sidebar metadata API contract: `GET /workspace.cards` for reads + `POST /workspace.metadata` for contributor pushes. Ship local stub now; keep host-service transport deferred per D25/D17. | S | 1.7 | review | TIN-150 · PR #84. Typed local stub lives in `@tinker/workspace-sidebar` and supports create/update/remove/sort/subscribe flows. |
 
 ### M2 — Folder-scoped session (every chat starts in a local directory, per-user)
 Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to current user from M8.
@@ -220,7 +221,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | 10 | `@tinker/panes` workspace layout | [[10-tinker-panes]] | MVP scope folded into M1 (registration + Dockview retirement). |
 | 11 | Device ↔ host-service split | [[11-host-service]] | Premature abstraction for single-user MVP. Revisit when headless mode becomes real scope. |
 | 12 | Workspace attention coordinator | [[12-attention-coordinator]] | Multi-pane UX polish. MVP = one pane. |
-| 13 | Vertical workspace sidebar | [[13-workspace-sidebar]] | Depends on multi-workspace UX which MVP doesn't have. Package scaffold landed via TIN-149 — PR #45 review — not wired into `App.tsx`; dead code per D25. |
+| 13 | Vertical workspace sidebar | [[13-workspace-sidebar]] | Partially reopened on 2026-04-22 for MVP slice TIN-101/TIN-150/TIN-151. Keep the rest of multi-workspace scope post-MVP. Package scaffold landed via TIN-149; metadata stub landed via TIN-150 · PR #84. |
 | 14 | Session history windowing | [[14-session-history-windowing]] | review — TIN-152 · PR #51. Perf feature. Revisit at >1000 messages/session. |
 | 15 | Connection gate (full splash + retry) | [[15-connection-gate]] | Minimal variant in M7.8 covers MVP. |
 
