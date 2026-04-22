@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import {
   Badge,
@@ -9,6 +18,7 @@ import {
   SearchInput,
   SegmentedControl,
   Skeleton,
+  TextInput,
   Toggle,
   useToast,
 } from '@tinker/design';
@@ -29,9 +39,17 @@ import './PlaybookPane.css';
 const MAX_PREVIEW_BODY_LENGTH = 16_000;
 
 const SettingsIcon = (): JSX.Element => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+  </svg>
+);
+
+const OverflowIcon = (): JSX.Element => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="5" cy="12" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
   </svg>
 );
 
@@ -93,6 +111,7 @@ const PlaybookPaneInner = ({
   const [previewSkill, setPreviewSkill] = useState<Skill | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [uninstallTarget, setUninstallTarget] = useState<Skill | null>(null);
 
   const refresh = useCallback(async (): Promise<ReadonlyArray<Skill>> => {
     const next = await skillStore.list();
@@ -250,6 +269,27 @@ const PlaybookPaneInner = ({
     });
   }, [gitAvailabilityOverride, refresh, skillStore, skillsRootPath, syncSkillsOverride, toast]);
 
+  const handleConfirmUninstall = useCallback(
+    async (skill: Skill): Promise<void> => {
+      try {
+        await skillStore.uninstall(skill.slug);
+        await refresh();
+        onActiveSkillsChanged();
+        toast.show({ title: `Uninstalled ${skill.title}`, variant: 'success' });
+        void runAutoSync();
+      } catch (error) {
+        toast.show({
+          title: 'Could not uninstall skill',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'error',
+        });
+      } finally {
+        setUninstallTarget(null);
+      }
+    },
+    [onActiveSkillsChanged, refresh, runAutoSync, skillStore, toast],
+  );
+
   const roleOptions = useMemo(() => derivePlaybookRoleOptions(skills), [skills]);
 
   const filteredSkills = useMemo(() => {
@@ -318,10 +358,10 @@ const PlaybookPaneInner = ({
           </div>
         ) : filteredSkills.length === 0 ? (
           <EmptyState
-            title={skills.length === 0 ? 'No skills yet' : 'No skills match this search'}
+            title={skills.length === 0 ? 'Empty bookshelf.' : 'No plays match this search.'}
             description={
               skills.length === 0
-                ? 'Install a skill markdown from your disk, or save a conversation as a skill from the chat.'
+                ? 'Install a skill from disk or save a conversation to start your playbook.'
                 : 'Try a different search or clear the role filter.'
             }
             action={
@@ -344,35 +384,29 @@ const PlaybookPaneInner = ({
                 skill={skill}
                 onPreview={() => setPreviewSkill(skill)}
                 onToggleActive={(next) => void handleToggleActive(skill, next)}
+                onRequestUninstall={() => setUninstallTarget(skill)}
               />
             ))}
           </div>
         )}
       </div>
 
-      <Modal
-        open={previewSkill !== null}
+      <PreviewModal
+        skill={previewSkill}
         onClose={() => setPreviewSkill(null)}
-        title={previewSkill?.title ?? 'Skill preview'}
-        actions={
-          <Button variant="primary" onClick={() => setPreviewSkill(null)}>
-            Close
-          </Button>
-        }
-      >
-        {previewSkill ? (
-          <div className="tinker-playbook-pane__preview">
-            {previewSkill.description ? (
-              <p className="tinker-playbook-pane__preview-description">{previewSkill.description}</p>
-            ) : null}
-            <div className="tinker-chat-markdown">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {previewSkill.body.slice(0, MAX_PREVIEW_BODY_LENGTH)}
-              </ReactMarkdown>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+        onToggleActive={(next) => {
+          if (previewSkill) {
+            void handleToggleActive(previewSkill, next);
+            setPreviewSkill(null);
+          }
+        }}
+      />
+
+      <UninstallConfirmModal
+        skill={uninstallTarget}
+        onClose={() => setUninstallTarget(null)}
+        onConfirm={handleConfirmUninstall}
+      />
 
       <PlaybookSettingsModal
         open={settingsOpen}
@@ -389,14 +423,115 @@ type SkillCardProps = {
   readonly skill: Skill;
   readonly onPreview: () => void;
   readonly onToggleActive: (next: boolean) => void;
+  readonly onRequestUninstall: () => void;
 };
 
-const SkillCard = ({ skill, onPreview, onToggleActive }: SkillCardProps): JSX.Element => {
+const SkillCard = ({ skill, onPreview, onToggleActive, onRequestUninstall }: SkillCardProps): JSX.Element => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    const handleOutside = (event: MouseEvent): void => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [menuOpen]);
+
+  const handleCardKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>): void => {
+      // Ignore keys that originate from focusable children (toggle, button,
+      // overflow menu) so we don't hijack their native behavior.
+      if (event.target !== event.currentTarget) {
+        return;
+      }
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onPreview();
+        return;
+      }
+
+      if (event.key === 'a' || event.key === 'A') {
+        event.preventDefault();
+        onToggleActive(!skill.active);
+        return;
+      }
+
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        event.preventDefault();
+        onRequestUninstall();
+      }
+    },
+    [onPreview, onRequestUninstall, onToggleActive, skill.active],
+  );
+
+  const glyph = skill.active ? '\u25C6' : '\u25C7';
+
   return (
-    <article className="tinker-playbook-card">
+    <article
+      className={`tinker-playbook-card${skill.active ? ' tinker-playbook-card--active' : ''}`}
+      role="article"
+      tabIndex={0}
+      aria-label={skill.title}
+      aria-current={skill.active ? 'true' : undefined}
+      onKeyDown={handleCardKeyDown}
+    >
       <header className="tinker-playbook-card__header">
-        <h3 className="tinker-playbook-card__title">{skill.title}</h3>
-        {skill.role ? <Badge variant="skill" size="small">{skill.role}</Badge> : null}
+        <h3 className="tinker-playbook-card__title">
+          <span
+            className="tinker-playbook-card__glyph"
+            aria-hidden="true"
+          >
+            {glyph}
+          </span>
+          <span className="tinker-playbook-card__title-text">{skill.title}</span>
+        </h3>
+        <div className="tinker-playbook-card__header-actions">
+          {skill.role ? <Badge variant="skill" size="small">{skill.role}</Badge> : null}
+          <div className="tinker-playbook-card__menu" ref={menuRef}>
+            <IconButton
+              variant="ghost"
+              size="s"
+              icon={<OverflowIcon />}
+              label={`More actions for ${skill.title}`}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((prev) => !prev)}
+            />
+            {menuOpen ? (
+              <div className="tinker-playbook-card__menu-popover" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="tinker-playbook-card__menu-item tinker-playbook-card__menu-item--danger"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRequestUninstall();
+                  }}
+                >
+                  Uninstall…
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </header>
       {skill.description ? (
         <p className="tinker-playbook-card__description">{skill.description}</p>
@@ -412,7 +547,7 @@ const SkillCard = ({ skill, onPreview, onToggleActive }: SkillCardProps): JSX.El
             onChange={onToggleActive}
             label={skill.active ? `Disable ${skill.title} in session` : `Enable ${skill.title} in session`}
           />
-          <span>Active in session</span>
+          <span>{skill.active ? 'In play' : 'Shelved'}</span>
         </label>
         <Button variant="ghost" size="s" onClick={onPreview}>
           Preview
@@ -422,3 +557,149 @@ const SkillCard = ({ skill, onPreview, onToggleActive }: SkillCardProps): JSX.El
   );
 };
 
+type PreviewModalProps = {
+  readonly skill: Skill | null;
+  readonly onClose: () => void;
+  readonly onToggleActive: (next: boolean) => void;
+};
+
+const PreviewModal = ({ skill, onClose, onToggleActive }: PreviewModalProps): JSX.Element => {
+  if (!skill) {
+    return (
+      <Modal open={false} onClose={onClose} title="Skill preview">
+        {null}
+      </Modal>
+    );
+  }
+
+  const meta: string[] = [];
+  if (skill.role) meta.push(skill.role);
+  if (skill.version) meta.push(`v${skill.version}`);
+  if (skill.author) meta.push(skill.author);
+  if (skill.tags.length > 0) meta.push(`${skill.tags.length} tag${skill.tags.length === 1 ? '' : 's'}`);
+  if (skill.tools.length > 0) meta.push(`${skill.tools.length} tool${skill.tools.length === 1 ? '' : 's'}`);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={skill.title}
+      contentClassName="tinker-playbook-preview-card"
+      actions={
+        <>
+          <Button
+            variant="ghost"
+            onClick={() => onToggleActive(!skill.active)}
+          >
+            {skill.active ? 'Shelve' : 'Put in play'}
+          </Button>
+          <Button variant="primary" onClick={onClose}>
+            Close
+          </Button>
+        </>
+      }
+    >
+      <div className="tinker-playbook-pane__preview">
+        {meta.length > 0 ? (
+          <p className="tinker-playbook-pane__preview-meta" aria-label="Skill metadata">
+            {meta.join(' · ')}
+          </p>
+        ) : null}
+        {skill.description ? (
+          <p className="tinker-playbook-pane__preview-description">{skill.description}</p>
+        ) : null}
+        <div className="tinker-chat-markdown tinker-playbook-pane__preview-body">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {skill.body.slice(0, MAX_PREVIEW_BODY_LENGTH)}
+          </ReactMarkdown>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+type UninstallConfirmModalProps = {
+  readonly skill: Skill | null;
+  readonly onClose: () => void;
+  readonly onConfirm: (skill: Skill) => Promise<void>;
+};
+
+const UninstallConfirmModal = ({
+  skill,
+  onClose,
+  onConfirm,
+}: UninstallConfirmModalProps): JSX.Element => {
+  const inputId = useId();
+  const [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!skill) {
+      setConfirmation('');
+      setBusy(false);
+    }
+  }, [skill]);
+
+  if (!skill) {
+    return (
+      <Modal open={false} onClose={onClose} title="Uninstall skill">
+        {null}
+      </Modal>
+    );
+  }
+
+  const matches = confirmation.trim() === skill.title.trim();
+  const disableConfirm = !matches || busy;
+
+  const handleConfirm = async (): Promise<void> => {
+    if (disableConfirm) {
+      return;
+    }
+    setBusy(true);
+    await onConfirm(skill);
+    setConfirmation('');
+    setBusy(false);
+  };
+
+  return (
+    <Modal
+      open
+      onClose={busy ? () => undefined : onClose}
+      title="Uninstall skill"
+      actions={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => void handleConfirm()}
+            disabled={disableConfirm}
+          >
+            {busy ? 'Uninstalling…' : 'Uninstall'}
+          </Button>
+        </>
+      }
+    >
+      <div className="tinker-playbook-pane__uninstall">
+        <p className="tinker-playbook-pane__uninstall-copy">
+          This removes <strong>{skill.title}</strong> from your playbook. The
+          skill file will be deleted from disk.
+        </p>
+        <label className="tinker-playbook-pane__uninstall-field" htmlFor={inputId}>
+          <span className="tinker-playbook-pane__uninstall-label">
+            Type the skill title to confirm
+          </span>
+          <TextInput
+            id={inputId}
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder={skill.title}
+            aria-label="Confirm skill title"
+            autoComplete="off"
+          />
+        </label>
+      </div>
+    </Modal>
+  );
+};

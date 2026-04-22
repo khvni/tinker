@@ -104,8 +104,8 @@ describe('SaveAsSkillModal', () => {
     expect(markup).toContain('aria-label="Skill tools"');
     expect(markup).toContain('aria-label="Skill description"');
     expect(markup).toContain('aria-label="Skill body"');
-    expect(markup).toContain('Activate immediately');
-    expect(markup).toContain('Save skill');
+    expect(markup).toContain('Activate in this session after publish');
+    expect(markup).toContain('Publish skill');
   });
 
   it('initial render disables the Save button because title + slug are empty', () => {
@@ -125,7 +125,7 @@ describe('SaveAsSkillModal', () => {
 
     // Primary Save button is disabled when the title+body are empty.
     expect(markup).toMatch(/tk-button--primary[^"]*tk-button--disabled[^"]*"\s+disabled/);
-    expect(markup).toContain('Save skill');
+    expect(markup).toContain('Publish skill');
   });
 
   it('does not render the dialog when closed', () => {
@@ -223,7 +223,7 @@ describe('SaveAsSkillModal — DOM submit', () => {
     await flushEffects();
 
     const saveButton = Array.from(container.querySelectorAll('button')).find(
-      (btn) => btn.textContent?.trim() === 'Save skill',
+      (btn) => btn.textContent?.trim() === 'Publish skill',
     ) as HTMLButtonElement | undefined;
     if (!saveButton) throw new Error('Save skill button missing');
     expect(saveButton.disabled).toBe(false);

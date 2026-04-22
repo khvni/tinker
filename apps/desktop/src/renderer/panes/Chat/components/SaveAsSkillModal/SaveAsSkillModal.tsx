@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type JSX } from 'react';
 import {
   Button,
   Modal,
+  Progress,
   TextInput,
   Textarea,
   Toggle,
@@ -143,8 +144,13 @@ export const SaveAsSkillModal = ({
           <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => void handleSubmit()} disabled={disableSubmit}>
-            {saving ? 'Saving…' : 'Save skill'}
+          <Button
+            variant="primary"
+            onClick={() => void handleSubmit()}
+            disabled={disableSubmit}
+            {...(saving ? { leadingIcon: <Progress variant="spinner" size="sm" /> } : {})}
+          >
+            {saving ? 'Publishing…' : 'Publish skill'}
           </Button>
         </>
       }
@@ -165,8 +171,14 @@ export const SaveAsSkillModal = ({
             aria-label="Skill title"
             required
           />
-          <span className="tinker-save-skill-modal__hint">
-            Slug: <code>{slugLooksValid ? computedSlug : '—'}</code>
+          <span
+            className="tinker-save-skill-modal__slug"
+            aria-live="polite"
+          >
+            <span aria-hidden="true" className="tinker-save-skill-modal__slug-arrow">→</span>
+            <code className="tinker-save-skill-modal__slug-value">
+              {slugLooksValid ? computedSlug : '—'}
+            </code>
           </span>
         </label>
 
@@ -215,6 +227,7 @@ export const SaveAsSkillModal = ({
         <label className="tinker-save-skill-modal__field">
           <span className="tinker-save-skill-modal__label">Body</span>
           <Textarea
+            className="tinker-save-skill-modal__body"
             value={body}
             onChange={(event) => setBody(event.target.value)}
             rows={10}
@@ -230,7 +243,7 @@ export const SaveAsSkillModal = ({
             onChange={setActivate}
             label={activate ? 'Disable activate-immediately' : 'Enable activate-immediately'}
           />
-          <span>Activate immediately</span>
+          <span>Activate in this session after publish</span>
         </label>
       </form>
     </Modal>

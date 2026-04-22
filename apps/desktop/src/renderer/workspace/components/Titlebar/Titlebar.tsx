@@ -38,10 +38,11 @@ const SettingsIcon = (): JSX.Element => (
   </svg>
 );
 
-const SparkleIcon = (): JSX.Element => (
+const PlaybookIcon = (): JSX.Element => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 3.5 13.4 8 18 9.4 13.4 10.8 12 15.4 10.6 10.8 6 9.4 10.6 8 12 3.5Z" />
-    <path d="M18 15.5 18.7 17.3 20.5 18 18.7 18.7 18 20.5 17.3 18.7 15.5 18 17.3 17.3 18 15.5Z" />
+    <path d="M5 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5Z" />
+    <path d="M7 5v14" />
+    <path d="M9 9h5M9 12h5" />
   </svg>
 );
 
@@ -89,7 +90,7 @@ export const Titlebar = ({
           <IconButton
             variant="ghost"
             size="s"
-            icon={<SparkleIcon />}
+            icon={<PlaybookIcon />}
             label="Playbook"
             onClick={onOpenPlaybook}
           />

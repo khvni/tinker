@@ -105,7 +105,7 @@ export const PlaybookSettingsModal = ({
     <Modal
       open={open}
       onClose={onClose}
-      title="Playbook git sync"
+      title="Skill sync settings"
       actions={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving || syncing}>
@@ -118,51 +118,62 @@ export const PlaybookSettingsModal = ({
       }
     >
       <div className="tinker-playbook-settings">
-        <label className="tinker-playbook-settings__field">
-          <span className="tinker-playbook-settings__label">Remote URL</span>
-          <TextInput
-            value={remoteUrl}
-            onChange={(event) => setRemoteUrl(event.target.value)}
-            placeholder="git@github.com:you/tinker-skills.git"
-          />
-        </label>
-        <label className="tinker-playbook-settings__field">
-          <span className="tinker-playbook-settings__label">Branch</span>
-          <TextInput
-            value={branch}
-            onChange={(event) => setBranch(event.target.value)}
-            placeholder={DEFAULT_BRANCH}
-          />
-        </label>
-        <label className="tinker-playbook-settings__field">
-          <span className="tinker-playbook-settings__label">Author name (optional)</span>
-          <TextInput
-            value={authorName}
-            onChange={(event) => setAuthorName(event.target.value)}
-            placeholder="Tinker"
-          />
-        </label>
-        <label className="tinker-playbook-settings__field">
-          <span className="tinker-playbook-settings__label">Author email (optional)</span>
-          <TextInput
-            value={authorEmail}
-            onChange={(event) => setAuthorEmail(event.target.value)}
-            placeholder="tinker@local"
-          />
-        </label>
+        <div>
+          <p className="tinker-playbook-settings__section-eyebrow">Remote</p>
+          <h3 className="tinker-playbook-settings__section-title">Git mirror</h3>
+        </div>
+
+        <div className="tinker-playbook-settings__grid">
+          <label className="tinker-playbook-settings__field">
+            <span className="tinker-playbook-settings__label">Remote URL</span>
+            <TextInput
+              value={remoteUrl}
+              onChange={(event) => setRemoteUrl(event.target.value)}
+              placeholder="git@github.com:you/tinker-skills.git"
+              aria-label="Remote URL"
+            />
+          </label>
+          <label className="tinker-playbook-settings__field">
+            <span className="tinker-playbook-settings__label">Branch</span>
+            <TextInput
+              value={branch}
+              onChange={(event) => setBranch(event.target.value)}
+              placeholder={DEFAULT_BRANCH}
+              aria-label="Branch"
+            />
+          </label>
+          <label className="tinker-playbook-settings__field">
+            <span className="tinker-playbook-settings__label">Author name (optional)</span>
+            <TextInput
+              value={authorName}
+              onChange={(event) => setAuthorName(event.target.value)}
+              placeholder="Tinker"
+              aria-label="Author name"
+            />
+          </label>
+          <label className="tinker-playbook-settings__field">
+            <span className="tinker-playbook-settings__label">Author email (optional)</span>
+            <TextInput
+              value={authorEmail}
+              onChange={(event) => setAuthorEmail(event.target.value)}
+              placeholder="tinker@local"
+              aria-label="Author email"
+            />
+          </label>
+        </div>
 
         <div className="tinker-playbook-settings__sync-row">
           <Button
             variant="secondary"
             onClick={() => void handleSyncNow()}
             disabled={syncing || remoteUrl.trim().length === 0}
+            {...(syncing ? { leadingIcon: <Progress variant="spinner" size="sm" /> } : {})}
           >
             {syncing ? 'Syncing…' : 'Sync now'}
           </Button>
-          {syncing ? <Progress variant="spinner" size="sm" /> : null}
         </div>
 
-        {error ? <p className="tinker-playbook-settings__error">{error}</p> : null}
+        {error ? <p className="tinker-playbook-settings__error" role="alert">{error}</p> : null}
       </div>
     </Modal>
   );

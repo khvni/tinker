@@ -149,4 +149,34 @@ describe('<Titlebar>', () => {
       expect(spy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('Playbook affordance', () => {
+    it('omits the Playbook button when onOpenPlaybook is not provided', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          onNewSession={() => undefined}
+          onOpenMemory={() => undefined}
+          onOpenSettings={() => undefined}
+        />,
+      );
+      expect(markup).not.toContain('aria-label="Playbook"');
+    });
+
+    it('renders the Playbook button with a stacked-book glyph when the callback is provided', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          onNewSession={() => undefined}
+          onOpenMemory={() => undefined}
+          onOpenSettings={() => undefined}
+          onOpenPlaybook={() => undefined}
+        />,
+      );
+      expect(markup).toContain('aria-label="Playbook"');
+      // Stacked-book glyph: vertical spine + two shelf lines.
+      expect(markup).toContain('M7 5v14');
+      expect(markup).toContain('M9 9h5M9 12h5');
+    });
+  });
 });
