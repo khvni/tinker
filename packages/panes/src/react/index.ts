@@ -7,5 +7,6 @@ export type {
   PaneRendererProps,
   ResolvedTabTitle,
   TabStripAction,
+  WorkspaceAttentionConfig,
   WorkspaceProps,
 } from './types.js';

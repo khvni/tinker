@@ -1,5 +1,10 @@
 import { useCallback, useMemo, useRef, useState, type JSX } from 'react';
 import {
+  countUnreadPanes,
+  createAttentionStore,
+  useAttentionSnapshot,
+} from '@tinker/attention';
+import {
   createWorkspaceStore,
   type PaneRegistry,
   type WorkspaceStore,
@@ -12,6 +17,8 @@ import '@tinker/panes/styles.css';
 import '@tinker/design/styles/tokens.css';
 import { Badge, Button, TextInput } from '@tinker/design';
 import './panes-demo.css';
+
+const PANES_DEMO_WORKSPACE_ID = 'panes-demo';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Demo data shapes
@@ -137,8 +144,11 @@ const seedStore = (): WorkspaceStore<DemoData> => {
 
 export const PanesDemo = (): JSX.Element => {
   const storeRef = useRef<WorkspaceStore<DemoData> | null>(null);
+  const attentionStoreRef = useRef(createAttentionStore());
   if (!storeRef.current) storeRef.current = seedStore();
   const store = storeRef.current;
+  const attentionStore = attentionStoreRef.current;
+  const attentionSnapshot = useAttentionSnapshot(attentionStore);
 
   const [paneCounter, setPaneCounter] = useState(100);
   const [tabCounter, setTabCounter] = useState(3);
@@ -201,6 +211,17 @@ export const PanesDemo = (): JSX.Element => {
     });
   }, [paneCounter, store]);
 
+  const signalPane = useCallback(
+    (paneId: string, reason: 'notification-arrival' | 'navigation') => {
+      attentionStore.getState().actions.signal({
+        workspaceId: PANES_DEMO_WORKSPACE_ID,
+        paneId,
+        reason,
+      });
+    },
+    [attentionStore],
+  );
+
   const stats = useMemo(() => {
     const state = store.getState();
     const tab = state.tabs.find((t) => t.id === state.activeTabId);
@@ -217,6 +238,8 @@ export const PanesDemo = (): JSX.Element => {
     count(tab.layout);
     return { stacks: collectStacks(tab.layout).length, panes: Object.keys(tab.panes).length, splits };
   }, [store]);
+  const unreadCount = countUnreadPanes(attentionSnapshot);
+  const activeFlash = attentionSnapshot.activeFlash?.accent ?? 'none';
 
   return (
     <main className="panes-demo-shell">
@@ -241,11 +264,20 @@ export const PanesDemo = (): JSX.Element => {
           <Button variant="secondary" size="s" onClick={splitActiveBottom}>
             + Split bottom
           </Button>
+          <Button variant="secondary" size="s" onClick={() => signalPane('p-notes', 'notification-arrival')}>
+            Signal notes
+          </Button>
+          <Button variant="secondary" size="s" onClick={() => signalPane('p-term', 'navigation')}>
+            Flash terminal
+          </Button>
           <Button variant="primary" size="s" onClick={addTab}>
             + New workspace tab
           </Button>
           <Badge variant="accent" size="small">
             stacks {stats.stacks} · panes {stats.panes} · splits {stats.splits}
+          </Badge>
+          <Badge variant="default" size="small">
+            unread {unreadCount} · flash {activeFlash}
           </Badge>
         </div>
       </header>
@@ -254,6 +286,10 @@ export const PanesDemo = (): JSX.Element => {
         <Workspace
           store={store}
           registry={registry}
+          attention={{
+            store: attentionStore,
+            workspaceId: PANES_DEMO_WORKSPACE_ID,
+          }}
           ariaLabel="Tinker panes demo"
           tabStripActions={[{ id: 'new-tab', label: 'New tab', onSelect: addTab, icon: '+' }]}
           emptyState={<p>Click &quot;New workspace tab&quot; to begin.</p>}

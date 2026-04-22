@@ -22,6 +22,10 @@ pnpm install
 pnpm --filter @tinker/desktop dev
 ```
 
+Manual verification:
+
+- [docs/development.md](./docs/development.md) — MVP smoke-test checklist for local runs
+
 ## Architecture
 
 ```text
