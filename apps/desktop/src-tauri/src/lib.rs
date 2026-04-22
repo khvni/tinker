@@ -121,7 +121,7 @@ fn ensure_main_window(app: &tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn restart_opencode(app: tauri::AppHandle) -> Result<OpencodeConnection, String> {
-  stop_opencode(&app);
+  terminate_legacy_opencode(&app);
   bootstrap_opencode(&app).await?;
   let state = app.state::<OpencodeState>();
   clone_opencode_connection(&state)
@@ -248,7 +248,7 @@ async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
   let connection = match wait_for_opencode_connection(&mut receiver, username, password).await {
     Ok(connection) => connection,
     Err(error) => {
-      stop_opencode(app);
+      terminate_legacy_opencode(app);
       return Err(error);
     }
   };
@@ -287,7 +287,7 @@ async fn bootstrap_opencode(app: &tauri::AppHandle) -> Result<(), String> {
   Ok(())
 }
 
-fn stop_opencode(app: &tauri::AppHandle) {
+fn terminate_legacy_opencode(app: &tauri::AppHandle) {
   let child = {
     let state = app.state::<OpencodeState>();
 
@@ -329,7 +329,8 @@ pub fn run() {
       commands::keychain::save_refresh_token,
       commands::keychain::load_refresh_token,
       commands::keychain::clear_refresh_token,
-      commands::opencode::start_opencode
+      commands::opencode::start_opencode,
+      commands::opencode::stop_opencode
     ])
     .setup(|app| {
       tauri::async_runtime::block_on(async {
@@ -346,7 +347,7 @@ pub fn run() {
   app.run(move |_app, event| {
     if matches!(event, RunEvent::Exit) {
       crate::commands::auth::stop_better_auth(&handle);
-      stop_opencode(&handle);
+      terminate_legacy_opencode(&handle);
     }
   });
 }

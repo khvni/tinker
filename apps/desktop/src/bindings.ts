@@ -39,3 +39,7 @@ export function loadRefreshToken(provider: RefreshTokenProvider, userId: string)
 export function clearRefreshToken(provider: RefreshTokenProvider, userId: string): Promise<void> {
   return invoke('clear_refresh_token', { provider, userId });
 }
+
+export function stopOpencode(pid: number): Promise<void> {
+  return invoke<void>('stop_opencode', { pid });
+}
