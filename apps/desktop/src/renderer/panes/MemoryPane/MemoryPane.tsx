@@ -20,6 +20,14 @@ import {
   dismissMemoryEntry,
   readMemoryDiff,
 } from './memory-commands.js';
+import { isTauriRuntime } from '../../runtime.js';
+import {
+  PREVIEW_MEMORY_BUCKETS,
+  PREVIEW_MEMORY_DIFF,
+  PREVIEW_MEMORY_MARKDOWN,
+  PREVIEW_MEMORY_REFERENCE_TIME_MS,
+  PREVIEW_MEMORY_SELECTION,
+} from './memory-preview.js';
 import './MemoryPane.css';
 
 type LoadState =
@@ -51,6 +59,8 @@ type Selection = {
 export const MemoryPane = (): JSX.Element => {
   const { currentUserId } = useMemoryPaneRuntime();
   const filePaneRuntime = useFilePaneRuntime();
+  const nativeRuntime = isTauriRuntime();
+  const browserPreview = !nativeRuntime && import.meta.env.VITE_E2E === '1';
 
   const [reloadToken, setReloadToken] = useState(0);
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
@@ -69,6 +79,18 @@ export const MemoryPane = (): JSX.Element => {
   useEffect(() => {
     let cancelled = false;
     setLoad({ status: 'loading' });
+
+    if (browserPreview) {
+      setCategorised({
+        rootPath: '/memory/demo',
+        buckets: PREVIEW_MEMORY_BUCKETS,
+      });
+      setSelection((current) => current ?? PREVIEW_MEMORY_SELECTION);
+      setLoad({ status: 'ready' });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     void listCategorisedMemoryFiles(currentUserId)
       .then((result) => {
@@ -99,7 +121,7 @@ export const MemoryPane = (): JSX.Element => {
     return () => {
       cancelled = true;
     };
-  }, [currentUserId, reloadToken]);
+  }, [browserPreview, currentUserId, reloadToken]);
 
   useEffect(() => {
     return subscribeMemoryPathChanged(() => {
@@ -110,6 +132,12 @@ export const MemoryPane = (): JSX.Element => {
   useEffect(() => {
     if (!selection) {
       setDiffText('');
+      setDiffLoading(false);
+      return;
+    }
+
+    if (browserPreview) {
+      setDiffText(PREVIEW_MEMORY_DIFF[selection.file.absolutePath] ?? '');
       setDiffLoading(false);
       return;
     }
@@ -133,7 +161,7 @@ export const MemoryPane = (): JSX.Element => {
     return () => {
       cancelled = true;
     };
-  }, [selection]);
+  }, [browserPreview, selection]);
 
   const reloadFiles = useCallback((): void => {
     setReloadToken((value) => value + 1);
@@ -159,6 +187,10 @@ export const MemoryPane = (): JSX.Element => {
     if (!selection || selection.bucket !== 'pending' || isBusy) {
       return;
     }
+    if (browserPreview) {
+      setActionError('Approve is unavailable in browser preview.');
+      return;
+    }
     setIsBusy(true);
     setActionError(null);
     try {
@@ -178,10 +210,14 @@ export const MemoryPane = (): JSX.Element => {
     } finally {
       setIsBusy(false);
     }
-  }, [isBusy, reloadFiles, selection]);
+  }, [browserPreview, isBusy, reloadFiles, selection]);
 
   const handleDismiss = useCallback(async (): Promise<void> => {
     if (!selection || selection.bucket !== 'pending' || isBusy) {
+      return;
+    }
+    if (browserPreview) {
+      setActionError('Dismiss is unavailable in browser preview.');
       return;
     }
     setIsBusy(true);
@@ -195,7 +231,7 @@ export const MemoryPane = (): JSX.Element => {
     } finally {
       setIsBusy(false);
     }
-  }, [isBusy, reloadFiles, selection]);
+  }, [browserPreview, isBusy, reloadFiles, selection]);
 
   const handleOpenInTab = useCallback(
     (file: MemoryMarkdownFile): void => {
@@ -230,6 +266,7 @@ export const MemoryPane = (): JSX.Element => {
         selectedPath={selection?.file.absolutePath ?? null}
         onSelect={handleSelect}
         seenPaths={seenPaths}
+        referenceTimeMs={browserPreview ? PREVIEW_MEMORY_REFERENCE_TIME_MS : undefined}
       />
       <div className="tinker-memory-pane__detail">
         {actionError ? (
@@ -250,6 +287,9 @@ export const MemoryPane = (): JSX.Element => {
           }}
           onOpenInTab={handleOpenInTab}
           isBusy={isBusy}
+          previewMarkdown={
+            !browserPreview || !selection ? null : (PREVIEW_MEMORY_MARKDOWN[selection.file.absolutePath] ?? null)
+          }
         />
       </div>
     </section>

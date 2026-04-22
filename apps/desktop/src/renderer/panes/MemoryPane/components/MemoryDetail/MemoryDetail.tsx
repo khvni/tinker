@@ -20,6 +20,7 @@ export type MemoryDetailProps = {
   onDismiss: () => void;
   onOpenInTab?: (file: MemoryMarkdownFile) => void;
   isBusy: boolean;
+  previewMarkdown?: string | null;
 };
 
 const RELATIVE_THRESHOLDS: ReadonlyArray<{ seconds: number; unit: Intl.RelativeTimeFormatUnit }> = [
@@ -117,12 +118,21 @@ type PreviewState =
   | { status: 'ready'; html: string }
   | { status: 'error'; message: string };
 
-const useFilePreview = (file: MemoryMarkdownFile | null): PreviewState => {
+const useFilePreview = (file: MemoryMarkdownFile | null, previewMarkdown?: string | null): PreviewState => {
   const [state, setState] = useState<PreviewState>({ status: 'idle' });
 
   useEffect(() => {
     if (file === null) {
       setState({ status: 'idle' });
+      return;
+    }
+
+    if (typeof previewMarkdown === 'string') {
+      void (async () => {
+        const rendered = await renderMarkdown(previewMarkdown);
+        const safeHtml = DOMPurify.sanitize(rendered);
+        setState({ status: 'ready', html: safeHtml });
+      })();
       return;
     }
 
@@ -150,7 +160,7 @@ const useFilePreview = (file: MemoryMarkdownFile | null): PreviewState => {
     return () => {
       cancelled = true;
     };
-  }, [file]);
+  }, [file, previewMarkdown]);
 
   return state;
 };
@@ -175,9 +185,10 @@ export const MemoryDetail = ({
   onDismiss,
   onOpenInTab,
   isBusy,
+  previewMarkdown,
 }: MemoryDetailProps): JSX.Element => {
   const relativeFormatter = useMemo(() => new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }), []);
-  const preview = useFilePreview(file);
+  const preview = useFilePreview(file, previewMarkdown);
 
   if (file === null || bucket === null) {
     return (

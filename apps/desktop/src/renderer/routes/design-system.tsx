@@ -44,7 +44,10 @@ import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.
 import type { ReasoningLevel } from '@tinker/shared-types';
 import { SignIn } from './SignIn/index.js';
 import { MemorySidebar } from '../panes/MemoryPane/components/MemorySidebar/index.js';
-import type { MemoryEntryBucket, MemoryMarkdownFile } from '@tinker/memory';
+import {
+  PREVIEW_MEMORY_BUCKETS,
+  PREVIEW_MEMORY_REFERENCE_TIME_MS,
+} from '../panes/MemoryPane/memory-preview.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -1579,59 +1582,6 @@ const TitlebarTab = (): JSX.Element => (
 
 /* --------------------- Memory sidebar -------------------- */
 
-const memoryPlaygroundBuckets: Record<MemoryEntryBucket, MemoryMarkdownFile[]> = {
-  pending: [
-    {
-      absolutePath: '/memory/demo/pending/glass-scheduled-doc.md',
-      relativePath: 'pending/glass-scheduled-doc.md',
-      name: 'Glass Scheduled Doc',
-      modifiedAt: '2026-04-21T14:00:00.000Z',
-    },
-    {
-      absolutePath: '/memory/demo/pending/writing-articles.md',
-      relativePath: 'pending/writing-articles.md',
-      name: 'Writing Articles on AI Agents',
-      modifiedAt: '2026-04-21T14:00:00.000Z',
-    },
-    {
-      absolutePath: '/memory/demo/pending/project-glass.md',
-      relativePath: 'pending/project-glass.md',
-      name: 'Project Glass',
-      modifiedAt: '2026-04-21T14:00:00.000Z',
-    },
-  ],
-  people: new Array(27).fill(null).map((_, index) => ({
-    absolutePath: `/memory/demo/people/person-${index}.md`,
-    relativePath: `people/person-${index}.md`,
-    name: `Person ${index + 1}`,
-    modifiedAt: '2026-04-20T12:00:00.000Z',
-  })),
-  'active-work': new Array(9).fill(null).map((_, index) => ({
-    absolutePath: `/memory/demo/active-work/work-${index}.md`,
-    relativePath: `active-work/work-${index}.md`,
-    name: `Active Work ${index + 1}`,
-    modifiedAt: '2026-04-20T12:00:00.000Z',
-  })),
-  capabilities: new Array(2).fill(null).map((_, index) => ({
-    absolutePath: `/memory/demo/capabilities/cap-${index}.md`,
-    relativePath: `capabilities/cap-${index}.md`,
-    name: `Capability ${index + 1}`,
-    modifiedAt: '2026-04-20T12:00:00.000Z',
-  })),
-  preferences: new Array(7).fill(null).map((_, index) => ({
-    absolutePath: `/memory/demo/preferences/pref-${index}.md`,
-    relativePath: `preferences/pref-${index}.md`,
-    name: `Preference ${index + 1}`,
-    modifiedAt: '2026-04-20T12:00:00.000Z',
-  })),
-  organization: new Array(2).fill(null).map((_, index) => ({
-    absolutePath: `/memory/demo/organization/org-${index}.md`,
-    relativePath: `organization/org-${index}.md`,
-    name: `Organization ${index + 1}`,
-    modifiedAt: '2026-04-20T12:00:00.000Z',
-  })),
-};
-
 const MemorySidebarPlayground = (): JSX.Element => {
   const [selected, setSelected] = useState<string | null>(
     '/memory/demo/pending/writing-articles.md',
@@ -1641,12 +1591,13 @@ const MemorySidebarPlayground = (): JSX.Element => {
   return (
     <div style={{ height: 480, border: '1px solid var(--color-border-subtle)' }}>
       <MemorySidebar
-        buckets={memoryPlaygroundBuckets}
+        buckets={PREVIEW_MEMORY_BUCKETS}
         searchQuery={search}
         onSearchChange={setSearch}
         selectedPath={selected}
         onSelect={(file) => setSelected(file.absolutePath)}
         seenPaths={new Set(['/memory/demo/pending/writing-articles.md'])}
+        referenceTimeMs={PREVIEW_MEMORY_REFERENCE_TIME_MS}
       />
     </div>
   );

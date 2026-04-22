@@ -35,7 +35,9 @@ test.describe('memory pane', () => {
     await page.goto('/');
     await waitForAppReady(page);
     await page.click('[aria-label="Memory"]');
-    await page.waitForSelector('text=Memory files', { timeout: 5_000 });
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Writing Articles on AI Agents' }),
+    ).toBeVisible();
     await captureAndCompare(page, 'memory-pane');
   });
 });

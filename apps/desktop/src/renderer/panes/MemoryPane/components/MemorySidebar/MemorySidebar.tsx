@@ -16,6 +16,7 @@ export type MemorySidebarProps = {
   selectedPath: string | null;
   onSelect: (file: MemoryMarkdownFile, bucket: MemoryEntryBucket) => void;
   seenPaths: ReadonlySet<string>;
+  referenceTimeMs?: number | undefined;
 };
 
 const RELATIVE_THRESHOLDS: ReadonlyArray<{ seconds: number; unit: Intl.RelativeTimeFormatUnit }> = [
@@ -223,9 +224,10 @@ export const MemorySidebar = ({
   selectedPath,
   onSelect,
   seenPaths,
+  referenceTimeMs,
 }: MemorySidebarProps): JSX.Element => {
   const relativeFormatter = useMemo(() => new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }), []);
-  const nowMs = useMemo(() => Date.now(), []);
+  const nowMs = useMemo(() => referenceTimeMs ?? Date.now(), [referenceTimeMs]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const pendingFiles = buckets.pending.filter((file) => matchesQuery(file, normalizedQuery));
