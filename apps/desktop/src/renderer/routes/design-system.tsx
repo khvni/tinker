@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   ClickableBadge,
+  ContextBadge,
   IconButton,
   SearchInput,
   SegmentedControl,
@@ -209,6 +210,14 @@ const ComponentsTab = (): JSX.Element => {
               <span className="ds-status-item__label">{item.label}</span>
             </span>
           ))}
+        </Row>
+      </Section>
+
+      <Section label="ContextBadge">
+        <Row>
+          <ContextBadge percent={24} tokens={48_320} windowSize={200_000} model="claude-sonnet-4-6" />
+          <ContextBadge percent={64} tokens={128_000} windowSize={200_000} model="claude-sonnet-4-6" />
+          <ContextBadge percent={92} tokens={184_320} windowSize={200_000} model="claude-sonnet-4-6" />
         </Row>
       </Section>
 
