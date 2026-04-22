@@ -7,6 +7,7 @@ export * from './memory-categories.js';
 export * from './memory-files.js';
 export * from './memory-pipeline.js';
 export * from './memory-paths.js';
+export * from './memory-seed.js';
 export * from './memory-settings.js';
 export * from './memory-store.js';
 export * from './role-profile.js';

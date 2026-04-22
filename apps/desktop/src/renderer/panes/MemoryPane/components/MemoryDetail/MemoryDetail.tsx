@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { Badge, Button, EmptyState, IconButton, Textarea } from '@tinker/design';
 import {
+  type MemoryCategoryId,
   PENDING_MEMORY_CATEGORY,
   type MemoryEntryBucket,
   type MemoryMarkdownFile,
@@ -59,11 +60,8 @@ const PencilIcon = (): JSX.Element => (
   </svg>
 );
 
-const CategoryBadge = ({ bucket }: { bucket: MemoryEntryBucket }): JSX.Element | null => {
-  if (bucket === PENDING_MEMORY_CATEGORY) {
-    return null;
-  }
-  return <Badge variant="default" size="medium">{bucket}</Badge>;
+const CategoryBadge = ({ category }: { category: MemoryCategoryId }): JSX.Element => {
+  return <Badge variant="default" size="medium">{category}</Badge>;
 };
 
 type StatusLineProps = {
@@ -240,6 +238,7 @@ export const MemoryDetail = ({
   const isDirty = draft !== savedDraft;
   const canStartEditing = allowEditing && effectivePreview.status === 'ready' && !controlsBusy;
   const diffEmpty = !diffLoading && diffText.trim().length === 0;
+  const badgeCategory = file.category ?? (bucket === PENDING_MEMORY_CATEGORY ? null : bucket);
 
   const handleSave = async (): Promise<void> => {
     if (file === null || !allowEditing || isSaving) {
@@ -281,8 +280,8 @@ export const MemoryDetail = ({
       <header className="tinker-memory-detail__header">
         <div className="tinker-memory-detail__header-main">
           <div className="tinker-memory-detail__title-row">
-            <h2 className="tinker-memory-detail__title">{file.name}</h2>
-            {bucket !== PENDING_MEMORY_CATEGORY ? <CategoryBadge bucket={bucket} /> : null}
+            <h2 className="tinker-memory-detail__title">{file.title}</h2>
+            {badgeCategory ? <CategoryBadge category={badgeCategory} /> : null}
           </div>
           <StatusLine bucket={bucket} modifiedAt={file.modifiedAt} formatter={relativeFormatter} />
         </div>
@@ -304,7 +303,7 @@ export const MemoryDetail = ({
             <div className="tinker-memory-detail__file-card-header">
               <div className="tinker-memory-detail__file-card-titles">
                 <span className="tinker-memory-detail__file-name">{file.name}</span>
-                <span className="tinker-memory-detail__file-path">{file.absolutePath}</span>
+                <span className="tinker-memory-detail__file-path">{file.displayPath}</span>
               </div>
               <div className="tinker-memory-detail__file-card-actions">
                 {isEditing ? (

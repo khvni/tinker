@@ -36,7 +36,7 @@ test.describe('memory pane', () => {
     await waitForAppReady(page);
     await page.click('[aria-label="Memory"]');
     await expect(
-      page.getByRole('heading', { level: 2, name: 'Writing Articles on AI Agents' }),
+      page.getByRole('heading', { level: 2, name: 'Writing Articles on AI Agents and Software Strategy' }),
     ).toBeVisible();
     await captureAndCompare(page, 'memory-pane');
   });

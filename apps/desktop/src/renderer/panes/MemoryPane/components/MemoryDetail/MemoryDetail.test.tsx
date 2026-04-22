@@ -29,7 +29,11 @@ const makeFile = (overrides: Partial<MemoryMarkdownFile> = {}): MemoryMarkdownFi
   absolutePath: '/memory/u/Pending/alice.md',
   relativePath: 'Pending/alice.md',
   name: 'alice.md',
+  title: 'Alice',
   modifiedAt: '2026-04-22T14:00:00.000Z',
+  category: null,
+  displayPath: '/memory/u/Pending/alice.md',
+  changesPreview: null,
   ...overrides,
 });
 
@@ -142,7 +146,14 @@ describe('<MemoryDetail>', () => {
     await act(async () => {
       root.render(
         <MemoryDetail
-          file={makeFile({ absolutePath: '/memory/u/Active Work/ship.md', relativePath: 'Active Work/ship.md', name: 'ship.md' })}
+          file={makeFile({
+            absolutePath: '/memory/u/Active Work/ship.md',
+            relativePath: 'Active Work/ship.md',
+            name: 'ship.md',
+            title: 'Ship MVP',
+            category: 'Active Work',
+            displayPath: '/memory/u/Active Work/ship.md',
+          })}
           bucket="Active Work"
           diffText=""
           diffLoading={false}
@@ -159,6 +170,35 @@ describe('<MemoryDetail>', () => {
       .map((button) => button.textContent?.trim());
     expect(buttons).not.toContain('Approve');
     expect(buttons).not.toContain('Dismiss');
+  });
+
+  it('shows seeded category badge and display path for pending notes', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryDetail
+          file={makeFile({
+            name: 'synthesis-auto-20260408-glass-article.md',
+            title: 'Writing Articles on AI Agents and Software Strategy',
+            category: 'Active Work',
+            displayPath:
+              '/Users/seb.goddijn/project-glass/memory/Pending/synthesis-auto-20260408-glass-article.md',
+          })}
+          bucket="Pending"
+          diffText=""
+          diffLoading={false}
+          onApprove={() => undefined}
+          onDismiss={() => undefined}
+          isBusy={false}
+        />,
+      );
+    });
+    await flushEffects();
+
+    expect(container.textContent).toContain('Writing Articles on AI Agents and Software Strategy');
+    expect(container.textContent).toContain('Active Work');
+    expect(container.textContent).toContain(
+      '/Users/seb.goddijn/project-glass/memory/Pending/synthesis-auto-20260408-glass-article.md',
+    );
   });
 
   it('renders diff text when present and empty-state copy when absent', async () => {

@@ -50,6 +50,23 @@ vi.mock('@tinker/memory', () => ({
   listCategorisedMemoryFiles: memoryPaneTestMocks.listCategorisedMemoryFiles,
   subscribeMemoryPathChanged: memoryPaneTestMocks.subscribeMemoryPathChanged,
   parseFrontmatter: memoryPaneTestMocks.parseFrontmatter,
+  DEMO_MEMORY_PREVIEW: {
+    categorised: {
+      rootPath: '/memory/demo',
+      buckets: {
+        Pending: [],
+        People: [],
+        'Active Work': [],
+        Capabilities: [],
+        Preferences: [],
+        Organization: [],
+      },
+    },
+    selection: null,
+    markdownByAbsolutePath: {},
+  },
+  DEMO_MEMORY_REFERENCE_TIME_MS: Date.parse('2026-04-22T14:00:00.000Z'),
+  DEMO_MEMORY_SELECTED_RELATIVE_PATH: 'Pending/synthesis-auto-20260408-glass-article.md',
   isMemoryCategoryId: (value: string): value is MemoryCategoryId => {
     const valid = ['People', 'Active Work', 'Capabilities', 'Preferences', 'Organization'];
     return valid.includes(value);
@@ -60,12 +77,12 @@ vi.mock('@tinker/memory', () => ({
 
 const { mockReadTextFile, mockWriteTextFile, mockRenderMarkdown, mockApprove, mockDismiss, mockDiff } =
   vi.hoisted(() => ({
-  mockReadTextFile: vi.fn<(path: string) => Promise<string>>(),
-  mockWriteTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(),
-  mockRenderMarkdown: vi.fn<(text: string) => Promise<string>>(),
-  mockApprove: vi.fn<(filePath: string, destinationDir: string) => Promise<string>>(),
-  mockDismiss: vi.fn<(filePath: string) => Promise<void>>(),
-  mockDiff: vi.fn<(filePath: string) => Promise<string>>(),
+    mockReadTextFile: vi.fn<(path: string) => Promise<string>>(),
+    mockWriteTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(),
+    mockRenderMarkdown: vi.fn<(text: string) => Promise<string>>(),
+    mockApprove: vi.fn<(filePath: string, destinationDir: string) => Promise<string>>(),
+    mockDismiss: vi.fn<(filePath: string) => Promise<void>>(),
+    mockDiff: vi.fn<(filePath: string) => Promise<string>>(),
   }));
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
@@ -81,6 +98,10 @@ vi.mock('./memory-commands.js', () => ({
   approveMemoryEntry: mockApprove,
   dismissMemoryEntry: mockDismiss,
   readMemoryDiff: mockDiff,
+}));
+
+vi.mock('../../runtime.js', () => ({
+  isTauriRuntime: () => true,
 }));
 
 import { MemoryPane } from './MemoryPane.js';
@@ -122,7 +143,11 @@ const makeFile = (overrides: Partial<MemoryMarkdownFile> = {}): MemoryMarkdownFi
   absolutePath: '/memory/u/Pending/alice.md',
   relativePath: 'Pending/alice.md',
   name: 'alice.md',
+  title: 'Alice',
   modifiedAt: '2026-04-22T14:00:00.000Z',
+  category: null,
+  displayPath: '/memory/u/Pending/alice.md',
+  changesPreview: null,
   ...overrides,
 });
 
@@ -174,13 +199,21 @@ describe('<MemoryPane>', () => {
     await flushEffects();
   };
 
-  it('renders sidebar sections with counts and a selection-empty detail pane', async () => {
+  it('renders sidebar sections with counts and auto-selects the first pending entry', async () => {
     memoryPaneTestMocks.listCategorisedMemoryFiles.mockResolvedValue({
       rootPath: '/memory/u',
       buckets: {
         ...emptyBuckets(),
         Pending: [makeFile()],
-        People: [makeFile({ absolutePath: '/memory/u/People/khani.md', relativePath: 'People/khani.md', name: 'khani.md' })],
+        People: [
+          makeFile({
+            absolutePath: '/memory/u/People/khani.md',
+            relativePath: 'People/khani.md',
+            name: 'khani.md',
+            title: 'Khani',
+            displayPath: '/memory/u/People/khani.md',
+          }),
+        ],
       },
     });
 
@@ -188,8 +221,8 @@ describe('<MemoryPane>', () => {
 
     expect(container.textContent).toContain('Pending');
     expect(container.textContent).toContain('People');
-    expect(container.textContent).toContain('alice.md');
-    expect(container.textContent).toContain('Select a memory entry');
+    expect(container.textContent).toContain('Alice');
+    expect(container.textContent).toContain('Update · Pending review');
   });
 
   it('populates detail pane on pending row click and calls approve with the frontmatter destination', async () => {
@@ -200,7 +233,16 @@ describe('<MemoryPane>', () => {
       })
       .mockResolvedValueOnce({
         rootPath: '/memory/u',
-        buckets: { ...emptyBuckets(), People: [makeFile({ relativePath: 'People/alice.md', absolutePath: '/memory/u/People/alice.md' })] },
+        buckets: {
+          ...emptyBuckets(),
+          People: [
+            makeFile({
+              relativePath: 'People/alice.md',
+              absolutePath: '/memory/u/People/alice.md',
+              displayPath: '/memory/u/People/alice.md',
+            }),
+          ],
+        },
       });
     mockReadTextFile.mockResolvedValue('---\nkind: People\n---\n# Alice');
     mockApprove.mockResolvedValue('/memory/u/People/alice.md');
@@ -208,10 +250,10 @@ describe('<MemoryPane>', () => {
     await render();
 
     const aliceRow = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('alice.md'),
+      button.textContent?.includes('Alice'),
     );
     if (!(aliceRow instanceof HTMLButtonElement)) {
-      throw new Error('Expected alice row to render.');
+      throw new Error('Expected Alice row to render.');
     }
     await act(async () => {
       aliceRow.click();
@@ -244,7 +286,7 @@ describe('<MemoryPane>', () => {
     await render();
 
     const row = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('alice.md'),
+      button.textContent?.includes('Alice'),
     );
     if (!(row instanceof HTMLButtonElement)) {
       throw new Error('Expected pending row.');
@@ -274,7 +316,18 @@ describe('<MemoryPane>', () => {
       .mockResolvedValueOnce({ rootPath: '/memory/u', buckets: { ...emptyBuckets(), Pending: [makeFile()] } })
       .mockResolvedValueOnce({
         rootPath: '/memory/u',
-        buckets: { ...emptyBuckets(), Pending: [makeFile({ name: 'bob.md', absolutePath: '/memory/u/Pending/bob.md', relativePath: 'Pending/bob.md' })] },
+        buckets: {
+          ...emptyBuckets(),
+          Pending: [
+            makeFile({
+              name: 'bob.md',
+              title: 'Bob',
+              absolutePath: '/memory/u/Pending/bob.md',
+              relativePath: 'Pending/bob.md',
+              displayPath: '/memory/u/Pending/bob.md',
+            }),
+          ],
+        },
       });
 
     await render();
@@ -285,7 +338,40 @@ describe('<MemoryPane>', () => {
     await flushEffects();
 
     expect(memoryPaneTestMocks.listCategorisedMemoryFiles).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain('bob.md');
+    expect(container.textContent).toContain('Bob');
+  });
+
+  it('prefers the seeded Paper note when present', async () => {
+    memoryPaneTestMocks.listCategorisedMemoryFiles.mockResolvedValue({
+      rootPath: '/memory/u',
+      buckets: {
+        ...emptyBuckets(),
+        Pending: [
+          makeFile({
+            absolutePath: '/memory/u/Pending/glass.md',
+            relativePath: 'Pending/glass.md',
+            name: 'glass.md',
+            title: 'Glass',
+            displayPath: '/memory/u/Pending/glass.md',
+          }),
+          makeFile({
+            absolutePath: '/memory/u/Pending/synthesis-auto-20260408-glass-article.md',
+            relativePath: 'Pending/synthesis-auto-20260408-glass-article.md',
+            name: 'synthesis-auto-20260408-glass-article.md',
+            title: 'Writing Articles on AI Agents and Software Strategy',
+            category: 'Active Work',
+            displayPath:
+              '/Users/seb.goddijn/project-glass/memory/Pending/synthesis-auto-20260408-glass-article.md',
+            changesPreview: 'seeded diff',
+          }),
+        ],
+      },
+    });
+
+    await render();
+
+    expect(container.textContent).toContain('Writing Articles on AI Agents and Software Strategy');
+    expect(container.textContent).toContain('Active Work');
   });
 
   it('reloads memory after save and keeps the same file selected', async () => {
@@ -302,7 +388,7 @@ describe('<MemoryPane>', () => {
     await render();
 
     const row = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('alice.md'),
+      button.textContent?.includes('Alice'),
     );
     if (!(row instanceof HTMLButtonElement)) {
       throw new Error('Expected pending row.');
@@ -341,7 +427,9 @@ describe('<MemoryPane>', () => {
 
     expect(mockWriteTextFile).toHaveBeenCalledWith('/memory/u/Pending/alice.md', '# Updated note');
     expect(memoryPaneTestMocks.listCategorisedMemoryFiles).toHaveBeenCalledTimes(2);
-    expect(container.querySelector('.tinker-memory-sidebar__row--selected')?.textContent).toContain('alice.md');
+    const selectedRow = container.querySelector('.tinker-memory-sidebar__row--selected');
+    expect(selectedRow?.textContent).toContain('Alice');
+    expect(selectedRow).toHaveAttribute('title', 'Pending/alice.md');
     expect(container.textContent).toContain('Read mode');
     expect(container.textContent).toContain('Updated note');
   });

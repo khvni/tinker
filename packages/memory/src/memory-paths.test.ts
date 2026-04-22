@@ -56,6 +56,7 @@ import {
   subscribeMemoryPathChanged,
   validateMemoryRootWritable,
 } from './memory-paths.js';
+import { DEMO_MEMORY_NOTES } from './memory-seed.js';
 
 const stubProcessPlatform = (platform: NodeJS.Platform): void => {
   vi.stubGlobal('process', { ...process, platform });
@@ -215,17 +216,39 @@ describe('default memory root resolution', () => {
     expect(mockJoin).toHaveBeenCalledWith('/tmp/memory-b', 'user-1');
   });
 
-  it('creates the canonical category folders inside each active user directory', async () => {
-    mockSettingsGet.mockResolvedValue(makeSetting('/tmp/memory-root'));
+  it('seeds the Paper memory scaffold when the memory root is empty', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/tmp/custom-memory'));
+    mockReadDir.mockResolvedValue([]);
 
-    await expect(getActiveMemoryPath('user-1', 'linux')).resolves.toBe('/tmp/memory-root/user-1');
+    await expect(getActiveMemoryPath('guest', 'linux')).resolves.toBe('/tmp/custom-memory/guest');
 
-    expect(mockMkdir).toHaveBeenCalledWith('/tmp/memory-root/user-1/Pending', { recursive: true });
-    expect(mockMkdir).toHaveBeenCalledWith('/tmp/memory-root/user-1/People', { recursive: true });
-    expect(mockMkdir).toHaveBeenCalledWith('/tmp/memory-root/user-1/Active Work', { recursive: true });
-    expect(mockMkdir).toHaveBeenCalledWith('/tmp/memory-root/user-1/Capabilities', { recursive: true });
-    expect(mockMkdir).toHaveBeenCalledWith('/tmp/memory-root/user-1/Preferences', { recursive: true });
-    expect(mockMkdir).toHaveBeenCalledWith('/tmp/memory-root/user-1/Organization', { recursive: true });
+    expect(mockWriteTextFile).toHaveBeenCalledTimes(DEMO_MEMORY_NOTES.length);
+    expect(mockWriteTextFile).toHaveBeenCalledWith(
+      '/tmp/custom-memory/guest/Pending/synthesis-auto-20260408-glass-article.md',
+      expect.stringContaining('Writing Articles on AI Agents and Software Strategy'),
+    );
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Pending', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/People', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Active Work', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Capabilities', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Preferences', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/guest/Organization', { recursive: true });
+  });
+
+  it('does not re-seed the demo scaffold when the memory root already has content', async () => {
+    mockSettingsGet.mockResolvedValue(makeSetting('/tmp/custom-memory'));
+    mockReadDir.mockResolvedValue([createDirEntry('guest', 'directory')]);
+
+    await expect(getActiveMemoryPath('user-2', 'linux')).resolves.toBe('/tmp/custom-memory/user-2');
+
+    expect(mockWriteTextFile).not.toHaveBeenCalled();
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Pending', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/People', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Active Work', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Capabilities', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Preferences', { recursive: true });
+    expect(mockMkdir).toHaveBeenCalledWith('/tmp/custom-memory/user-2/Organization', { recursive: true });
   });
 
   it('validates that a candidate memory root is writable', async () => {

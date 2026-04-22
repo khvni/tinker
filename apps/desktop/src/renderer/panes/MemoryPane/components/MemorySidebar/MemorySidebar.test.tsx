@@ -17,7 +17,11 @@ const makeFile = (
   absolutePath,
   relativePath,
   name: relativePath.split('/').at(-1) ?? relativePath,
+  title: relativePath.split('/').at(-1)?.replace(/\.md$/u, '') ?? relativePath,
   modifiedAt,
+  category: null,
+  displayPath: absolutePath,
+  changesPreview: null,
 });
 
 const emptyBuckets = (): Record<MemoryEntryBucket, MemoryMarkdownFile[]> => ({
@@ -88,8 +92,8 @@ describe('<MemorySidebar>', () => {
     });
 
     expect(container.textContent).toContain('Pending');
-    expect(container.textContent).toContain('alice.md');
-    expect(container.textContent).toContain('bob.md');
+    expect(container.textContent).toContain('alice');
+    expect(container.textContent).toContain('bob');
     expect(container.textContent).toContain('People');
     expect(container.textContent).toContain('1');
 
@@ -97,7 +101,7 @@ describe('<MemorySidebar>', () => {
     expect(dots.length).toBe(1);
 
     const aliceRow = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('alice.md'),
+      button.textContent?.includes('alice'),
     );
     if (!(aliceRow instanceof HTMLButtonElement)) {
       throw new Error('Expected alice row to render as button.');
@@ -137,16 +141,16 @@ describe('<MemorySidebar>', () => {
       throw new Error('Expected Active Work header button.');
     }
 
-    expect(container.textContent).not.toContain('ship.md');
+    expect(container.textContent).not.toContain('ship');
 
     await act(async () => {
       header.click();
     });
 
-    expect(container.textContent).toContain('ship.md');
+    expect(container.textContent).toContain('ship');
 
     const shipRow = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('ship.md'),
+      button.textContent?.includes('ship'),
     );
     if (!(shipRow instanceof HTMLButtonElement)) {
       throw new Error('Expected ship row button.');
@@ -178,7 +182,7 @@ describe('<MemorySidebar>', () => {
       );
     });
 
-    expect(container.textContent).toContain('alpha.md');
-    expect(container.textContent).not.toContain('zeta.md');
+    expect(container.textContent).toContain('alpha');
+    expect(container.textContent).not.toContain('zeta');
   });
 });

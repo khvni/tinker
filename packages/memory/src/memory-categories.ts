@@ -35,6 +35,16 @@ export const isMemoryEntryBucket = (value: string): value is MemoryEntryBucket =
   return MEMORY_BUCKET_SET.has(value);
 };
 
+export const bucketForFrontmatter = (frontmatter: Record<string, unknown>): MemoryCategoryId | null => {
+  const rawKind = frontmatter.kind;
+  if (typeof rawKind !== 'string') {
+    return null;
+  }
+
+  const exactFolderName = rawKind.trim();
+  return isMemoryCategoryId(exactFolderName) ? exactFolderName : null;
+};
+
 export const bucketForRelativePath = (relativePath: string): MemoryEntryBucket | null => {
   const segments = relativePath
     .split('/')

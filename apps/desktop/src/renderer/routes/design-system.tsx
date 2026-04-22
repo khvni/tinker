@@ -44,6 +44,10 @@ import type {
   SkillStore,
 } from '@tinker/shared-types';
 import {
+  DEMO_MEMORY_PREVIEW,
+  DEMO_MEMORY_REFERENCE_TIME_MS,
+} from '@tinker/memory';
+import {
   SettingsShell,
   type SettingsShellSection,
 } from '../workspace/components/SettingsShell/index.js';
@@ -55,10 +59,6 @@ import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.
 import { PlaybookPane } from '../workspace/components/PlaybookPane/index.js';
 import { SignIn } from './SignIn/index.js';
 import { MemorySidebar } from '../panes/MemoryPane/components/MemorySidebar/index.js';
-import {
-  PREVIEW_MEMORY_BUCKETS,
-  PREVIEW_MEMORY_REFERENCE_TIME_MS,
-} from '../panes/MemoryPane/memory-preview.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -1901,20 +1901,20 @@ const TitlebarTab = (): JSX.Element => (
 
 const MemorySidebarPlayground = (): JSX.Element => {
   const [selected, setSelected] = useState<string | null>(
-    '/memory/demo/Pending/writing-articles.md',
+    DEMO_MEMORY_PREVIEW.selection.file.absolutePath,
   );
   const [search, setSearch] = useState('');
 
   return (
     <div style={{ height: 480, border: '1px solid var(--color-border-subtle)' }}>
       <MemorySidebar
-        buckets={PREVIEW_MEMORY_BUCKETS}
+        buckets={DEMO_MEMORY_PREVIEW.categorised.buckets}
         searchQuery={search}
         onSearchChange={setSearch}
         selectedPath={selected}
         onSelect={(file) => setSelected(file.absolutePath)}
-        seenPaths={new Set(['/memory/demo/Pending/writing-articles.md'])}
-        referenceTimeMs={PREVIEW_MEMORY_REFERENCE_TIME_MS}
+        seenPaths={new Set([DEMO_MEMORY_PREVIEW.selection.file.absolutePath])}
+        referenceTimeMs={DEMO_MEMORY_REFERENCE_TIME_MS}
       />
     </div>
   );

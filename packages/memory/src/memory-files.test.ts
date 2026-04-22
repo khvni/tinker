@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetActiveMemoryPath, mockReadDir, mockStat } = vi.hoisted(() => ({
+const { mockGetActiveMemoryPath, mockReadDir, mockReadTextFile, mockStat } = vi.hoisted(() => ({
   mockGetActiveMemoryPath: vi.fn<(userId: string, runtimePlatform?: string) => Promise<string>>(),
   mockReadDir: vi.fn<
     (path: string) => Promise<Array<{ name: string; isDirectory: boolean; isFile: boolean; isSymlink: boolean }>>
   >(),
+  mockReadTextFile: vi.fn<(path: string) => Promise<string>>(),
   mockStat: vi.fn<(path: string) => Promise<{ mtime?: Date }>>(),
 }));
 
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readDir: mockReadDir,
+  readTextFile: mockReadTextFile,
   stat: mockStat,
 }));
 
@@ -30,6 +32,7 @@ describe('listMemoryMarkdownFiles', () => {
   beforeEach(() => {
     mockGetActiveMemoryPath.mockReset();
     mockReadDir.mockReset();
+    mockReadTextFile.mockReset();
     mockStat.mockReset();
 
     mockGetActiveMemoryPath.mockResolvedValue('/memory/google:42');
@@ -47,6 +50,10 @@ describe('listMemoryMarkdownFiles', () => {
       }
 
       return [];
+    });
+    mockReadTextFile.mockImplementation(async (path: string) => {
+      const basename = path.split('/').pop()?.replace(/\.md$/u, '') ?? 'untitled';
+      return `# ${basename}`;
     });
     mockStat.mockImplementation(async (path: string) => {
       if (path.endsWith('profile.md')) {
@@ -67,13 +74,21 @@ describe('listMemoryMarkdownFiles', () => {
         absolutePath: '/memory/google:42/sessions/2026-04-22-1000-session.md',
         relativePath: 'sessions/2026-04-22-1000-session.md',
         name: '2026-04-22-1000-session.md',
+        title: '2026-04-22-1000-session',
         modifiedAt: '2026-04-22T10:00:00.000Z',
+        category: null,
+        displayPath: '/memory/google:42/sessions/2026-04-22-1000-session.md',
+        changesPreview: null,
       },
       {
         absolutePath: '/memory/google:42/profile.md',
         relativePath: 'profile.md',
         name: 'profile.md',
+        title: 'profile',
         modifiedAt: '2026-04-21T12:00:00.000Z',
+        category: null,
+        displayPath: '/memory/google:42/profile.md',
+        changesPreview: null,
       },
     ]);
 
@@ -99,13 +114,21 @@ describe('listMemoryMarkdownFiles', () => {
         absolutePath: '/memory/google:42/alpha.md',
         relativePath: 'alpha.md',
         name: 'alpha.md',
+        title: 'alpha',
         modifiedAt: '2026-04-22T10:00:00.000Z',
+        category: null,
+        displayPath: '/memory/google:42/alpha.md',
+        changesPreview: null,
       },
       {
         absolutePath: '/memory/google:42/zeta.md',
         relativePath: 'zeta.md',
         name: 'zeta.md',
+        title: 'zeta',
         modifiedAt: '2026-04-22T10:00:00.000Z',
+        category: null,
+        displayPath: '/memory/google:42/zeta.md',
+        changesPreview: null,
       },
     ]);
   });
@@ -115,6 +138,7 @@ describe('listCategorisedMemoryFiles', () => {
   beforeEach(() => {
     mockGetActiveMemoryPath.mockReset();
     mockReadDir.mockReset();
+    mockReadTextFile.mockReset();
     mockStat.mockReset();
 
     mockGetActiveMemoryPath.mockResolvedValue('/memory/google:42');
@@ -144,6 +168,10 @@ describe('listCategorisedMemoryFiles', () => {
         return [createDirEntry('2026-04-22-session.md', 'file')];
       }
       return [];
+    });
+    mockReadTextFile.mockImplementation(async (path: string) => {
+      const basename = path.split('/').pop()?.replace(/\.md$/u, '') ?? 'untitled';
+      return `# ${basename}`;
     });
     mockStat.mockImplementation(async (path: string) => {
       if (path.endsWith('new-person.md')) {
@@ -177,13 +205,21 @@ describe('listCategorisedMemoryFiles', () => {
         absolutePath: '/memory/google:42/Pending/new-person.md',
         relativePath: 'Pending/new-person.md',
         name: 'new-person.md',
+        title: 'new-person',
         modifiedAt: '2026-04-22T14:00:00.000Z',
+        category: null,
+        displayPath: '/memory/google:42/Pending/new-person.md',
+        changesPreview: null,
       },
       {
         absolutePath: '/memory/google:42/Pending/loose-note.md',
         relativePath: 'Pending/loose-note.md',
         name: 'loose-note.md',
+        title: 'loose-note',
         modifiedAt: '2026-04-22T12:00:00.000Z',
+        category: null,
+        displayPath: '/memory/google:42/Pending/loose-note.md',
+        changesPreview: null,
       },
     ]);
     expect(result.buckets.People).toEqual([
@@ -191,7 +227,11 @@ describe('listCategorisedMemoryFiles', () => {
         absolutePath: '/memory/google:42/People/khani.md',
         relativePath: 'People/khani.md',
         name: 'khani.md',
+        title: 'khani',
         modifiedAt: '2026-04-21T08:00:00.000Z',
+        category: 'People',
+        displayPath: '/memory/google:42/People/khani.md',
+        changesPreview: null,
       },
     ]);
     expect(result.buckets['Active Work']).toEqual([
@@ -199,7 +239,11 @@ describe('listCategorisedMemoryFiles', () => {
         absolutePath: '/memory/google:42/Active Work/ship-tin-196.md',
         relativePath: 'Active Work/ship-tin-196.md',
         name: 'ship-tin-196.md',
+        title: 'ship-tin-196',
         modifiedAt: '2026-04-22T09:00:00.000Z',
+        category: 'Active Work',
+        displayPath: '/memory/google:42/Active Work/ship-tin-196.md',
+        changesPreview: null,
       },
     ]);
     expect(result.buckets.Capabilities).toEqual([]);
