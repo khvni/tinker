@@ -1,23 +1,36 @@
 import {
+  createAttentionStore,
+  FLASH_DURATION_MS,
+  getFlashOpacity,
+  type FlashAccent,
+} from '@tinker/attention';
+import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
+import { useStore } from 'zustand';
 import type { DropTarget, Pane, StackId, StackNode, Tab } from '../../types.js';
 import { classifyBodyDrop, type BodyDrop } from '../../core/utils/layout.js';
-import type { PaneDefinition, PaneRegistry } from '../types.js';
+import type { PaneDefinition, PaneRegistry, WorkspaceAttentionConfig } from '../types.js';
 
 const PANE_DRAG_MIME = 'application/x-tinker-pane';
+const ATTENTION_DISABLED_WORKSPACE_ID = '__tinker-panes-attention-disabled__';
+const DISABLED_ATTENTION_STORE = createAttentionStore();
+const EMPTY_PANE_IDS = new Set<string>();
 
 type StackProps<TData> = {
   readonly tab: Tab<TData>;
   readonly node: StackNode;
   readonly registry: PaneRegistry<TData>;
+  readonly attention?: WorkspaceAttentionConfig;
   readonly isActiveStack: boolean;
   readonly onFocusPane: (stackId: StackId, paneId: string) => void;
   readonly onClosePane: (paneId: string) => void;
@@ -40,6 +53,7 @@ export const Stack = <TData,>({
   tab,
   node,
   registry,
+  attention,
   isActiveStack,
   onFocusPane,
   onClosePane,
@@ -49,9 +63,88 @@ export const Stack = <TData,>({
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [bodyDrop, setBodyDrop] = useState<BodyDrop | null>(null);
   const [tabInsertIndex, setTabInsertIndex] = useState<number | null>(null);
+  const attentionStore = attention?.store ?? DISABLED_ATTENTION_STORE;
+  const attentionWorkspaceId = attention?.workspaceId ?? ATTENTION_DISABLED_WORKSPACE_ID;
+  const unreadPaneIds = useStore(
+    attentionStore,
+    (state) => state.workspaces[attentionWorkspaceId]?.unreadPaneIds ?? EMPTY_PANE_IDS,
+  );
+  const manualUnreadPaneIds = useStore(
+    attentionStore,
+    (state) => state.workspaces[attentionWorkspaceId]?.manualUnreadPaneIds ?? EMPTY_PANE_IDS,
+  );
+  const activeFlash = useStore(
+    attentionStore,
+    (state) => state.workspaces[attentionWorkspaceId]?.activeFlash ?? null,
+  );
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const activePaneId = node.activePaneId;
   const activePane = activePaneId ? tab.panes[activePaneId] : undefined;
+
+  useEffect(() => {
+    if (!activeFlash) return;
+
+    const raf = typeof globalThis.requestAnimationFrame === 'function';
+    let handle: number | ReturnType<typeof setTimeout>;
+    setCurrentTime(Date.now());
+
+    const tick = (): void => {
+      const nextTime = Date.now();
+      setCurrentTime(nextTime);
+      if (nextTime - activeFlash.startedAt < FLASH_DURATION_MS) {
+        handle = raf ? globalThis.requestAnimationFrame(tick) : setTimeout(tick, 16);
+      }
+    };
+
+    handle = raf ? globalThis.requestAnimationFrame(tick) : setTimeout(tick, 16);
+    return () => {
+      if (raf) globalThis.cancelAnimationFrame(handle as number);
+      else clearTimeout(handle as ReturnType<typeof setTimeout>);
+    };
+  }, [activeFlash]);
+
+  const resolvePaneAttention = useCallback(
+    (
+      paneId: string,
+    ): {
+      readonly unread: boolean;
+      readonly flash: null | { readonly accent: FlashAccent; readonly opacity: number };
+    } => {
+      const unread =
+        unreadPaneIds.has(paneId)
+        || manualUnreadPaneIds.has(paneId);
+      if (!activeFlash || activeFlash.paneId !== paneId) {
+        return { unread, flash: null };
+      }
+
+      const elapsed = currentTime - activeFlash.startedAt;
+      if (elapsed >= FLASH_DURATION_MS) {
+        return { unread, flash: null };
+      }
+
+      return {
+        unread,
+        flash: {
+          accent: activeFlash.accent,
+          opacity: getFlashOpacity(activeFlash.accent, elapsed),
+        },
+      };
+    },
+    [activeFlash, currentTime, manualUnreadPaneIds, unreadPaneIds],
+  );
+
+  const activePaneAttention = activePane ? resolvePaneAttention(activePane.id) : null;
+  const edgeAttention = !isActiveStack && activePaneAttention
+    ? activePaneAttention.unread
+      ? { accent: 'notification-blue' as const, opacity: 1 }
+      : activePaneAttention.flash
+    : null;
+  const edgeAttentionStyle = edgeAttention
+    ? ({
+        '--tinker-pane-attention-opacity': String(edgeAttention.opacity),
+      } as CSSProperties)
+    : undefined;
 
   // ────────────────────────────────────────────────────────────────────────
   // Drag sources — tab → pane move
@@ -214,7 +307,10 @@ export const Stack = <TData,>({
     <div
       className={`tinker-stack${isActiveStack ? ' tinker-stack--active' : ''}`}
       data-stack-id={node.id}
+      data-active-pane-id={activePaneId ?? undefined}
+      data-attention-accent={edgeAttention?.accent ?? undefined}
       data-drop-center={bodyDrop?.kind === 'center' || undefined}
+      style={edgeAttentionStyle}
       onPointerDown={handleStackActivate}
     >
       <div
@@ -230,8 +326,17 @@ export const Stack = <TData,>({
           const title = definition ? resolveTitle(definition, pane) : pane.kind;
           const icon = definition ? resolveIcon(definition, pane) : null;
           const isActive = pane.id === activePaneId;
+          const paneAttention = resolvePaneAttention(pane.id);
+          const tabAttention = paneAttention.unread
+            ? { accent: 'notification-blue' as const, opacity: 1 }
+            : paneAttention.flash;
           const showInsertBefore = tabInsertIndex === index;
           const showInsertAfter = tabInsertIndex === index + 1 && index === paneTabs.length - 1;
+          const tabAttentionStyle = tabAttention
+            ? ({
+                '--tinker-pane-attention-opacity': String(tabAttention.opacity),
+              } as CSSProperties)
+            : undefined;
           return (
             <div
               key={pane.id}
@@ -250,7 +355,17 @@ export const Stack = <TData,>({
               title={title}
             >
               {icon ? <span className="tinker-stack__tab-icon" aria-hidden>{icon}</span> : null}
-              <span className="tinker-stack__tab-label">{title}</span>
+              <span className="tinker-stack__tab-label-shell">
+                <span className="tinker-stack__tab-label">{title}</span>
+                {tabAttention ? (
+                  <span
+                    className="tinker-stack__tab-attention"
+                    data-attention-accent={tabAttention.accent}
+                    style={tabAttentionStyle}
+                    aria-hidden
+                  />
+                ) : null}
+              </span>
               <span
                 role="button"
                 tabIndex={-1}

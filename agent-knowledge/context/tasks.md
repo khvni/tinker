@@ -92,7 +92,7 @@ Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
 | 3.8 | Code renderer: move existing `CodeRenderer.tsx` behind FilePane dispatch; add language autodetect via existing `code-highlighter`. | S | 3.2 | review | TIN-34 · PR #59 |
 | 3.9 | Markdown renderer: move existing `MarkdownRenderer.tsx` behind FilePane dispatch. Confirm GFM + code highlighting. | S | 3.2 | review | TIN-35 · PR #59 |
 | 3.10 | "Open file" from Chat: when OpenCode output includes a file path link, clicking opens a new FilePane tab. | M | 3.2, M1.7 | review | TIN-36 · PR #75. Relative links resolve against session folder; missing files render friendly FilePane state. |
-| 3.11 | Remove `panes/Today.tsx`, `panes/SchedulerPane.tsx`, `panes/Playbook.tsx`, `panes/VaultBrowser.tsx` from build. Either delete or move to `apps/desktop/_deferred/` with git mv. Per D25 only chat/file/settings/memory ship. | S | 1.10 | not started | Dead-code cleanup. |
+| 3.11 | Remove `panes/Today.tsx`, `panes/SchedulerPane.tsx`, `panes/Playbook.tsx`, `panes/VaultBrowser.tsx` from build. Either delete or move to `apps/desktop/_deferred/` with git mv. Per D25 only chat/file/settings/memory ship. | S | 1.10 | review | TIN-37 · PR #88 · deleted `Today` / `SchedulerPane`; `Playbook` + `VaultBrowser` were already absent on `main`. |
 
 ### M4 — Chat interface (markdown rendering, input, model picker)
 Spec: [[23-mvp-chat-markdown]] + [[24-mvp-model-picker]] · Depends on: M1.3
@@ -149,12 +149,12 @@ Spec: [[27-mvp-builtin-mcp]] · Depends on: M6.3 (memory path resolved)
 |----|------|------|------------|--------|-------|
 | 7.1 | Strip `opencode.json` → only `qmd`, `smart-connections`, `exa`. Remove `github`, `linear` (additional MCP integrations deferred). Keep `better-auth` entry ONLY if the Better Auth sidecar needs it — otherwise remove (Better Auth in MVP is a local sidecar, not an MCP). | S | — | done | TIN-66 · PR #26 merged 2026-04-22. |
 | 7.2 | Ensure `exa` works zero-config: it's remote, no env needed. Add boot-time check that calls exa's health MCP. | S | 7.1 | review | TIN-67 · PR #42 opened 2026-04-21. |
-| 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` = `<memory_root>/<current-user-id>/` from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | not started | Env var injection at spawn. |
-| 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = same per-user subdir from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | not started | Mirror of 7.3. |
+| 7.3 | `qmd` env wiring: `SMART_VAULT_PATH` = `<memory_root>/<current-user-id>/` from M6.3. Passed to OpenCode at sidecar spawn. | S | 7.1, 6.3 | review | TIN-68 + TIN-69 · PR #91. Restart path now takes explicit `user_id` + `memory_subdir` and boot/auth flows use it. |
+| 7.4 | `smart-connections` env wiring: `SMART_VAULT_PATH` = same per-user subdir from M6.3. Same spawn-time injection as 7.3. | S | 7.1, 6.3 | review | TIN-68 + TIN-69 · PR #91. Shared restart flow reuses the same per-user memory subdir for both MCPs. |
 | 7.5 | Settings pane: "Integrations" section lists 3 MCPs with status (connected/error). Calls OpenCode SDK `mcp.list()` on mount. | M | 7.1, 6.5 | not started | Status only, no config. |
 | 7.6 | Per-MCP retry button in Settings: calls `mcp.reconnect(name)` SDK method (or restarts sidecar if SDK doesn't expose). | S | 7.5 | not started | Recovery. |
 | 7.7 | Memory-root change OR user-switch triggers MCP refresh: stop OpenCode → respawn with new env → MCPs reconnect. Triggered by 6.9 (path change) and 8.8 (sign-out/in). | M | 7.3, 7.4, 6.6, 8.8 | not started | Invalidation path. |
-| 7.8 | First-run verification: on new session launch, wait for all 3 MCPs to report `connected` before enabling the composer. Show `<ConnectionGate>` minimal variant during wait (3-5s typical). | M | 7.5 | not started | Quality bar. |
+| 7.8 | First-run verification: on new session launch, wait for all 3 MCPs to report `connected` before enabling the composer. Show `<ConnectionGate>` minimal variant during wait (3-5s typical). | M | 7.5 | review | TIN-73 · PR #94. Gated brand-new chat sessions on qmd + smart-connections + exa readiness with retry, skip, and 10s timeout warning. |
 
 ### M8 — Identity (Better Auth) + per-user chat-history persistence
 Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffold (present) · D2 / D4 / D5
@@ -173,7 +173,7 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | 8.10 | Current-user context: renderer `useCurrentUser()` hook reads session + hydrates from `users` table. App boot blocks on this until resolved or unauthenticated. | M | 8.9 | not started | Single source of truth for `user_id` everywhere. |
 | 8.11 | Settings pane: "Account" section shows current user's name + avatar + provider + `<Button>Sign out</Button>`. Sign-out clears keychain + returns to sign-in screen. | M | 8.10 | not started | Routes through `clear_refresh_token` + resets `useCurrentUser` state. |
 | 8.12 | Auto-sign-in on cold launch: Rust checks keychain for any refresh token → if found, Better Auth sidecar validates → `useCurrentUser` resolves without showing sign-in screen. If invalid, fall through to sign-in. | M | 8.8, 8.10 | not started | Silent sign-in. |
-| 8.13 | Per-user memory subdir creation: on successful sign-in, ensure `<memory_root>/<user-id>/` exists. On user-switch, re-resolve. Triggers M6.9. | S | 8.3, 6.3 | not started | One-liner wired to 8.10's sign-in callback. |
+| 8.13 | Per-user memory subdir creation: on successful sign-in, ensure `<memory_root>/<user-id>/` exists. On user-switch, re-resolve. Triggers M6.9. | S | 8.3, 6.3 | review | TIN-86 · PR #86. Active memory-path tracker emits on auth-driven user changes; same-user re-sign-in stays no-op. |
 | 8.14 | Chat-history JSONL file format doc: one line per OpenCode SSE event, `{ ts, event, data }`. Deliverable: short `agent-knowledge/reference/chat-history-format.md`. | S | — | done | TIN-87 · PR #31 merged 2026-04-22. Schema reference for M2.11 + M2.12. |
 | 8.15 | Integration test: sign in as User A → pick folder F → send message → sign out → sign in as User B → folder F session NOT visible in switcher → User B picks folder F → new JSONL created under `.tinker/chats/<user-b-id>/`. Doc result in `docs/mvp-verification.md`. | S | 8.11, 2.7, 2.11 | not started | End-to-end identity-scoping proof. |
 
@@ -183,7 +183,7 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 |----|------|------|------------|--------|-------|
 | X.1 | Repo-wide: add `.cursor/rules` or `.github/copilot-instructions.md` pointing async agents at this file + D25 + claim rules. | S | — | done | TIN-89 · PR #28 merged 2026-04-22. Both `.github/copilot-instructions.md` + `.cursor/rules/tinker.mdc` landed. |
 | X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | done | TIN-90 · PR #29 merged 2026-04-22. |
-| X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | not started | Manual verification checklist. |
+| X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | review | TIN-91 · PR #88 · documented with repo-root `pnpm dev:desktop` because `pnpm tauri dev` is not wired in this workspace. |
 
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
 
@@ -239,6 +239,8 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | TIN-172 | 15 / M7.8 | `<ConnectionGate>` primitive (minimal MCP variant) | review | PR #50. Ships the atom TIN-155 generalizes. |
 | TIN-155 | 15 | `<ConnectionSplash>` full-window splash (generalizes TIN-172) | review | PR stacks on #50. Composes ConnectionGate + Tinker wordmark + spinner + 4 service categories. |
 | TIN-118 + TIN-119 + TIN-120 + TIN-121 + TIN-122 | 03 | Memory pipeline bundle: typed extractor markers, D12 provenance persistence, relationship graph expansion, FTS-backed memory lookup, daily maintenance sweep | review | PR #98 · Branch `khvni/tin118-122-workspace` · Explicit user-requested post-MVP slice. |
+| TIN-182 | UI.7 | Workspace shell redesign per Paper — Titlebar + tauri Overlay + delete bespoke header + IntegrationsStrip compact | review | Branch `khvni/ui7-shell`. Session [[2026-04-22-0315-ui7-shell]]. Folder-per-component `<Titlebar>` (D21), tokens-only (D14/D23), macOS traffic-lights honored via `titleBarStyle:"Overlay"` + 68px reservation. 9 new tests. |
+| TIN-146 + TIN-147 | 12 | Pane-frame attention ring + pane-tab unread dot in `@tinker/panes`; desktop chat raises unread attention for unfocused assistant output; panes demo can trigger both states | review | PR #89. Branch `khvni/tin146-147-workspace-ui`. Paper MCP unavailable in-session, so parity used existing tokens + local workspace patterns. |
 
 ## Rejected (not coming back)
 

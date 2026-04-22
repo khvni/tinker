@@ -1,13 +1,14 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import type { DropTarget, LayoutNode, StackId, Tab } from '../../types.js';
 import { clampRatio, isStack } from '../../core/utils/layout.js';
-import type { PaneRegistry } from '../types.js';
+import type { PaneRegistry, WorkspaceAttentionConfig } from '../types.js';
 import { ResizeHandle } from './ResizeHandle.js';
 import { Stack } from './Stack.js';
 
 type SplitTreeProps<TData> = {
   readonly tab: Tab<TData>;
   readonly registry: PaneRegistry<TData>;
+  readonly attention?: WorkspaceAttentionConfig;
   readonly onFocusPane: (stackId: StackId, paneId: string) => void;
   readonly onClosePane: (paneId: string) => void;
   readonly onReorderPaneInStack: (paneId: string, toIndex: number) => void;
@@ -42,6 +43,7 @@ const SplitNode = <TData,>(props: SplitNodeProps<TData>): ReactNode => {
         tab={tab}
         node={node}
         registry={registry}
+        {...(props.attention ? { attention: props.attention } : {})}
         isActiveStack={tab.activeStackId === node.id}
         onFocusPane={onFocusPane}
         onClosePane={onClosePane}

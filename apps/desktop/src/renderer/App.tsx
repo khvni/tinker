@@ -11,8 +11,8 @@ import {
   createSkillStore,
   createVaultService,
   getActiveMemoryPath,
-  getMemoryRoot,
   indexVault,
+  syncActiveMemoryPath,
   upsertUser,
   type MemoryRunState,
 } from '@tinker/memory';
@@ -56,6 +56,10 @@ type AppState =
 
 type ProviderBusyState = Record<AuthProvider, boolean>;
 type ProviderMessageState = Record<AuthProvider, string | null>;
+type OpencodeRestartConfig = {
+  userId: User['id'];
+  memorySubdir: string;
+};
 
 const MODEL_CONNECT_POLL_INTERVAL_MS = 1_500;
 const MODEL_CONNECT_TIMEOUT_MS = 180_000;
@@ -83,10 +87,6 @@ const providerNeedsRefreshToken = (provider: AuthProvider): boolean => {
   return provider === 'google' || provider === 'microsoft';
 };
 
-const providerNeedsWorkspaceRefresh = (provider: AuthProvider): boolean => {
-  return provider === 'github';
-};
-
 const buildStoredUserId = (provider: User['provider'], providerUserId: string): string => {
   return `${provider}:${providerUserId}`;
 };
@@ -109,6 +109,14 @@ const pickCurrentUserId = (sessions: SSOStatus): User['id'] => {
   return activeSession
     ? buildStoredUserId(activeSession.provider, activeSession.userId)
     : DEFAULT_USER_ID;
+};
+
+const resolveOpencodeRestartConfig = async (sessions: SSOStatus): Promise<OpencodeRestartConfig> => {
+  const userId = pickCurrentUserId(sessions);
+  return {
+    userId,
+    memorySubdir: await getActiveMemoryPath(userId),
+  };
 };
 
 const toStoredUser = (session: SSOSession): User => {
@@ -138,13 +146,15 @@ const readAuthStatus = async (): Promise<SSOStatus> => {
   return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
 };
 
-const ensureConnectedMemoryPaths = async (sessions: SSOStatus): Promise<void> => {
-  await getMemoryRoot();
-
+const syncCurrentUserMemoryPath = async (
+  sessions: SSOStatus,
+  options?: { emit?: boolean },
+): Promise<void> => {
   const connectedSessions = Object.values(sessions).filter((session): session is SSOSession => session !== null);
   await Promise.all(
     connectedSessions.map((session) => getActiveMemoryPath(buildStoredUserId(session.provider, session.userId))),
   );
+  await syncActiveMemoryPath(pickCurrentUserId(sessions), options);
 };
 
 const getDefaultVaultPath = async (): Promise<string> => {
@@ -282,6 +292,17 @@ const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath
   }
 };
 
+const restartWorkspaceOpencode = async (
+  vaultPath: string | null,
+  sessions: SSOStatus,
+): Promise<{ opencode: OpencodeConnection; modelConnected: boolean }> => {
+  const restartConfig = await resolveOpencodeRestartConfig(sessions);
+  const opencode = await invoke<OpencodeConnection>('restart_opencode', restartConfig);
+  await syncConnectorState(opencode, vaultPath, sessions);
+  const modelConnected = await probeModelConnection(opencode, vaultPath);
+  return { opencode, modelConnected };
+};
+
 export const App = (): JSX.Element => {
   const nativeRuntime = useMemo(() => isTauriRuntime(), []);
   const memoryStore = useMemo(() => createMemoryStore(), []);
@@ -352,9 +373,9 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const [opencode, sessions] = await Promise.all([invoke<OpencodeConnection>('get_opencode_connection'), readAuthStatus()]);
+        const sessions = await readAuthStatus();
         await upsertUser(createLocalUser());
-        await ensureConnectedMemoryPaths(sessions);
+        await syncCurrentUserMemoryPath(sessions, { emit: false });
         const vaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         let vaultRevision = 0;
@@ -367,10 +388,7 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
-        await syncConnectorState(opencode, vaultPath, sessions).catch((error) => {
-          console.warn('Could not restore connector state on boot.', error);
-        });
-        const modelConnected = await probeModelConnection(opencode, vaultPath);
+        const { opencode, modelConnected } = await restartWorkspaceOpencode(vaultPath, sessions);
 
         if (!active) {
           return;
@@ -691,26 +709,17 @@ export const App = (): JSX.Element => {
     );
   }
 
-  const reloadConnectionState = async (connection: OpencodeConnection, vaultPath: string | null) => {
-    const sessions = await readAuthStatus();
-    await syncConnectorState(connection, vaultPath, sessions);
-    const modelConnected = await probeModelConnection(connection, vaultPath);
-
-    return { sessions, modelConnected };
-  };
-
-  const refreshWorkspaceConnection = async (): Promise<void> => {
+  const refreshWorkspaceConnection = async (sessions: SSOStatus): Promise<void> => {
     requireNativeRuntime('Restarting OpenCode');
-    const opencode = await invoke<OpencodeConnection>('restart_opencode');
-    const nextState = await reloadConnectionState(opencode, state.vaultPath);
+    const nextState = await restartWorkspaceOpencode(state.vaultPath, sessions);
 
     setState((current) =>
       current.status !== 'ready'
         ? current
         : {
             ...current,
-            opencode,
-            sessions: nextState.sessions,
+            opencode: nextState.opencode,
+            sessions,
             mcpStatus: {
               ...current.mcpStatus,
               [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
@@ -841,26 +850,14 @@ export const App = (): JSX.Element => {
     try {
       requireNativeRuntime(`Connecting ${providerDisplayName(provider)}`);
       const session = await invoke<SSOSession>('auth_sign_in', { provider });
-      await upsertUser(toStoredUser(session));
-      await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
       if (providerNeedsRefreshToken(provider) && session.refreshToken.length === 0) {
         throw new Error(`${providerDisplayName(provider)} sign-in did not return refresh token. Try again.`);
       }
+      await upsertUser(toStoredUser(session));
+      await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
 
-      if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshWorkspaceConnection();
-      } else {
-        const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
-        setState((current) =>
-          current.status !== 'ready'
-            ? current
-            : {
-                ...current,
-                sessions: nextState.sessions,
-                modelConnected: nextState.modelConnected,
-              },
-        );
-      }
+      const nextSessions = await readAuthStatus();
+      await refreshWorkspaceConnection(nextSessions);
 
       setProviderMessage(provider, `${providerDisplayName(provider)} connected as ${session.email}.`);
     } catch (error) {
@@ -877,21 +874,8 @@ export const App = (): JSX.Element => {
     try {
       requireNativeRuntime(`Disconnecting ${providerDisplayName(provider)}`);
       await invoke('auth_sign_out', { provider });
-
-      if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshWorkspaceConnection();
-      } else {
-        const nextState = await reloadConnectionState(state.opencode, state.vaultPath);
-        setState((current) =>
-          current.status !== 'ready'
-            ? current
-            : {
-                ...current,
-                sessions: nextState.sessions,
-                modelConnected: nextState.modelConnected,
-              },
-        );
-      }
+      const nextSessions = await readAuthStatus();
+      await refreshWorkspaceConnection(nextSessions);
 
       setProviderMessage(provider, `${providerDisplayName(provider)} disconnected.`);
     } catch (error) {
