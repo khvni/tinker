@@ -1,19 +1,23 @@
 import { useState, type JSX, type ReactNode } from 'react';
 import {
+  Avatar,
   Badge,
   Button,
   ClickableBadge,
   ContextBadge,
   IconButton,
   ModelPicker,
+  Progress,
   SearchInput,
   SegmentedControl,
   StatusDot,
   TextInput,
   Textarea,
   Toggle,
+  type AvatarSize,
   type BadgeVariant,
   type ModelPickerItem,
+  type ProgressSpinnerSize,
   type StatusDotState,
 } from '@tinker/design';
 import '@tinker/design/styles/tokens.css';
@@ -76,6 +80,28 @@ const CONTEXT_BADGE_TOOLTIP_DEMO = {
   windowSize: 200_000,
   model: 'claude-sonnet-4-6',
 } as const;
+
+const AVATAR_SIZES: ReadonlyArray<{ size: AvatarSize; label: string }> = [
+  { size: 'xs', label: 'xs · 20' },
+  { size: 'sm', label: 'sm · 24' },
+  { size: 'md', label: 'md · 32' },
+  { size: 'lg', label: 'lg · 40' },
+];
+
+const AVATAR_NAMES: ReadonlyArray<string> = [
+  'Khani Bangalu',
+  'Ada Lovelace',
+  'Grace Hopper',
+  'Linus Torvalds',
+  'Margaret Hamilton',
+  'Ken Thompson',
+];
+
+const PROGRESS_SPINNER_SIZES: ReadonlyArray<{ size: ProgressSpinnerSize; label: string }> = [
+  { size: 'xs', label: 'xs · 12' },
+  { size: 'sm', label: 'sm · 16' },
+  { size: 'md', label: 'md · 24' },
+];
 
 const PlusIcon = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -264,6 +290,68 @@ const ComponentsTab = (): JSX.Element => {
           />
           <p className="ds-context-badge-demo__hint">Hover badge to inspect native tooltip counts.</p>
         </div>
+      </Section>
+
+      <Section label="Avatar">
+        <Row>
+          {AVATAR_SIZES.map((item) => (
+            <span key={item.size} className="ds-status-item">
+              <Avatar name="Khani Bangalu" size={item.size} />
+              <span className="ds-status-item__label">{item.label}</span>
+            </span>
+          ))}
+        </Row>
+        <Row>
+          {AVATAR_NAMES.map((name) => (
+            <span key={name} className="ds-status-item">
+              <Avatar name={name} size="md" />
+              <span className="ds-status-item__label">{name}</span>
+            </span>
+          ))}
+        </Row>
+        <Row>
+          <span className="ds-status-item">
+            <Avatar
+              name="Octocat"
+              size="md"
+              src="https://avatars.githubusercontent.com/u/583231?v=4"
+            />
+            <span className="ds-status-item__label">Image</span>
+          </span>
+          <span className="ds-status-item">
+            <Avatar name="Missing Link" size="md" src="https://x.invalid/404.png" />
+            <span className="ds-status-item__label">Broken src → initials</span>
+          </span>
+          <span className="ds-status-item">
+            <Avatar name="" size="md" />
+            <span className="ds-status-item__label">No name</span>
+          </span>
+        </Row>
+      </Section>
+
+      <Section label="Progress">
+        <Row>
+          <div className="ds-progress-bar-wrap">
+            <Progress variant="bar" value={25} max={100} label="25%" />
+            <span className="ds-status-item__label">Determinate · 25%</span>
+          </div>
+          <div className="ds-progress-bar-wrap">
+            <Progress variant="bar" value={72} max={100} label="72%" />
+            <span className="ds-status-item__label">Determinate · 72%</span>
+          </div>
+          <div className="ds-progress-bar-wrap">
+            <Progress variant="bar" label="Working" />
+            <span className="ds-status-item__label">Indeterminate</span>
+          </div>
+        </Row>
+        <Row>
+          {PROGRESS_SPINNER_SIZES.map((item) => (
+            <span key={item.size} className="ds-status-item">
+              <Progress variant="spinner" size={item.size} />
+              <span className="ds-status-item__label">{item.label}</span>
+            </span>
+          ))}
+        </Row>
       </Section>
 
       <Section label="SegmentedControl">

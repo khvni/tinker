@@ -9,6 +9,8 @@ export { Toggle } from './Toggle.js';
 export { TextInput } from './TextInput.js';
 export { SearchInput } from './SearchInput.js';
 export { Textarea } from './Textarea.js';
+export { Avatar, type AvatarProps, type AvatarSize } from './Avatar/index.js';
+export { Progress, type ProgressProps, type ProgressSpinnerSize } from './Progress/index.js';
 export {
   ModelPicker,
   type ModelPickerItem,

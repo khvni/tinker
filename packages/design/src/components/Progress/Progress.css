@@ -1,0 +1,90 @@
+.tk-progress {
+  display: inline-block;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+/* ── Bar ─────────────────────────────────────────────── */
+
+.tk-progress--bar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-subtle);
+  overflow: hidden;
+}
+
+.tk-progress--bar .tk-progress__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+  transition: width var(--duration-base) var(--ease-standard);
+}
+
+.tk-progress--bar-indeterminate .tk-progress__fill {
+  width: 40%;
+  animation: tk-progress-bar-slide 1.4s var(--ease-standard) infinite;
+}
+
+@keyframes tk-progress-bar-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* ── Spinner ─────────────────────────────────────────── */
+
+.tk-progress--spinner {
+  display: inline-block;
+  border-radius: var(--radius-pill);
+  border-style: solid;
+  border-color: var(--color-border-default);
+  border-top-color: var(--color-accent);
+  animation: tk-progress-spin 0.9s linear infinite;
+}
+
+.tk-progress--spinner-xs {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+
+.tk-progress--spinner-sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.tk-progress--spinner-md {
+  width: 24px;
+  height: 24px;
+  border-width: 2.5px;
+}
+
+@keyframes tk-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-progress--bar-indeterminate .tk-progress__fill {
+    animation: none;
+    width: 60%;
+    transform: none;
+  }
+
+  .tk-progress--spinner {
+    animation: none;
+    border-top-color: var(--color-accent);
+  }
+}
