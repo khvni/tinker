@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { homeDir, join } from '@tauri-apps/api/path';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
@@ -12,6 +12,7 @@ import {
   getActiveMemoryPath,
   indexVault,
   migrateLocalUserIdentity,
+  subscribeMemoryPathChanged,
   syncActiveMemoryPath,
   upsertUser,
   type MemoryRunState,
@@ -367,6 +368,55 @@ export const App = (): JSX.Element => {
   const setProviderMessage = (provider: AuthProvider, message: string | null): void => {
     setProviderMessages((current) => ({ ...current, [provider]: message }));
   };
+
+  const refreshWorkspaceConnection = useCallback(async (sessions: SSOStatus): Promise<void> => {
+    if (!nativeRuntime || state.status !== 'ready') {
+      return;
+    }
+
+    requireNativeRuntime('Restarting OpenCode');
+    const nextState = await restartWorkspaceOpencode(state.vaultPath, sessions);
+    await syncCurrentUserMemoryPath(sessions, { emit: false });
+
+    setState((current) =>
+      current.status !== 'ready'
+        ? current
+        : {
+            ...current,
+            opencode: nextState.opencode,
+            mcpStatus: {
+              ...current.mcpStatus,
+              [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
+              ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
+            },
+            modelConnected: nextState.modelConnected,
+          },
+    );
+  }, [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null]);
+
+  useEffect(() => {
+    if (!nativeRuntime || state.status !== 'ready' || currentUserState.status !== 'ready') {
+      return;
+    }
+
+    const sessions = currentUserState.sessions;
+
+    return subscribeMemoryPathChanged((detail) => {
+      if (detail.reason !== 'root-changed') {
+        return;
+      }
+
+      void refreshWorkspaceConnection(sessions).catch((error) => {
+        console.warn('Failed to refresh OpenCode after a memory path change.', error);
+      });
+    });
+  }, [
+    nativeRuntime,
+    refreshWorkspaceConnection,
+    state.status,
+    currentUserState.status,
+    currentUserState.status === 'ready' ? currentUserState.sessions : null,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -810,28 +860,6 @@ export const App = (): JSX.Element => {
     const modelConnected = await probeModelConnection(connection, vaultPath);
 
     return { sessions, modelConnected };
-  };
-
-  const refreshWorkspaceConnection = async (sessions?: SSOStatus): Promise<void> => {
-    requireNativeRuntime('Restarting OpenCode');
-    const nextSessions = sessions ?? (await readAuthStatus());
-    const nextState = await restartWorkspaceOpencode(state.vaultPath, nextSessions);
-    await syncCurrentUserMemoryPath(nextSessions);
-
-    setState((current) =>
-      current.status !== 'ready'
-        ? current
-        : {
-            ...current,
-            opencode: nextState.opencode,
-            modelConnected: nextState.modelConnected,
-            mcpStatus: {
-              ...current.mcpStatus,
-              [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
-              ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, EXA_CHECKING_STATUS])),
-            },
-          },
-    );
   };
 
   const setSessionFolder = async (config: VaultConfig): Promise<void> => {

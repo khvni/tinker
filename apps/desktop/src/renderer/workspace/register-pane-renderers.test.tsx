@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { SSOStatus } from '@tinker/shared-types';
+import { createDefaultWorkspacePreferences, type SSOStatus } from '@tinker/shared-types';
 import { FilePaneRuntimeContext } from '../panes/FilePane/file-pane-runtime.js';
 import { getRenderer, resetPaneRegistry } from './pane-registry.js';
 import { MemoryPaneRuntimeContext } from './memory-pane-runtime.js';
@@ -29,6 +29,7 @@ const settingsRuntime: SettingsPaneRuntime = {
   modelConnected: false,
   modelAuthBusy: false,
   modelAuthMessage: null,
+  workspacePreferences: createDefaultWorkspacePreferences(),
   opencode: null,
   vaultPath: null,
   mcpSeedStatuses: {},
@@ -39,6 +40,7 @@ const settingsRuntime: SettingsPaneRuntime = {
   onConnectMicrosoft: vi.fn().mockResolvedValue(undefined),
   onConnectModel: vi.fn().mockResolvedValue(undefined),
   onDisconnectModel: vi.fn().mockResolvedValue(undefined),
+  onWorkspacePreferencesChange: vi.fn(),
   onRequestRespawn: vi.fn().mockResolvedValue(undefined),
 };
 
@@ -47,7 +49,7 @@ describe('registerWorkspacePaneRenderers', () => {
     resetPaneRegistry();
   });
 
-  it('registers settings and memory pane renderers', () => {
+  it('registers settings and memory panes once', () => {
     registerWorkspacePaneRenderers();
     expect(() => registerWorkspacePaneRenderers()).not.toThrow();
 
@@ -66,6 +68,7 @@ describe('registerWorkspacePaneRenderers', () => {
 
     expect(settingsMarkup).toContain('Account');
     expect(settingsMarkup).toContain('Model');
+    expect(settingsMarkup).toContain('Memory');
     expect(settingsMarkup).toContain('Connections');
     expect(memoryMarkup).toContain('Memory files');
     expect(memoryMarkup).toContain('tinker-memory-pane');

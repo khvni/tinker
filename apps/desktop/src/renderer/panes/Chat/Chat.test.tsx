@@ -59,14 +59,12 @@ vi.mock('@tinker/bridge', () => ({
 }));
 
 vi.mock('@tinker/memory', () => ({
-  resolveRelevantEntities: () => Promise.resolve([]),
+  appendMemoryCapture: () => Promise.resolve(false),
   createSession: () => Promise.resolve(),
   findLatestSessionForFolder: () => Promise.resolve(null),
+  getActiveMemoryPath: () => Promise.resolve('/memory/test-user'),
+  subscribeMemoryPathChanged: () => () => undefined,
   updateLastActive: () => Promise.resolve(),
-}));
-
-vi.mock('../../memory.js', () => ({
-  captureConversationMemory: () => Promise.resolve(null),
 }));
 
 // Import after the mocks are registered.

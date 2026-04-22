@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { SSOSession, SSOStatus, User } from '@tinker/shared-types';
+import type { SSOSession, SSOStatus, User, WorkspacePreferences } from '@tinker/shared-types';
 import type { AuthProvider, OpencodeConnection } from '../../bindings.js';
 import type { BuiltinMcpName, MCPStatus } from '../integrations.js';
 
@@ -23,9 +23,11 @@ export type SettingsPaneRuntime = {
   readonly modelConnected: boolean;
   readonly modelAuthBusy: boolean;
   readonly modelAuthMessage: string | null;
+  readonly workspacePreferences: WorkspacePreferences;
   readonly opencode: OpencodeConnection | null;
   readonly vaultPath: string | null;
   readonly mcpSeedStatuses: Partial<Record<BuiltinMcpName, MCPStatus>>;
+  onWorkspacePreferencesChange(nextPreferences: WorkspacePreferences): void;
   onSignOut(session: SSOSession): Promise<void>;
   onContinueAsGuest(): Promise<void>;
   onConnectGoogle(): Promise<void>;

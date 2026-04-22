@@ -1,4 +1,5 @@
 import { useMemo, type JSX } from 'react';
+import { MemorySettingsPanel } from '../MemorySettingsPanel/index.js';
 import { SettingsShell, type SettingsShellSection } from '../SettingsShell/index.js';
 import { useSettingsPaneRuntime } from '../../settings-pane-runtime.js';
 import { ConnectionsSection } from '../../../panes/Settings/ConnectionsSection/index.js';
@@ -43,6 +44,16 @@ export const SettingsPane = (): JSX.Element => {
             modelAuthMessage={runtime.modelAuthMessage}
             onConnectModel={runtime.onConnectModel}
             onDisconnectModel={runtime.onDisconnectModel}
+          />
+        ),
+      },
+      {
+        id: 'memory',
+        label: 'Memory',
+        content: (
+          <MemorySettingsPanel
+            workspacePreferences={runtime.workspacePreferences}
+            onWorkspacePreferencesChange={runtime.onWorkspacePreferencesChange}
           />
         ),
       },
