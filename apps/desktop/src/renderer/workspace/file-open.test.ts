@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createWorkspaceStore } from '@tinker/panes';
 import type { TinkerPaneData } from '@tinker/shared-types';
 import { MISSING_FILE_MIME } from '../panes/FilePane/index.js';
-import { getPanelIdForPath } from '../renderers/file-utils.js';
+import { getPanelIdForPath, XLSX_MIME } from '../renderers/file-utils.js';
 import { openWorkspaceFile } from './file-open.js';
 import { createDefaultWorkspaceState } from './layout.default.js';
 
@@ -116,6 +116,18 @@ describe('openWorkspaceFile', () => {
       kind: 'file',
       path: '/vault/deck.pptx',
       mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
+  });
+
+  it('opens xlsx files with the spreadsheet MIME so FilePane routes them through the workbook renderer', async () => {
+    const store = createWorkspaceStore<TinkerPaneData>();
+
+    await openWorkspaceFile(store, '/vault/roadmap.xlsx', async () => XLSX_MIME);
+
+    expect(store.getState().tabs[0]?.panes[getPanelIdForPath('file', '/vault/roadmap.xlsx')]?.data).toEqual({
+      kind: 'file',
+      path: '/vault/roadmap.xlsx',
+      mime: XLSX_MIME,
     });
   });
 });
