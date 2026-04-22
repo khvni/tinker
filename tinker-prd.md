@@ -21,7 +21,7 @@
 
 Tinker is a desktop AI workspace. The shell is Tauri v2, the UI is React 19 + `@tinker/panes` (recursive split tree + tabs; supersedes Dockview per D16), and OpenCode runs as a localhost sidecar scoped to a user-picked folder.
 
-First launch signs the user in (Google, GitHub, or Microsoft — via Better Auth). Every chat session begins by pointing Tinker at a local folder. OpenCode runs inside that folder. Chat replies are rendered as native markdown and every message streams to a per-user append-only history file in `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Files referenced in chat open inline (PDF, XLSX, DOCX, PPTX, HTML, code, markdown). A desktop-native memory folder — per-user, user-relocatable — holds cross-session context. Three auth-free MCP servers (qmd, smart-connections, exa) ship pre-wired.
+First launch opens directly into a Chat pane (no sign-in gate, no setup wizard — per D26). Sign-in via Google, GitHub, or Microsoft (Better Auth) is reachable later from Settings → Account; until then sessions attach to a `'local-user'` placeholder. Every chat session begins by pointing Tinker at a local folder via the composer's folder-picker button (next to ModelPicker). OpenCode runs inside that folder. Chat replies are rendered as native markdown and every message streams to a per-user append-only history file in `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Files referenced in chat open inline (PDF, XLSX, DOCX, PPTX, HTML, code, markdown). A desktop-native memory folder — per-user, user-relocatable — holds cross-session context. Three auth-free MCP servers (qmd, smart-connections, exa) ship pre-wired.
 
 The app is not a cloud dashboard. It is a local workspace that happens to talk to a model scoped to the folder you're working in, with per-user chat history that survives outside the app.
 
@@ -38,10 +38,10 @@ Each pillar has a dedicated feature spec in `agent-knowledge/features/` and a ta
 - Spec: [[20-mvp-panes-workspace]]
 
 ### 2.2 Folder-scoped session (M2)
-- A session is `{ id, userId, folderPath, createdAt, lastActiveAt, modelId? }`. Stored in SQLite. `userId` FK → `users` table (§2.8).
-- First run: after sign-in (§2.8), user picks a folder. Picked folder becomes the session's OpenCode `cwd`.
-- "New session" always begins with a folder pick. One sidecar per active session.
-- Session switcher lists recent sessions for the current user only (filtered by `userId`).
+- A session is `{ id, userId, folderPath, createdAt, lastActiveAt, modelId? }`. Stored in SQLite. `userId` FK → `users` table (§2.8); defaults to `'local-user'` placeholder until first sign-in (per [[decisions]] D26).
+- **No FirstRun screen** (D26 / TIN-187): app boots directly into a single Chat pane. Folder selection happens from a button next to ModelPicker in the composer (file icon + "Select folder" label).
+- "New session" always begins with a folder pick from the composer button. One sidecar per active session.
+- Session switcher lists recent sessions for the current user only (filtered by `userId`); placeholder rows surface until M8 sign-in attaches.
 - Spec: [[21-mvp-session-folder]]
 
 ### 2.3 In-line document renderer (M3)
@@ -86,7 +86,7 @@ Each pillar has a dedicated feature spec in `agent-knowledge/features/` and a ta
 
 ### 2.8 Identity + per-user chat-history persistence (M8)
 - **Better Auth** local sidecar (`packages/auth-sidecar`) handles consumer OAuth via **Google, GitHub, and Microsoft** — the three providers from D2 / D4. No enterprise SSO in MVP (SAML / SCIM / tenant-locked federation stays deferred per D1 / D8).
-- First-run flow: sign-in screen precedes folder picker. After sign-in, a `users` row is created (`id, provider, provider_user_id, display_name, avatar_url, created_at`). Session creation binds to the current user via FK.
+- **No sign-in gate on boot** (per D26 / TIN-187). Sessions attach to `user_id='local-user'` until the user reaches Settings → Account. On first real sign-in via Google/GitHub/Microsoft, a `users` row is created (`id, provider, provider_user_id, display_name, avatar_url, created_at`); placeholder sessions migrate to the new `userId`.
 - **Per-user chat history**: every streamed message (user + assistant + tool use + reasoning) is appended as one JSON line to `<session-folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. The folder is the durable source of truth — if the app database is lost, history still exists in the folder.
 - **Hydration**: opening a session reads the JSONL and populates the Chat pane before re-connecting to OpenCode for new turns.
 - Settings pane shows current user, sign-out, and provider-switch. Sign-out clears keychain refresh tokens + routes back to first-run.

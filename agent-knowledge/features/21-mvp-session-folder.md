@@ -20,10 +20,11 @@ This is the MVP's identity model: no sign-in, no account, no OAuth — just "whi
 
 - `Session` type: `{ id, folderPath, createdAt, lastActiveAt, modelId?: string }`. Persisted in SQLite `sessions` table.
 - Tauri commands: `open_folder_picker`, `start_opencode(folder_path)`, `stop_opencode(pid)`.
-- First-run screen is a folder picker, not a sign-in wizard.
-- "New session" anywhere in the app = folder picker → spawn sidecar → open Chat pane.
+- **No first-run screen** (per [[decisions]] D26 / TIN-187). App boots directly into a single Chat pane. Folder selection happens from a button next to ModelPicker in the Chat composer.
+- "New session" anywhere in the app = folder picker → spawn sidecar → bind to active Chat pane.
 - Session switcher on cold launch shows recent sessions ordered by `lastActiveAt`.
 - On app quit, all running sidecars are stopped (best-effort per D22 coordinator pattern).
+- `user_id` defaults to `'local-user'` placeholder until Better Auth (M8) is reached via Settings; rows migrate to the real user-id on first sign-in.
 
 ## Out of scope
 
@@ -34,8 +35,8 @@ This is the MVP's identity model: no sign-in, no account, no OAuth — just "whi
 
 ## Acceptance
 
-- Opening the app with an empty SQLite → first-run folder picker appears.
-- Picking a folder → `opencode serve --cwd <folder>` spawns → Chat pane opens once health check passes.
+- Opening the app with an empty SQLite → workspace opens to a single Chat pane with an inline "Pick a folder to start" hint; the composer's folder-picker button is the only call to action.
+- Picking a folder via that button → `opencode serve --cwd <folder>` spawns → Chat pane is bound to the new session once health check passes (no route change, no full-window screen).
 - Quitting + reopening the app → session switcher shows the previous session at the top.
 - "New session" button → folder picker → second session row appears.
 - Switching between sessions stops the previous sidecar and starts a new one for the picked session's folder.

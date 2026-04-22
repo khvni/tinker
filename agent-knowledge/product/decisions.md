@@ -249,6 +249,23 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
 - **Non-goals reaffirmed** (from existing PRD §6, relisted so MVP agents don't drift): multi-provider model support, cloud sync, mobile dispatch, enterprise SSO (SAML / SCIM / dedicated-tenant federation — stays per D1 / D8), legacy desktop-shell compatibility, prompt marketplace. Plus D25 adds: no entity extraction / FTS indexing (memory = flat markdown files read top-N-recent), no vault-wide indexing (folder scope = session scope), no sub-agent orchestration, no scheduled jobs, no additional MCP integrations beyond qmd / smart-connections / exa (built-in integrations like GitHub / Linear / Gmail wait until post-MVP), no Playbook / Coach skill marketplace.
 - **In scope for MVP identity**: Google + GitHub + Microsoft consumer OAuth via Better Auth (per D2 / D4). Per-user chat-history persistence to `<session-folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Per-user memory scoping. Tokens in OS keychain (D5).
 
+### `[2026-04-22]` D26 — FirstRun killed; workspace opens direct; folder picker in composer
+
+- **Decision**: Delete `FirstRun.tsx` and the tri-panel sign-in/connected-tools/vault wizard. App boot opens directly into a single Chat pane. Folder selection happens from a button next to ModelPicker in the Chat composer (file icon + "Select folder"). No sign-in screen on cold boot — Better Auth (M8) is reachable from Settings only and is **deferred from the boot path** (per TIN-187 + sibling TIN-188 "Continue as guest" CTA). Sessions schema gains `user_id='local-user'` placeholder until real sign-in attaches.
+- **Why**:
+  1. **First useful outcome ≠ a setup wizard.** D25 principle: "first useful outcome should come from using the app, not from studying setup docs." Three boxy gray panels before the user sees a chat box violate that.
+  2. **Composer-side folder picker = lower friction.** ModelPicker already lives next to the composer; folder picking is the same kind of per-session choice. Co-locating them means "new session" is a single composer interaction, not a route change.
+  3. **Auth on boot blocks testing + adds compliance surface we don't want yet.** D1 says enterprise federation stays out of upstream; even consumer OAuth on cold boot creates a permission/loop UX problem before the user knows what they're signing into. Defer until Settings → Account.
+- **How to apply**:
+  - Delete `FirstRun.tsx` + the route. Workspace mounts directly. (TIN-187)
+  - Add folder-picker button next to ModelPicker in Composer per Paper artboard. Click → `open_folder_picker` → bind session → spawn OpenCode. (TIN-187)
+  - When no session exists, Chat pane shows a calm "Pick a folder to start" hint inline — not a separate route or modal.
+  - Sessions table writes `user_id='local-user'` until M8 sign-in re-enters via Settings; on first real sign-in the placeholder rows migrate to the new user-id (migration scripted later — see M8 follow-up).
+  - Sign In screen retains "Continue as guest" CTA (TIN-188) for users who reach it manually but don't want auth.
+  - **Don't** reintroduce a boot-time sign-in gate without reopening this decision.
+- **Supersedes**: TIN-20 (M2.6 first-run folder picker screen) — closed as superseded by TIN-187. The folder-picker-as-screen idea is replaced by folder-picker-in-composer.
+- **Touches**: `apps/desktop/src/renderer/App.tsx` (route), `apps/desktop/src/renderer/panes/Chat/Composer.tsx` (button), `packages/memory/src/sessions.ts` (placeholder user_id), `tinker-prd.md` §2.2 + §2.8, `agent-knowledge/features/21-mvp-session-folder.md`.
+
 ## Open Questions (not yet decided)
 
 - **Scheduler implementation**: in-process TypeScript cron vs. OS-level (launchd/Task Scheduler/systemd). Leaning in-process for cross-platform simplicity; revisit when app sleep/wake behavior is tested.
