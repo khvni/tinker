@@ -8,39 +8,42 @@ import {
   useState,
   type JSX,
   type KeyboardEvent,
+  type ReactNode,
   type UIEventHandler,
 } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { Badge, Button, ClickableBadge, ContextBadge, EmptyState, ModelPicker, Textarea } from '@tinker/design';
-import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import {
-  createSession as createStoredSession,
-  getSession as getStoredSession,
-  listSessionsForUser,
-  resolveRelevantEntities,
-  updateSession as updateStoredSession,
-  type SessionUpdate,
-} from '@tinker/memory';
+  Badge,
+  Button,
+  ClickableBadge,
+  ContextBadge,
+  EmptyState,
+  IconButton,
+  ModelPicker,
+  Textarea,
+} from '@tinker/design';
 import {
-  DEFAULT_REASONING_LEVEL,
-  DEFAULT_SESSION_MODE,
-  type ReasoningLevel,
-  type Session,
-  type SessionMode,
-  type SkillStore,
-} from '@tinker/shared-types';
+  createChatHistoryWriter,
+  findLatestChatHistorySessionId,
+  injectActiveSkills,
+  injectMemoryContext,
+  readChatHistory,
+  streamSessionEvents,
+  type ChatHistoryWriter,
+} from '@tinker/bridge';
+import { createSession, findLatestSessionForFolder, resolveRelevantEntities, updateLastActive } from '@tinker/memory';
+import { DEFAULT_SESSION_MODE, type SkillStore } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../../bindings.js';
 import { captureConversationMemory } from '../../memory.js';
 import {
   buildModelPickerItems,
   createWorkspaceClient,
   findModelOptionById,
-  findModelOptionByStoredId,
   getOpencodeDirectory,
   pickDefaultModelOptionId,
-  resolveReasoningVariant,
   type WorkspaceModelOption,
 } from '../../opencode.js';
+import { AttachmentIcon } from './AttachmentIcon.js';
 import { ChatMessage } from '../ChatMessage/index.js';
 import {
   calculateComposerHeight,
@@ -49,8 +52,6 @@ import {
 } from '../chat-composer.js';
 import { useSessionHistoryWindow } from '../useSessionHistoryWindow.js';
 import { messageTextFromBlocks, MessageBlock, partToBlock, type Block } from './Block.js';
-import { ModeToggle } from './components/ModeToggle/index.js';
-import { ReasoningPicker } from './components/ReasoningPicker/index.js';
 import {
   CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD,
   getChatTailSignature,
@@ -61,34 +62,25 @@ import {
   type ResolvedContextUsage,
 } from './chatState.js';
 import { draftReducer } from './draftReducer.js';
-
-type ChatMessageRecord = {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  blocks: Block[];
-};
-
-type RawHistoryMessage = {
-  info: Message;
-  parts: Part[];
-};
+import { replayChatHistory, type ChatMessageRecord } from './historyReplay.js';
 
 type ChatProps = {
   skillStore: SkillStore;
+  currentUserId: string;
   modelConnected: boolean;
   opencode: OpencodeConnection;
-  currentUserId: Session['userId'];
-  paneSessionId?: Session['id'];
+  sessionFolderPath: string | null;
   vaultPath: string | null;
   activeSkillsRevision: number;
-  onPersistSessionId?: (sessionId: Session['id']) => void;
   onFileWritten?: (path: string) => void;
   onOpenFileLink?: (path: string) => void;
   onOpenNewChat?: () => void;
   onMemoryCommitted?: () => void;
+  modeToggleSlot?: ReactNode;
+  reasoningPickerSlot?: ReactNode;
 };
 
-const formatMessages = (messages: ReadonlyArray<RawHistoryMessage>): ChatMessageRecord[] => {
+const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessageRecord[] => {
   return messages.map(({ info, parts }) => {
     const blocks: Block[] = [];
     for (const part of parts) {
@@ -100,10 +92,7 @@ const formatMessages = (messages: ReadonlyArray<RawHistoryMessage>): ChatMessage
 
     const hasText = blocks.some((block) => block.kind === 'text' && block.text.length > 0);
     if (!hasText && (info.role !== 'assistant' || blocks.length === 0)) {
-      const placeholder =
-        info.role === 'assistant'
-          ? 'Response contained only non-text output.'
-          : 'Message sent.';
+      const placeholder = info.role === 'assistant' ? 'Response contained only non-text output.' : 'Message sent.';
       blocks.push({ kind: 'text', partID: `placeholder-${info.id}`, text: placeholder });
     }
 
@@ -115,10 +104,7 @@ const formatMessages = (messages: ReadonlyArray<RawHistoryMessage>): ChatMessage
   });
 };
 
-const mergeHistoryMessages = (
-  olderMessages: readonly ChatMessageRecord[],
-  newerMessages: readonly ChatMessageRecord[],
-): ChatMessageRecord[] => {
+const mergeHistoryMessages = (olderMessages: readonly ChatMessageRecord[], newerMessages: readonly ChatMessageRecord[]): ChatMessageRecord[] => {
   const merged = new Map<string, ChatMessageRecord>();
 
   for (const message of olderMessages) {
@@ -145,9 +131,7 @@ const syncComposerHeight = (textarea: HTMLTextAreaElement | null): void => {
   const styles = window.getComputedStyle(textarea);
   const fontSize = readPixelValue(styles.fontSize, 16);
   const lineHeight =
-    styles.lineHeight === 'normal'
-      ? fontSize * 1.5
-      : readPixelValue(styles.lineHeight, fontSize * 1.5);
+    styles.lineHeight === 'normal' ? fontSize * 1.5 : readPixelValue(styles.lineHeight, fontSize * 1.5);
 
   textarea.style.height = 'auto';
 
@@ -163,49 +147,6 @@ const syncComposerHeight = (textarea: HTMLTextAreaElement | null): void => {
   textarea.style.maxHeight = `${maxHeight}px`;
   textarea.style.height = `${height}px`;
   textarea.style.overflowY = overflowY;
-};
-
-const buildReasoningLookup = (
-  sessions: ReadonlyArray<Session>,
-): Record<string, ReasoningLevel> => {
-  const lookup: Record<string, ReasoningLevel> = {};
-
-  for (const session of sessions) {
-    if (!session.modelId || !session.reasoningLevel || lookup[session.modelId] !== undefined) {
-      continue;
-    }
-
-    lookup[session.modelId] = session.reasoningLevel;
-  }
-
-  return lookup;
-};
-
-const mergeStoredSession = (
-  session: Session,
-  update: SessionUpdate,
-  lastActiveAt: string,
-): Session => {
-  return {
-    ...session,
-    lastActiveAt,
-    folderPath: update.folderPath ?? session.folderPath,
-    mode: update.mode ?? session.mode,
-    ...(update.modelId !== undefined
-      ? update.modelId === null
-        ? {}
-        : { modelId: update.modelId }
-      : session.modelId
-        ? { modelId: session.modelId }
-        : {}),
-    ...(update.reasoningLevel !== undefined
-      ? update.reasoningLevel === null
-        ? {}
-        : { reasoningLevel: update.reasoningLevel }
-      : session.reasoningLevel
-        ? { reasoningLevel: session.reasoningLevel }
-        : {}),
-  };
 };
 
 const readContextUsageTokens = (value: unknown): ContextUsageSnapshot['tokens'] | null => {
@@ -268,18 +209,20 @@ const extractAssistantContextUsage = (
 
 export const Chat = ({
   skillStore,
+  currentUserId,
   modelConnected,
   opencode,
-  currentUserId,
-  paneSessionId,
+  sessionFolderPath,
   vaultPath,
   activeSkillsRevision,
-  onPersistSessionId,
   onFileWritten,
   onOpenFileLink,
   onOpenNewChat,
   onMemoryCommitted,
+  modeToggleSlot,
+  reasoningPickerSlot,
 }: ChatProps): JSX.Element => {
+  const readyStatus = modelConnected ? 'OpenCode is ready.' : 'Connect an AI model in Settings to start chatting.';
   const client = useMemo(
     () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
     [opencode.baseUrl, opencode.password, opencode.username, vaultPath],
@@ -287,24 +230,14 @@ export const Chat = ({
   const [messages, setMessages] = useState<ChatMessageRecord[]>([]);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [hydratingHistory, setHydratingHistory] = useState(false);
   const [draftBlocks, dispatchDraft] = useReducer(draftReducer, []);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [modelOptions, setModelOptions] = useState<ReadonlyArray<WorkspaceModelOption>>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>();
-  const [persistedModelStoredId, setPersistedModelStoredId] = useState<string>();
-  const [selectedMode, setSelectedMode] = useState<SessionMode>(DEFAULT_SESSION_MODE);
-  const [selectedReasoningLevel, setSelectedReasoningLevel] = useState<ReasoningLevel>(
-    DEFAULT_REASONING_LEVEL,
-  );
   const [modelOptionsLoading, setModelOptionsLoading] = useState(true);
-  const [sessionPreferencesReady, setSessionPreferencesReady] = useState(false);
-  const [modelWarning, setModelWarning] = useState<string | null>(null);
-  const [status, setStatus] = useState(
-    modelConnected
-      ? 'OpenCode is ready.'
-      : 'Connect an AI model in Settings to start chatting.',
-  );
+  const [status, setStatus] = useState(readyStatus);
   const [contextUsage, setContextUsage] = useState<ResolvedContextUsage | null>(null);
   const [showNewMessagesPill, setShowNewMessagesPill] = useState(false);
   // Global default applied where no per-disclosure override exists. ⌥T flips this and clears overrides.
@@ -312,9 +245,7 @@ export const Chat = ({
   const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
   const mountedRef = useRef(true);
   const sessionIDRef = useRef<string | null>(null);
-  const storedSessionRef = useRef<Session | null>(null);
-  const reasoningByModelRef = useRef<Record<string, ReasoningLevel>>({});
-  const previousModelStoredIdRef = useRef<string | null>(null);
+  const historyWriterRef = useRef<ChatHistoryWriter | null>(null);
   const memoryCommitRef = useRef<Promise<void>>(Promise.resolve());
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -323,47 +254,18 @@ export const Chat = ({
   const draftBlocksRef = useRef<Block[]>([]);
   const shouldStickToBottomRef = useRef(true);
   const lastTailSignatureRef = useRef('empty');
-  const selectedModel = useMemo(
-    () => findModelOptionById(modelOptions, selectedModelId),
-    [modelOptions, selectedModelId],
-  );
-  const selectedReasoningVariant = useMemo(
-    () =>
-      resolveReasoningVariant(
-        selectedModel,
-        selectedModel?.supportsReasoning ? selectedReasoningLevel : undefined,
-      ),
-    [selectedModel, selectedReasoningLevel],
-  );
-
-  const persistSessionUpdate = useCallback(async (update: SessionUpdate): Promise<void> => {
-    const currentSession = storedSessionRef.current;
-    if (!currentSession) {
-      return;
-    }
-
-    const lastActiveAt = new Date().toISOString();
-
-    try {
-      await updateStoredSession(currentSession.id, {
-        ...update,
-        lastActiveAt,
-      });
-      storedSessionRef.current = mergeStoredSession(currentSession, update, lastActiveAt);
-
-      if (update.modelId !== undefined) {
-        setPersistedModelStoredId(update.modelId ?? undefined);
-      }
-    } catch (error) {
-      console.warn('Failed to persist chat session settings.', error);
-    }
-  }, []);
+  const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
 
   useEffect(() => {
     mountedRef.current = true;
 
     return () => {
       mountedRef.current = false;
+      const writer = historyWriterRef.current;
+      historyWriterRef.current = null;
+      if (writer) {
+        void writer.dispose();
+      }
       const activeSessionID = sessionIDRef.current;
       sessionIDRef.current = null;
       if (activeSessionID) {
@@ -373,12 +275,10 @@ export const Chat = ({
   }, [client]);
 
   useEffect(() => {
-    setStatus(
-      modelConnected
-        ? 'OpenCode is ready.'
-        : 'Connect an AI model in Settings to start chatting.',
-    );
-  }, [modelConnected]);
+    if (!hydratingHistory) {
+      setStatus(readyStatus);
+    }
+  }, [hydratingHistory, readyStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -394,9 +294,7 @@ export const Chat = ({
 
         const providers = response.data?.providers ?? [];
         const nextOptions = buildModelPickerItems(providers);
-        const nextSelectedId =
-          pickDefaultModelOptionId(providers, response.data?.default ?? {}) ??
-          nextOptions[0]?.id;
+        const nextSelectedId = pickDefaultModelOptionId(providers, response.data?.default ?? {}) ?? nextOptions[0]?.id;
 
         setModelOptions(nextOptions);
         setSelectedModelId((current) => {
@@ -427,106 +325,29 @@ export const Chat = ({
     };
   }, [client, modelConnected]);
 
+  const activateSession = useCallback(
+    (sessionID: string): void => {
+      sessionIDRef.current = sessionID;
+
+      const previousWriter = historyWriterRef.current;
+      historyWriterRef.current = sessionFolderPath
+        ? createChatHistoryWriter({
+            folderPath: sessionFolderPath,
+            userId: currentUserId,
+            sessionId: sessionID,
+          })
+        : null;
+
+      if (previousWriter) {
+        void previousWriter.dispose();
+      }
+    },
+    [currentUserId, sessionFolderPath],
+  );
+
   useEffect(() => {
     let cancelled = false;
 
-    setSessionPreferencesReady(false);
-
-    void (async () => {
-      try {
-        const recentSessions = await listSessionsForUser(currentUserId);
-        if (cancelled) {
-          return;
-        }
-
-        reasoningByModelRef.current = buildReasoningLookup(recentSessions);
-
-        let nextSessionId = paneSessionId ?? crypto.randomUUID();
-        let storedSession = paneSessionId
-          ? await getStoredSession(paneSessionId)
-          : null;
-
-        if (cancelled) {
-          return;
-        }
-
-        if (storedSession?.userId !== currentUserId) {
-          storedSession = null;
-          nextSessionId = crypto.randomUUID();
-        }
-
-        const timestamp = new Date().toISOString();
-
-        if (!storedSession) {
-          const inheritedModelId = recentSessions.find((session) => session.modelId)?.modelId;
-          const inheritedReasoningLevel = inheritedModelId
-            ? reasoningByModelRef.current[inheritedModelId]
-            : undefined;
-
-          storedSession = {
-            id: nextSessionId,
-            userId: currentUserId,
-            folderPath: vaultPath ?? '',
-            createdAt: timestamp,
-            lastActiveAt: timestamp,
-            mode: recentSessions[0]?.mode ?? DEFAULT_SESSION_MODE,
-            ...(inheritedModelId ? { modelId: inheritedModelId } : {}),
-            ...(inheritedReasoningLevel
-              ? { reasoningLevel: inheritedReasoningLevel }
-              : {}),
-          };
-          await createStoredSession(storedSession);
-
-          if (nextSessionId !== paneSessionId) {
-            onPersistSessionId?.(nextSessionId);
-          }
-        } else {
-          const nextFolderPath = vaultPath ?? '';
-          const update: SessionUpdate = {
-            ...(storedSession.folderPath !== nextFolderPath
-              ? { folderPath: nextFolderPath }
-              : {}),
-            lastActiveAt: timestamp,
-          };
-
-          await updateStoredSession(storedSession.id, update);
-          storedSession = mergeStoredSession(storedSession, update, timestamp);
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        storedSessionRef.current = storedSession;
-        setPersistedModelStoredId(storedSession.modelId);
-        setSelectedMode(storedSession.mode);
-        setSelectedReasoningLevel(
-          storedSession.reasoningLevel ?? DEFAULT_REASONING_LEVEL,
-        );
-
-        if (storedSession.modelId && storedSession.reasoningLevel) {
-          reasoningByModelRef.current[storedSession.modelId] =
-            storedSession.reasoningLevel;
-        }
-      } catch (error) {
-        console.warn('Failed to initialize chat session persistence.', error);
-        storedSessionRef.current = null;
-        setPersistedModelStoredId(undefined);
-        setSelectedMode(DEFAULT_SESSION_MODE);
-        setSelectedReasoningLevel(DEFAULT_REASONING_LEVEL);
-      } finally {
-        if (!cancelled) {
-          setSessionPreferencesReady(true);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUserId, onPersistSessionId, paneSessionId, vaultPath]);
-
-  useEffect(() => {
     const existing = sessionIDRef.current;
     sessionIDRef.current = null;
     abortRequestedRef.current = false;
@@ -535,6 +356,13 @@ export const Chat = ({
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
+
+    const previousWriter = historyWriterRef.current;
+    historyWriterRef.current = null;
+    if (previousWriter) {
+      void previousWriter.dispose();
+    }
+
     setMessages([]);
     dispatchDraft({ type: 'reset' });
     setHistoryCursor(null);
@@ -544,7 +372,77 @@ export const Chat = ({
     setShowNewMessagesPill(false);
     setDisclosureOverrides({});
     setDefaultDisclosureOpen(false);
-  }, [activeSkillsRevision, client]);
+
+    if (!sessionFolderPath) {
+      setHydratingHistory(false);
+      setStatus(readyStatus);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setHydratingHistory(true);
+    setStatus('Hydrating chat history…');
+
+    void (async () => {
+      try {
+        const existingSession = await findLatestSessionForFolder(currentUserId, sessionFolderPath);
+        const restoredSessionID =
+          existingSession?.id
+          ?? (await findLatestChatHistorySessionId({
+            folderPath: sessionFolderPath,
+            userId: currentUserId,
+          }));
+
+        if (!restoredSessionID || cancelled || !mountedRef.current) {
+          return;
+        }
+
+        activateSession(restoredSessionID);
+
+        if (!existingSession) {
+          const timestamp = new Date().toISOString();
+          try {
+            await createSession({
+              id: restoredSessionID,
+              userId: currentUserId,
+              folderPath: sessionFolderPath,
+              createdAt: timestamp,
+              lastActiveAt: timestamp,
+              mode: DEFAULT_SESSION_MODE,
+            });
+          } catch (error) {
+            console.warn('Failed to restore the session row from chat history.', error);
+          }
+        }
+
+        const records = await readChatHistory({
+          folderPath: sessionFolderPath,
+          userId: currentUserId,
+          sessionId: restoredSessionID,
+        });
+        if (cancelled || !mountedRef.current || sessionIDRef.current !== restoredSessionID) {
+          return;
+        }
+
+        setMessages(replayChatHistory(records));
+        void updateLastActive(restoredSessionID, new Date().toISOString()).catch((error) => {
+          console.warn('Failed to refresh the restored session timestamp.', error);
+        });
+      } catch (error) {
+        console.warn('Failed to hydrate chat history from disk.', error);
+      } finally {
+        if (!cancelled && mountedRef.current) {
+          setHydratingHistory(false);
+          setStatus(readyStatus);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activateSession, activeSkillsRevision, client, currentUserId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     draftBlocksRef.current = draftBlocks;
@@ -554,114 +452,34 @@ export const Chat = ({
     syncComposerHeight(composerRef.current);
   }, [input]);
 
-  useEffect(() => {
-    if (!modelWarning || typeof window === 'undefined') {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setModelWarning(null);
-    }, 5_000);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [modelWarning]);
-
-  useEffect(() => {
-    if (!sessionPreferencesReady || modelOptionsLoading) {
-      return;
-    }
-
-    if (modelOptions.length === 0) {
-      setSelectedModelId(undefined);
-      return;
-    }
-
-    if (persistedModelStoredId) {
-      const persistedOption = findModelOptionByStoredId(
-        modelOptions,
-        persistedModelStoredId,
-      );
-      if (persistedOption) {
-        setSelectedModelId((current) =>
-          current === persistedOption.id ? current : persistedOption.id,
-        );
-        return;
-      }
-
-      const fallbackOption = modelOptions[0];
-      if (!fallbackOption) {
-        return;
-      }
-
-      setPersistedModelStoredId(fallbackOption.storedId);
-      setSelectedModelId(fallbackOption.id);
-      setModelWarning(
-        `Saved model unavailable. Switched to ${fallbackOption.providerName} ${fallbackOption.name}.`,
-      );
-      void persistSessionUpdate({ modelId: fallbackOption.storedId });
-      return;
-    }
-
-    setSelectedModelId((current) => {
-      if (current && modelOptions.some((option) => option.id === current)) {
-        return current;
-      }
-
-      return modelOptions[0]?.id;
-    });
-  }, [
-    modelOptions,
-    modelOptionsLoading,
-    persistSessionUpdate,
-    persistedModelStoredId,
-    sessionPreferencesReady,
-  ]);
-
-  useEffect(() => {
-    const nextModelStoredId = selectedModel?.storedId ?? null;
-    if (nextModelStoredId === previousModelStoredIdRef.current) {
-      return;
-    }
-
-    previousModelStoredIdRef.current = nextModelStoredId;
-
-    if (!selectedModel?.supportsReasoning || !nextModelStoredId) {
-      return;
-    }
-
-    setSelectedReasoningLevel(
-      reasoningByModelRef.current[nextModelStoredId] ?? DEFAULT_REASONING_LEVEL,
-    );
-  }, [selectedModel]);
-
+  // ⌥T toggles the global disclosure default. Listener is scoped to the chat
+  // log container so it never fires while typing in inputs / textareas, never
+  // intercepts macOS Option+T (`†`) for other panes, and only one Chat pane
+  // (the focused one) reacts.
   useEffect(() => {
     const node = chatLogRef.current;
     if (!node) {
       return;
     }
-
     const handler = (event: globalThis.KeyboardEvent): void => {
       if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
         return;
       }
-
       if (event.key !== 't' && event.key !== 'T' && event.key !== '†') {
         return;
       }
-
       event.preventDefault();
       setDefaultDisclosureOpen((current) => !current);
       setDisclosureOverrides({});
     };
-
     node.addEventListener('keydown', handler);
     return () => {
       node.removeEventListener('keydown', handler);
     };
   }, []);
 
+  // Per-disclosure override wins over the global default; ⌥T clears overrides
+  // so the new global default takes over uniformly.
   const isDisclosureOpen = (partID: string): boolean => {
     const override = disclosureOverrides[partID];
     return override === undefined ? defaultDisclosureOpen : override;
@@ -671,25 +489,22 @@ export const Chat = ({
     setDisclosureOverrides((current) => ({ ...current, [partID]: next }));
   }, []);
 
-  const loadHistoryPage = useCallback(
-    async (
-      sessionID: string,
-      before?: string,
-    ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null; contextUsage: ContextUsageSnapshot | null }> => {
-      const history = await client.session.messages({
-        sessionID,
-        limit: 100,
-        ...(before ? { before } : {}),
-      });
+  const loadHistoryPage = async (
+    sessionID: string,
+    before?: string,
+  ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null; contextUsage: ContextUsageSnapshot | null }> => {
+    const history = await client.session.messages({
+      sessionID,
+      limit: 100,
+      ...(before ? { before } : {}),
+    });
 
-      return {
-        messages: formatMessages(history.data ?? []),
-        cursor: history.response.headers.get('x-next-cursor') ?? null,
-        contextUsage: extractAssistantContextUsage(history.data ?? []),
-      };
-    },
-    [client],
-  );
+    return {
+      messages: formatMessages(history.data ?? []),
+      cursor: history.response.headers.get('x-next-cursor') ?? null,
+      contextUsage: extractAssistantContextUsage(history.data ?? []),
+    };
+  };
 
   const applyContextUsageSnapshot = useCallback((usage: ContextUsageSnapshot): void => {
     contextUsageSnapshotRef.current = usage;
@@ -733,34 +548,31 @@ export const Chat = ({
       }
       return page;
     },
-    [applyContextUsageSnapshot, loadHistoryPage],
+    [applyContextUsageSnapshot],
   );
 
-  const loadOlderHistory = useCallback(
-    async (before: string): Promise<void> => {
-      const activeSessionID = sessionIDRef.current;
-      if (!activeSessionID || historyLoading) {
+  const loadOlderHistory = async (before: string): Promise<void> => {
+    const activeSessionID = sessionIDRef.current;
+    if (!activeSessionID || historyLoading) {
+      return;
+    }
+
+    setHistoryLoading(true);
+
+    try {
+      const page = await loadHistoryPage(activeSessionID, before);
+      if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
         return;
       }
 
-      setHistoryLoading(true);
-
-      try {
-        const page = await loadHistoryPage(activeSessionID, before);
-        if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
-          return;
-        }
-
-        setMessages((current) => mergeHistoryMessages(page.messages, current));
-        setHistoryCursor(page.cursor);
-      } finally {
-        if (mountedRef.current && sessionIDRef.current === activeSessionID) {
-          setHistoryLoading(false);
-        }
+      setMessages((current) => mergeHistoryMessages(page.messages, current));
+      setHistoryCursor(page.cursor);
+    } finally {
+      if (mountedRef.current && sessionIDRef.current === activeSessionID) {
+        setHistoryLoading(false);
       }
-    },
-    [historyLoading, loadHistoryPage],
-  );
+    }
+  };
 
   const historyWindow = useSessionHistoryWindow({
     sessionId: sessionIDRef.current,
@@ -779,13 +591,10 @@ export const Chat = ({
     [draftBlocks, renderedMessageBlocks],
   );
 
-  const setLogScroller = useCallback(
-    (node: HTMLDivElement | null): void => {
-      chatLogRef.current = node;
-      historyWindow.setScroller(node);
-    },
-    [historyWindow],
-  );
+  const setLogScroller = useCallback((node: HTMLDivElement | null): void => {
+    chatLogRef.current = node;
+    historyWindow.setScroller(node);
+  }, [historyWindow]);
 
   useLayoutEffect(() => {
     const scroller = chatLogRef.current;
@@ -840,8 +649,12 @@ export const Chat = ({
     [historyWindow],
   );
 
-  const ensureSession = useCallback(async (): Promise<string> => {
+  const ensureSession = async (): Promise<string> => {
     if (sessionIDRef.current) {
+      if (!historyWriterRef.current && sessionFolderPath) {
+        activateSession(sessionIDRef.current);
+      }
+
       return sessionIDRef.current;
     }
 
@@ -851,7 +664,8 @@ export const Chat = ({
       throw new Error('OpenCode did not return a session.');
     }
 
-    sessionIDRef.current = session.id;
+    activateSession(session.id);
+
     if (selectedModel) {
       applyContextUsageSnapshot({
         providerID: selectedModel.providerId,
@@ -864,6 +678,23 @@ export const Chat = ({
       });
     }
 
+    if (sessionFolderPath) {
+      const timestamp = new Date().toISOString();
+
+      try {
+        await createSession({
+          id: session.id,
+          userId: currentUserId,
+          folderPath: sessionFolderPath,
+          createdAt: timestamp,
+          lastActiveAt: timestamp,
+          mode: DEFAULT_SESSION_MODE,
+        });
+      } catch (error) {
+        console.warn('Failed to persist the active chat session.', error);
+      }
+    }
+
     try {
       const activeSkills = await skillStore.getActive();
       if (activeSkills.length > 0) {
@@ -874,9 +705,9 @@ export const Chat = ({
     }
 
     return session.id;
-  }, [applyContextUsageSnapshot, client, selectedModel, skillStore]);
+  };
 
-  const abortActiveStream = useCallback(async (): Promise<void> => {
+  const abortActiveStream = async (): Promise<void> => {
     if (!busy) {
       return;
     }
@@ -901,7 +732,7 @@ export const Chat = ({
       console.warn('Failed to abort the active OpenCode session.', error);
       setStatus('Unable to stop current response.');
     }
-  }, [busy, client]);
+  };
 
   useEffect(() => {
     if (!busy || typeof window === 'undefined') {
@@ -922,59 +753,10 @@ export const Chat = ({
     return () => {
       window.removeEventListener('keydown', handleWindowKeyDown);
     };
-  }, [abortActiveStream, busy]);
-
-  const handleModeChange = useCallback(
-    (nextMode: SessionMode): void => {
-      setSelectedMode(nextMode);
-      void persistSessionUpdate({ mode: nextMode });
-    },
-    [persistSessionUpdate],
-  );
-
-  const handleModelSelect = useCallback(
-    (nextModelId: string): void => {
-      const nextModel = findModelOptionById(modelOptions, nextModelId);
-      if (!nextModel) {
-        return;
-      }
-
-      setModelWarning(null);
-      setSelectedModelId(nextModel.id);
-      setPersistedModelStoredId(nextModel.storedId);
-
-      if (!nextModel.supportsReasoning) {
-        void persistSessionUpdate({ modelId: nextModel.storedId });
-        return;
-      }
-
-      const nextReasoningLevel =
-        reasoningByModelRef.current[nextModel.storedId] ?? DEFAULT_REASONING_LEVEL;
-      setSelectedReasoningLevel(nextReasoningLevel);
-      void persistSessionUpdate({
-        modelId: nextModel.storedId,
-        reasoningLevel: nextReasoningLevel,
-      });
-    },
-    [modelOptions, persistSessionUpdate],
-  );
-
-  const handleReasoningChange = useCallback(
-    (nextReasoningLevel: ReasoningLevel): void => {
-      if (!selectedModel?.supportsReasoning) {
-        return;
-      }
-
-      reasoningByModelRef.current[selectedModel.storedId] = nextReasoningLevel;
-      setSelectedReasoningLevel(nextReasoningLevel);
-      void persistSessionUpdate({ reasoningLevel: nextReasoningLevel });
-    },
-    [persistSessionUpdate, selectedModel],
-  );
-
+  }, [busy, client]);
   const sendMessage = async (): Promise<void> => {
     const text = input.trim();
-    if (!text || busy || !modelConnected) {
+    if (!text || busy || hydratingHistory || !modelConnected) {
       return;
     }
 
@@ -995,23 +777,28 @@ export const Chat = ({
     try {
       const activeSessionID = await ensureSession();
       if (abortRequestedRef.current) {
-        setStatus('OpenCode is ready.');
+        setStatus(readyStatus);
         return;
       }
 
       const relevantEntities = await resolveRelevantEntities(text, 6);
       if (abortRequestedRef.current) {
-        setStatus('OpenCode is ready.');
+        setStatus(readyStatus);
         return;
       }
 
       await injectMemoryContext(client, activeSessionID, relevantEntities);
       if (abortRequestedRef.current) {
-        setStatus('OpenCode is ready.');
+        setStatus(readyStatus);
         return;
       }
 
-      const stream = streamSessionEvents(client, activeSessionID);
+      const historyWriter = historyWriterRef.current;
+      const stream = streamSessionEvents(client, activeSessionID, {
+        onEvent: (event) => {
+          historyWriter?.appendEvent(event);
+        },
+      });
       const consumeStream = (async () => {
         for await (const event of stream) {
           if (!mountedRef.current) {
@@ -1019,11 +806,11 @@ export const Chat = ({
           }
 
           if (
-            event.type === 'token' ||
-            event.type === 'reasoning' ||
-            event.type === 'tool_call' ||
-            event.type === 'tool_result' ||
-            event.type === 'tool_error'
+            event.type === 'token'
+            || event.type === 'reasoning'
+            || event.type === 'tool_call'
+            || event.type === 'tool_result'
+            || event.type === 'tool_error'
           ) {
             dispatchDraft({ type: 'event', event });
           } else if (event.type === 'context_usage') {
@@ -1035,18 +822,16 @@ export const Chat = ({
           } else if (event.type === 'file_written') {
             onFileWritten?.(event.path);
           } else if (event.type === 'error') {
-            setStatus(abortRequestedRef.current ? 'OpenCode is ready.' : event.message);
+            setStatus(abortRequestedRef.current ? readyStatus : event.message);
           } else if (event.type === 'done') {
-            setStatus('OpenCode is ready.');
+            setStatus(readyStatus);
           }
         }
       })();
 
-      const promptRequest = {
+      await client.session.prompt({
         sessionID: activeSessionID,
         parts: [{ type: 'text', text }],
-        agent: selectedMode,
-        ...(selectedReasoningVariant ? { variant: selectedReasoningVariant } : {}),
         ...(selectedModel
           ? {
               model: {
@@ -1055,9 +840,7 @@ export const Chat = ({
               },
             }
           : {}),
-      } as Parameters<typeof client.session.prompt>[0];
-
-      await client.session.prompt(promptRequest);
+      });
       await consumeStream;
 
       const aborted = abortRequestedRef.current;
@@ -1067,12 +850,15 @@ export const Chat = ({
       if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
         return;
       }
+      void updateLastActive(activeSessionID, new Date().toISOString()).catch((error) => {
+        console.warn('Failed to refresh the active session timestamp.', error);
+      });
 
       if (aborted && partialText.length > 0) {
         const historyAlreadyHasPartial = historyPage?.messages.some(
           (message) =>
-            message.role === 'assistant' &&
-            messageTextFromBlocks(message.blocks).trim() === partialText,
+            message.role === 'assistant'
+            && messageTextFromBlocks(message.blocks).trim() === partialText,
         );
 
         if (!historyAlreadyHasPartial) {
@@ -1096,13 +882,10 @@ export const Chat = ({
         ? messageTextFromBlocks(assistantMessageRecord.blocks)
         : undefined;
       const toolResults = (assistantMessageRecord?.blocks ?? []).flatMap((block) =>
-        block.kind === 'tool' &&
-        block.state === 'completed' &&
-        typeof block.output === 'string'
+        block.kind === 'tool' && block.state === 'completed' && typeof block.output === 'string'
           ? [{ name: block.name, output: block.output }]
           : [],
       );
-
       if (!aborted && assistantMessage && vaultPath) {
         memoryCommitRef.current = memoryCommitRef.current.then(async () => {
           try {
@@ -1172,58 +955,32 @@ export const Chat = ({
   };
 
   return (
-    <section className="tinker-pane">
-      <header className="tinker-pane-header tinker-chat-header">
-        <div>
-          <p className="tinker-eyebrow">Chat</p>
-          <h2>Talk to OpenCode directly</h2>
-        </div>
-        <div className="tinker-inline-actions tinker-chat-header-controls">
+    <section className="tinker-pane tinker-pane--chat">
+      <header className="tinker-chat-header">
+        <div className="tinker-chat-header__left">
           <ModelPicker
             items={modelOptions}
             value={selectedModelId}
-            onSelect={handleModelSelect}
+            onSelect={setSelectedModelId}
             loading={modelOptionsLoading}
-            disabled={busy || !sessionPreferencesReady}
+            disabled={busy || hydratingHistory}
             emptyLabel="No models available in OpenCode."
           />
-          <ModeToggle value={selectedMode} onChange={handleModeChange} />
-          {selectedModel?.supportsReasoning ? (
-            <ReasoningPicker
-              value={selectedReasoningLevel}
-              onChange={handleReasoningChange}
-            />
-          ) : null}
-          {contextUsage ? (
-            <ContextBadge
-              percent={contextUsage.percent}
-              tokens={contextUsage.tokens}
-              windowSize={contextUsage.windowSize}
-              model={contextUsage.model}
-            />
-          ) : null}
-          <Badge
-            variant={selectedMode === 'plan' ? 'info' : 'default'}
-            size="small"
-          >
-            {selectedMode === 'plan' ? 'Plan · read-only' : 'Build · can edit'}
-          </Badge>
-          {modelWarning ? (
-            <Badge variant="warning" size="small">
-              {modelWarning}
-            </Badge>
-          ) : null}
-          <span
-            className="tinker-chat-legend"
-            title="Toggle thinking + tool disclosures (Alt+T)"
-          >
+          <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
             ⌥T thinking
           </span>
+        </div>
+        <div className="tinker-chat-header__right">
+          {contextUsage ? <ContextBadge {...contextUsage} /> : null}
+          <div className="tinker-chat-header__slot">
+            {modeToggleSlot}
+            {reasoningPickerSlot}
+          </div>
           <Badge variant="default" size="small">
             {status}
           </Badge>
           {onOpenNewChat ? (
-            <Button variant="secondary" size="s" onClick={onOpenNewChat}>
+            <Button variant="ghost" size="s" onClick={onOpenNewChat}>
               New chat tab
             </Button>
           ) : null}
@@ -1239,11 +996,19 @@ export const Chat = ({
         >
           {messages.length === 0 ? (
             <EmptyState
-              title={modelConnected ? 'Start a conversation' : 'No model connected'}
+              title={
+                hydratingHistory
+                  ? 'Restoring chat history'
+                  : modelConnected
+                    ? 'Start a conversation'
+                    : 'No model connected'
+              }
               description={
-                modelConnected
-                  ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
-                  : 'Connect an AI model in Settings before sending a message.'
+                hydratingHistory
+                  ? 'Loading prior messages from the session folder before OpenCode resumes streaming.'
+                  : modelConnected
+                    ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+                    : 'Connect an AI model in Settings before sending a message.'
               }
               icon={
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1317,31 +1082,49 @@ export const Chat = ({
         ) : null}
       </div>
 
-      <div className={`tinker-composer${busy ? ' tinker-composer--busy' : ''}`}>
-        <Textarea
-          ref={composerRef}
-          value={input}
-          rows={4}
-          resize="none"
-          placeholder="Ask about the vault, your project, or the next change to make."
-          onChange={(event) => setInput(event.currentTarget.value)}
-          onKeyDown={handleComposerKeyDown}
-          disabled={busy || !modelConnected}
-        />
-        <div className="tinker-inline-actions tinker-composer-actions">
-          {busy ? (
-            <Button variant="danger" onClick={() => void abortActiveStream()}>
-              Stop
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              onClick={sendMessage}
-              disabled={!modelConnected || input.trim().length === 0}
-            >
-              Send message
-            </Button>
-          )}
+      <div className="tinker-composer-card__wrap">
+        <div
+          className={`tinker-composer-card${busy ? ' tinker-composer-card--busy' : ''}`}
+        >
+          <div className="tinker-composer-card__body">
+            <Textarea
+              ref={composerRef}
+              value={input}
+              rows={4}
+              resize="none"
+              placeholder="Ask about the vault, your project, or the next change to make."
+              onChange={(event) => setInput(event.currentTarget.value)}
+              onKeyDown={handleComposerKeyDown}
+              disabled={busy || hydratingHistory || !modelConnected}
+            />
+          </div>
+          <div className="tinker-composer-card__footer">
+            <div className="tinker-composer-card__footer-left">
+              <IconButton
+                variant="ghost"
+                size="s"
+                icon={<AttachmentIcon />}
+                label="Attachments coming soon"
+                aria-disabled
+                disabled
+              />
+            </div>
+            <div className="tinker-composer-card__footer-right">
+              {busy ? (
+                <Button variant="danger" onClick={() => void abortActiveStream()}>
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={sendMessage}
+                  disabled={hydratingHistory || !modelConnected || input.trim().length === 0}
+                >
+                  Send message
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </section>

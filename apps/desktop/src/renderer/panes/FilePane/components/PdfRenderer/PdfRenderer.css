@@ -1,0 +1,45 @@
+.tinker-pdf-pane {
+  outline: none;
+}
+
+.tinker-pdf-pane:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--color-accent-ring);
+  border-radius: var(--radius-md);
+}
+
+.tinker-pdf-toolbar {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.tinker-pdf-toolbar-buttons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.tinker-pdf-status {
+  margin: 0;
+}
+
+.tinker-pdf-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-panel);
+}
+
+.tinker-pdf-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-sm);
+}

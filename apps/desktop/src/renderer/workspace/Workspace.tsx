@@ -158,23 +158,6 @@ export const Workspace = ({
     openNewChatPanel(workspaceStore);
   }, [workspaceStore]);
 
-  const persistChatPaneSessionId = useCallback(
-    (tabId: string, paneId: string, sessionId: string): void => {
-      workspaceStore.getState().actions.updatePaneData(tabId, paneId, (data) => {
-        const chatPaneData = requirePaneData('chat', data);
-        if (chatPaneData.sessionId === sessionId) {
-          return chatPaneData;
-        }
-
-        return {
-          ...chatPaneData,
-          sessionId,
-        };
-      });
-    },
-    [workspaceStore],
-  );
-
   const handleAgentFileWritten = useCallback(
     (reportedPath: string): void => {
       if (!workspacePreferencesRef.current.autoOpenAgentWrittenFiles) {
@@ -321,16 +304,16 @@ export const Workspace = ({
   const chatPaneRuntime = useMemo(
     () => ({
       skillStore,
+      currentUserId,
       modelConnected,
       opencode,
-      currentUserId,
+      sessionFolderPath: vaultPath,
       vaultPath,
       activeSkillsRevision,
       onFileWritten: handleAgentFileWritten,
       onOpenFileLink: openFileInWorkspace,
       onOpenNewChat: openNewChatPane,
       onMemoryCommitted,
-      persistPaneSessionId: persistChatPaneSessionId,
     }),
     [
       activeSkillsRevision,
@@ -341,9 +324,8 @@ export const Workspace = ({
       openFileInWorkspace,
       openNewChatPane,
       opencode,
-      persistChatPaneSessionId,
-      skillStore,
       vaultPath,
+      skillStore,
     ],
   );
 

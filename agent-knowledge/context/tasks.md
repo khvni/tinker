@@ -73,8 +73,8 @@ Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to cur
 | 2.8 | "New session" button in session switcher → folder picker → spawn OpenCode → open new Chat pane tab. | S | 2.6 | not started | Same code path as first-run. |
 | 2.9 | Active session indicator in workspace titlebar: shows folder basename + monospace short path + current user's avatar (avatar from M8.10). | S | 2.7, 8.10 | not started | Purely cosmetic surface. |
 | 2.10 | On app quit, stop all running OpenCode instances (best-effort; survive kill -9 via manifest). | S | 2.5 | review | TIN-24 · PR #60 · `khvni/tin-24-ask-user` |
-| 2.11 | Chat history JSONL writer: every OpenCode SSE event from the active session appends one line to `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Buffered + flushed per event. Create dirs on first write. | M | 2.2, 4.2 | not started | Stream-persistence bridge. Lives in `packages/bridge/src/chat-history.ts`. |
-| 2.12 | Chat history hydration: on session open, read JSONL (if exists) and seed Chat pane with prior messages before the SSE subscription resumes. | M | 2.11 | not started | Hydrate-before-stream. Render from JSONL via same markdown path as live events. |
+| 2.11 | Chat history JSONL writer: every OpenCode SSE event from the active session appends one line to `<folder>/.tinker/chats/<user-id>/<session-id>.jsonl`. Buffered + flushed per event. Create dirs on first write. | M | 2.2, 4.2 | review | TIN-25 + TIN-26 · PR #77. Bridge writer reuses Chat SSE subscription, queues per-file appends, and restores session rows from history when SQLite is missing. |
+| 2.12 | Chat history hydration: on session open, read JSONL (if exists) and seed Chat pane with prior messages before the SSE subscription resumes. | M | 2.11 | review | TIN-25 + TIN-26 · PR #77. Hydration replays stored OpenCode events through the same Chat markdown/render path before composer unlock. |
 
 ### M3 — In-line document renderer
 Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
@@ -83,7 +83,7 @@ Spec: [[22-mvp-inline-renderer]] · Depends on: M1.4 (file pane registration)
 |----|------|------|------------|--------|-------|
 | 3.1 | **Research**: pick libraries for pdf / xlsx / docx / pptx / html / code / markdown. Deliverable: `agent-knowledge/reference/inline-renderers.md` with lib name + license + bundle size + rationale per format. Criterion: no paid libs, no copyleft licenses (MIT/Apache/ISC/BSD only). | M | — | done | TIN-27 · PR #18 merged 2026-04-21. |
 | 3.2 | Unified `FilePane` component: accepts `{ path, mime }`, looks up renderer in `mimeToRenderer` map, renders. Fallback = "unsupported, open externally" with Tauri `shell.open`. | S | 1.4, 3.1 | review | TIN-28 · PR #59 |
-| 3.3 | PDF renderer integration per 3.1 choice. Accepts file path → embedded viewer. Keyboard navigation (PgUp/PgDn). | M | 3.1, 3.2 | not started | Probably `react-pdf`. |
+| 3.3 | PDF renderer integration per 3.1 choice. Accepts file path → embedded viewer. Keyboard navigation (PgUp/PgDn). | M | 3.1, 3.2 | review | TIN-29 · PR #76. Uses lazy `pdfjs-dist` viewer + Home/End support. |
 | 3.4 | XLSX renderer per 3.1. First-sheet-by-default + `<SegmentedControl>` sheet switcher. Read-only table. | M | 3.1, 3.2 | not started | Probably SheetJS. |
 | 3.5 | DOCX renderer per 3.1. Converts → sanitized HTML → renders. No editing. | M | 3.1, 3.2 | review | TIN-31 · PR #72 |
 | 3.6 | PPTX renderer per 3.1. Slide carousel w/ next/prev + thumbnail strip. | M | 3.1, 3.2 | review | TIN-32 · PR #71. Cut to explicit external-open fallback per `agent-knowledge/reference/inline-renderers.md`; full inline rendering deferred past MVP. |
