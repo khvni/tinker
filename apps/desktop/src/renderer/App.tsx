@@ -11,10 +11,11 @@ import {
   createSkillStore,
   createVaultService,
   indexVault,
+  upsertUser,
   type MemoryRunState,
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
-import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, VaultConfig } from '@tinker/shared-types';
+import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User, VaultConfig } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, ONBOARDING_KEY, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import type { MCPStatus } from './components/IntegrationsStrip.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
@@ -58,6 +59,25 @@ const WEB_PREVIEW_CONNECTION: OpencodeConnection = {
   baseUrl: 'http://127.0.0.1:0',
   username: 'preview',
   password: 'preview',
+};
+
+const buildStoredUserId = (provider: User['provider'], providerUserId: string): string => {
+  return `${provider}:${providerUserId}`;
+};
+
+const toStoredUser = (session: SSOSession): User => {
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: buildStoredUserId(session.provider, session.userId),
+    provider: session.provider,
+    providerUserId: session.userId,
+    displayName: session.displayName,
+    email: session.email,
+    createdAt: timestamp,
+    lastSeenAt: timestamp,
+    ...(session.avatarUrl ? { avatarUrl: session.avatarUrl } : {}),
+  };
 };
 
 const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSOStatus => {
@@ -734,6 +754,7 @@ export const App = (): JSX.Element => {
     try {
       requireNativeRuntime(`Connecting ${provider === 'google' ? 'Google' : 'GitHub'}`);
       const session = await invoke<SSOSession>('auth_sign_in', { provider });
+      await upsertUser(toStoredUser(session));
       if (provider === 'google' && session.refreshToken.length === 0) {
         throw new Error('Google sign-in did not return refresh token. Try again.');
       }

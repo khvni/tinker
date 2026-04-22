@@ -10,5 +10,6 @@ export * from './settings-store.js';
 export * from './skill-git.js';
 export * from './skill-parser.js';
 export * from './skill-service.js';
+export * from './user-store.js';
 export * from './vault-service.js';
 export * from './vault-utils.js';
