@@ -220,6 +220,25 @@ struct AuthSessionResponse {
     error: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthRefreshTokens {
+    access_token: String,
+    refresh_token: Option<String>,
+    expires_at: String,
+    scopes: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthRefreshResponse {
+    authenticated: bool,
+    provider: Option<AuthProvider>,
+    tokens: Option<AuthRefreshTokens>,
+    status: Option<String>,
+    error: Option<String>,
+}
+
 #[derive(Debug)]
 enum PollAuthSession {
     Pending,
@@ -933,6 +952,82 @@ async fn poll_auth_session(
     ))
 }
 
+fn parse_refresh_response(
+    provider: AuthProvider,
+    response: AuthRefreshResponse,
+) -> Result<Option<AuthRefreshTokens>, String> {
+    if !response.authenticated {
+        if response.status.as_deref() == Some("expired")
+            || response.error.as_deref() == Some("invalid_grant")
+        {
+            return Ok(None);
+        }
+
+        let message = response
+            .error
+            .filter(|value| !value.trim().is_empty())
+            .or(response.status.filter(|value| !value.trim().is_empty()))
+            .unwrap_or_else(|| "unknown".to_string());
+
+        return Err(format!(
+            "{} session refresh failed: {message}",
+            provider.display_name()
+        ));
+    }
+
+    if response.provider != Some(provider) {
+        return Err("Better Auth returned refresh session for wrong provider.".to_string());
+    }
+
+    response
+        .tokens
+        .map(Some)
+        .ok_or_else(|| "Better Auth refresh response was missing token details.".to_string())
+}
+
+async fn refresh_auth_session(
+    runtime: &BetterAuthRuntime,
+    provider: AuthProvider,
+    user_id: &str,
+    refresh_token: &str,
+) -> Result<Option<AuthRefreshTokens>, String> {
+    let response = reqwest::Client::new()
+        .post(format!("{}/auth/refresh", runtime.handle.base_url))
+        .header(BETTER_AUTH_SECRET_HEADER, runtime.bridge_secret.clone())
+        .json(&serde_json::json!({
+          "provider": provider.as_str(),
+          "userId": user_id,
+          "refreshToken": refresh_token,
+        }))
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let status = response.status();
+    let payload = response
+        .json::<AuthRefreshResponse>()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        return parse_refresh_response(provider, payload);
+    }
+
+    if !status.is_success() {
+        let message = payload
+            .error
+            .filter(|value| !value.trim().is_empty())
+            .or(payload.status.filter(|value| !value.trim().is_empty()))
+            .unwrap_or_else(|| "unknown".to_string());
+        return Err(format!(
+            "{} session refresh could not be read: {message}",
+            provider.display_name()
+        ));
+    }
+
+    parse_refresh_response(provider, payload)
+}
+
 async fn sign_in_with_better_auth<R: Runtime>(
     app: &AppHandle<R>,
     provider: AuthProvider,
@@ -969,6 +1064,63 @@ pub async fn auth_sign_in<R: Runtime>(
     provider: AuthProvider,
 ) -> Result<SSOSession, String> {
     sign_in_with_better_auth(&app, provider).await
+}
+
+#[tauri::command]
+pub async fn restore_auth_session<R: Runtime>(
+    app: AppHandle<R>,
+    provider: AuthProvider,
+    user_id: String,
+) -> Result<Option<SSOSession>, String> {
+    let Some(mut session) = read_session(&app, provider)? else {
+        return Ok(None);
+    };
+
+    if session.user_id != user_id {
+        return Ok(None);
+    }
+
+    let Some(refresh_token) = crate::commands::keychain::load_refresh_token(
+        app.clone(),
+        provider.as_str().to_string(),
+        user_id.clone(),
+    )?
+    else {
+        return Ok(None);
+    };
+
+    require_provider_configuration(provider)?;
+
+    let runtime = ensure_better_auth(&app, &build_better_auth_spawn_config()?).await?;
+    let Some(tokens) = refresh_auth_session(&runtime, provider, &user_id, &refresh_token).await?
+    else {
+        clear_session(&app, provider)?;
+        return Ok(None);
+    };
+
+    let next_refresh_token = tokens
+        .refresh_token
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| refresh_token.clone());
+    if next_refresh_token != refresh_token {
+        crate::commands::keychain::save_refresh_token(
+            app.clone(),
+            provider.as_str().to_string(),
+            user_id,
+            next_refresh_token.clone(),
+        )?;
+    }
+
+    session.access_token = tokens.access_token;
+    session.refresh_token = next_refresh_token;
+    session.expires_at = tokens.expires_at;
+    if !tokens.scopes.is_empty() {
+        session.scopes = tokens.scopes;
+    }
+
+    store_session(&app, &session)?;
+    Ok(Some(session))
 }
 
 #[tauri::command]
@@ -1068,6 +1220,45 @@ mod tests {
             parse_auth_session_response(AuthProvider::Github, response).unwrap_err(),
             "GitHub sign-in failed: oauth_failed"
         );
+    }
+
+    #[test]
+    fn parse_refresh_response_returns_none_for_expired_refresh() {
+        let response = AuthRefreshResponse {
+            authenticated: false,
+            provider: Some(AuthProvider::Google),
+            tokens: None,
+            status: Some("expired".to_string()),
+            error: None,
+        };
+
+        assert!(parse_refresh_response(AuthProvider::Google, response)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn parse_refresh_response_returns_tokens_for_success() {
+        let response = AuthRefreshResponse {
+            authenticated: true,
+            provider: Some(AuthProvider::Microsoft),
+            tokens: Some(AuthRefreshTokens {
+                access_token: "access-token".to_string(),
+                refresh_token: Some("refresh-token".to_string()),
+                expires_at: "2026-04-22T00:00:00.000Z".to_string(),
+                scopes: vec!["openid".to_string()],
+            }),
+            status: None,
+            error: None,
+        };
+
+        let tokens = parse_refresh_response(AuthProvider::Microsoft, response)
+            .unwrap()
+            .expect("tokens");
+        assert_eq!(tokens.access_token, "access-token");
+        assert_eq!(tokens.refresh_token.as_deref(), Some("refresh-token"));
+        assert_eq!(tokens.expires_at, "2026-04-22T00:00:00.000Z");
+        assert_eq!(tokens.scopes, vec!["openid".to_string()]);
     }
 
     #[test]

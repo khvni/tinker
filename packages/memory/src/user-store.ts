@@ -83,6 +83,25 @@ export const getUser = async (id: User['id']): Promise<User | null> => {
   return hydrateUserRow(rows[0]);
 };
 
+export const listUsersByLastSeen = async (): Promise<User[]> => {
+  const database = await getDatabase();
+  const rows = await database.select<UserRow[]>(
+    `SELECT
+       id,
+       provider,
+       provider_user_id,
+       display_name,
+       avatar_url,
+       email,
+       created_at,
+       last_seen_at
+     FROM users
+     ORDER BY last_seen_at DESC, created_at DESC, id ASC`,
+  );
+
+  return rows.map((row) => hydrateUserRow(row)).filter((user): user is User => user !== null);
+};
+
 export const getUserByProvider = async (
   provider: User['provider'],
   providerUserId: User['providerUserId'],
