@@ -228,7 +228,7 @@ Tracked here when an explicit human priority pulls work outside the MVP matrix.
 
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
-| INF.1 | Release pipeline: tag-triggered GitHub Action builds, macOS signing/notarization, GitHub Release upload, updater manifest. | M | X.2 | in progress | TIN-167 · branch `khvni/tin-167-release-pipeline`. |
+| INF.1 | Release pipeline: tag-triggered GitHub Action builds, macOS signing/notarization, GitHub Release upload, updater manifest. | M | X.2 | review | TIN-167 · PR #49 · branch `khvni/tin-167-release-pipeline`. |
 
 ## Rejected (not coming back)
 
