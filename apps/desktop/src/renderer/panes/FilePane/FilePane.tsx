@@ -8,7 +8,11 @@ import { ImageRenderer } from '../../renderers/ImageRenderer.js';
 import { MarkdownEditor } from '../../renderers/MarkdownEditor.js';
 import { MarkdownRenderer } from '../../renderers/MarkdownRenderer.js';
 import { XlsxRenderer } from '../../renderers/XlsxRenderer/index.js';
-import { getPanelTitleForPath, type FilePaneParams, XLSX_MIME } from '../../renderers/file-utils.js';
+import {
+  getPanelTitleForPath,
+  type FilePaneParams,
+  XLSX_MIME,
+} from '../../renderers/file-utils.js';
 import { ExternalPreviewPane } from './components/ExternalPreviewPane/index.js';
 import { MISSING_FILE_MIME } from './file-mime.js';
 

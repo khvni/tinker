@@ -133,4 +133,16 @@ describe('openWorkspaceFile', () => {
       mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     });
   });
+
+  it('opens xlsx files with the spreadsheet MIME so FilePane routes them through the workbook renderer', async () => {
+    const store = createWorkspaceStore<TinkerPaneData>();
+
+    await openWorkspaceFile(store, '/vault/roadmap.xlsx', async () => XLSX_MIME);
+
+    expect(store.getState().tabs[0]?.panes[getPanelIdForPath('file', '/vault/roadmap.xlsx')]?.data).toEqual({
+      kind: 'file',
+      path: '/vault/roadmap.xlsx',
+      mime: XLSX_MIME,
+    });
+  });
 });
