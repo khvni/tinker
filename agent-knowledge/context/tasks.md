@@ -238,7 +238,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | TIN-177 + TIN-178 + TIN-181 | 09 | UI trio: `<Modal>` + `<Toast>` provider + `<EmptyState>` primitives in `@tinker/design`; `EmptyState` adopted by Chat / Today / IntegrationsStrip | review | Branch `khvni/ui-design-trio`. One bundled PR. Session: [[2026-04-21-2146-ui-trio]]. Folder-per-component (D21), tokens-only (D14/D23), dual-theme verified. 31 new tests. |
 | TIN-172 | 15 / M7.8 | `<ConnectionGate>` primitive (minimal MCP variant) | review | PR #50. Ships the atom TIN-155 generalizes. |
 | TIN-155 | 15 | `<ConnectionSplash>` full-window splash (generalizes TIN-172) | review | PR stacks on #50. Composes ConnectionGate + Tinker wordmark + spinner + 4 service categories. |
-| TIN-118 + TIN-119 + TIN-120 + TIN-121 + TIN-122 | 03 | Memory pipeline bundle: typed extractor markers, D12 provenance persistence, relationship graph expansion, FTS-backed memory lookup, daily maintenance sweep | in progress | Branch `khvni/tin118-122-workspace`. Explicit user-requested post-MVP slice. |
+| TIN-118 + TIN-119 + TIN-120 + TIN-121 + TIN-122 | 03 | Memory pipeline bundle: typed extractor markers, D12 provenance persistence, relationship graph expansion, FTS-backed memory lookup, daily maintenance sweep | review | PR #98 · Branch `khvni/tin118-122-workspace` · Explicit user-requested post-MVP slice. |
 
 ## Rejected (not coming back)
 
