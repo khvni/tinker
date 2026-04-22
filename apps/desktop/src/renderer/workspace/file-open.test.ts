@@ -58,4 +58,18 @@ describe('openWorkspaceFile', () => {
       mime: 'text/markdown',
     });
   });
+
+  it('maps PDF files to the PDF renderer MIME', () => {
+    const store = createWorkspaceStore<TinkerPaneData>({
+      initial: createDefaultWorkspaceState(),
+    });
+
+    openWorkspaceFile(store, '/vault/guide.pdf');
+
+    expect(store.getState().tabs[0]?.panes[getPanelIdForPath('file', '/vault/guide.pdf')]?.data).toEqual({
+      kind: 'file',
+      path: '/vault/guide.pdf',
+      mime: 'application/pdf',
+    });
+  });
 });

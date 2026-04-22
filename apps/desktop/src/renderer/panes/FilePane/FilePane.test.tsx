@@ -72,6 +72,10 @@ describe('FilePane', () => {
     });
   });
 
+  it('includes a lazy PDF renderer in the MIME dispatch map', () => {
+    expect(mimeToRenderer['application/pdf']).toBeDefined();
+  });
+
   it('supports the temporary markdown editor MIME until the editor flow is replaced', () => {
     expect(mimeToRenderer[MARKDOWN_EDITOR_MIME]).toBeDefined();
   });

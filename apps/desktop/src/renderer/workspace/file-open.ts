@@ -12,7 +12,7 @@ const createWorkspaceTabId = (): string => {
   return `workspace-${crypto.randomUUID()}`;
 };
 
-const getPaneMimeForPath = (absolutePath: string): string => {
+export const getPaneMimeForPath = (absolutePath: string): string => {
   switch (getFileExtension(absolutePath)) {
     case '.csv':
       return 'text/csv';
@@ -33,6 +33,8 @@ const getPaneMimeForPath = (absolutePath: string): string => {
     case '.mjs':
     case '.js':
       return 'text/javascript';
+    case '.pdf':
+      return 'application/pdf';
     case '.ts':
       return 'application/typescript';
     case '.tsx':

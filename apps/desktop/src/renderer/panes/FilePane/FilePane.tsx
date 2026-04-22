@@ -1,4 +1,4 @@
-import { useState, type ComponentProps, type JSX } from 'react';
+import { Suspense, lazy, useState, type ComponentProps, type JSX } from 'react';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { Button } from '@tinker/design';
 import type { TinkerPaneData } from '@tinker/shared-types';
@@ -26,6 +26,11 @@ type FileRendererProps = {
 
 type FileRenderer = (props: FileRendererProps) => JSX.Element;
 
+const LazyPdfRenderer = lazy(async () => {
+  const module = await import('./components/PdfRenderer/index.js');
+  return { default: module.PdfRenderer };
+});
+
 const createDockviewProps = (path: string, mime: string): IDockviewPanelProps<FilePaneParams> => {
   // Legacy file renderers still consume Dockview props. Keep the adapter
   // contained here until M1.7/M3 retire that contract.
@@ -46,6 +51,14 @@ const HtmlFileRenderer: FileRenderer = ({ path, mime }) => {
 
 const ImageFileRenderer: FileRenderer = ({ path, mime }) => {
   return <ImageRenderer {...createDockviewProps(path, mime)} />;
+};
+
+const PdfFileRenderer: FileRenderer = ({ path }) => {
+  return (
+    <Suspense fallback={<FilePaneLoadingState label="Loading PDF preview…" path={path} />}>
+      <LazyPdfRenderer path={path} />
+    </Suspense>
+  );
 };
 
 const MarkdownFileRenderer: FileRenderer = ({ path, mime, vaultRevision }) => {
@@ -109,6 +122,7 @@ export const MARKDOWN_EDITOR_MIME = 'text/markdown; mode=edit';
 export const mimeToRenderer: Readonly<Record<string, FileRenderer>> = Object.freeze({
   ...createMimeMap(CODE_MIME_TYPES, CodeFileRenderer),
   ...createMimeMap(IMAGE_MIME_TYPES, ImageFileRenderer),
+  'application/pdf': PdfFileRenderer,
   'application/xhtml+xml': HtmlFileRenderer,
   'text/csv': CsvFileRenderer,
   'text/html': HtmlFileRenderer,
@@ -117,6 +131,11 @@ export const mimeToRenderer: Readonly<Record<string, FileRenderer>> = Object.fre
   'text/x-markdown': MarkdownFileRenderer,
 });
 
+type FilePaneLoadingStateProps = {
+  label: string;
+  path: string;
+};
+
 type UnsupportedFilePaneProps = {
   path: string;
   mime: string;
@@ -124,6 +143,21 @@ type UnsupportedFilePaneProps = {
 
 export const openFileExternally = async (path: string): Promise<void> => {
   await openExternal(path);
+};
+
+const FilePaneLoadingState = ({ label, path }: FilePaneLoadingStateProps): JSX.Element => {
+  return (
+    <section className="tinker-pane tinker-renderer-pane">
+      <header className="tinker-pane-header">
+        <div>
+          <p className="tinker-eyebrow">Loading preview</p>
+          <h2>{getPanelTitleForPath(path)}</h2>
+        </div>
+      </header>
+
+      <p className="tinker-muted">{label}</p>
+    </section>
+  );
 };
 
 const UnsupportedFilePane = ({ path, mime }: UnsupportedFilePaneProps): JSX.Element => {
