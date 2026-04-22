@@ -476,10 +476,7 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const [opencode, sessions] = await Promise.all([
-          invoke<OpencodeConnection>('get_opencode_connection'),
-          readAuthStatus(),
-        ]);
+        const sessions = await readAuthStatus();
         await migrateLocalUserIdentity('local-user', GUEST_USER_ID);
         await syncStoredUsers(sessions);
         await syncCurrentUserMemoryPath(sessions, { emit: false });
@@ -495,10 +492,15 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
-        const modelConnected = await probeModelConnection(opencode, storedVaultPath);
         const home = await homeDir();
         const guestMemoryPath = await getActiveMemoryPath(GUEST_USER_ID);
         const defaultKey = bindingKey(home, guestMemoryPath, GUEST_USER_ID);
+        const opencode = await invoke<OpencodeConnection>('start_opencode', {
+          folderPath: home,
+          userId: GUEST_USER_ID,
+          memorySubdir: guestMemoryPath,
+        });
+        const modelConnected = await probeModelConnection(opencode, storedVaultPath);
 
         if (!active) {
           return;
