@@ -357,13 +357,21 @@ export const App = (): JSX.Element => {
         await ensureConnectedMemoryPaths(sessions);
         const vaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
+        // Skills live per-user at `<memory_root>/<user-id>/.tinker/skills/`, so
+        // the skill store is initialized against the active memory path rather
+        // than the vault path (TIN-113). This keeps user skill libraries
+        // scoped to the signed-in identity even if they share a vault with
+        // other local users.
+        const bootUserId = pickCurrentUserId(sessions);
+        const bootUserMemoryPath = await getActiveMemoryPath(bootUserId);
+        await skillStore.init(bootUserMemoryPath);
+        await skillStore.reindex();
+
         let vaultRevision = 0;
         if (vaultPath) {
           const config = { path: vaultPath, isNew: false };
           await vaultService.init(config);
           await indexVault(config);
-          await skillStore.init(vaultPath);
-          await skillStore.reindex();
           vaultRevision = 1;
         }
 
@@ -409,6 +417,51 @@ export const App = (): JSX.Element => {
     };
   }, [layoutStore, memoryStore, nativeRuntime, schedulerStore, skillStore, vaultService]);
 
+  // Skills are scoped per-user. Re-init the skill store whenever the signed-in
+  // user changes so skill writes land under the new user's memory path.
+  // (D22: per-call config; no stashed state between calls.)
+  const signedInUserId = useMemo(
+    () => (state.status === 'ready' ? pickCurrentUserId(state.sessions) : DEFAULT_USER_ID),
+    [state.status, state.status === 'ready' ? state.sessions : null],
+  );
+
+  useEffect(() => {
+    if (!nativeRuntime || state.status !== 'ready') {
+      return;
+    }
+
+    let active = true;
+
+    void (async () => {
+      try {
+        const userMemoryPath = await getActiveMemoryPath(signedInUserId);
+        await skillStore.init(userMemoryPath);
+        await skillStore.reindex();
+
+        if (!active) {
+          return;
+        }
+
+        setState((current) =>
+          current.status !== 'ready'
+            ? current
+            : {
+                ...current,
+                activeSkillsRevision: current.activeSkillsRevision + 1,
+              },
+        );
+      } catch (error) {
+        if (active) {
+          console.warn('Failed to initialize the skill store for the current user.', error);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [nativeRuntime, signedInUserId, skillStore, state.status]);
+
   useEffect(() => {
     if (!nativeRuntime || state.status !== 'ready' || !state.vaultPath) {
       return;
@@ -441,7 +494,6 @@ export const App = (): JSX.Element => {
 
       try {
         await indexVault({ path: activeVaultPath, isNew: false });
-        await skillStore.reindex();
 
         if (!active) {
           return;
@@ -482,7 +534,7 @@ export const App = (): JSX.Element => {
       }
       unsubscribe();
     };
-  }, [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null, vaultService, skillStore]);
+  }, [nativeRuntime, state.status, state.status === 'ready' ? state.vaultPath : null, vaultService]);
 
   useEffect(() => {
     if (!nativeRuntime || state.status !== 'ready') {
@@ -724,8 +776,6 @@ export const App = (): JSX.Element => {
     requireNativeRuntime('Selecting a vault');
     await vaultService.init(config);
     await indexVault(config);
-    await skillStore.init(config.path);
-    await skillStore.reindex();
     window.localStorage.setItem(VAULT_PATH_KEY, config.path);
 
     await syncConnectorState(state.opencode, config.path, state.sessions).catch((error) => {
@@ -741,7 +791,6 @@ export const App = (): JSX.Element => {
             vaultPath: config.path,
             modelConnected,
             vaultRevision: current.vaultRevision + 1,
-            activeSkillsRevision: current.activeSkillsRevision + 1,
           },
     );
   };
