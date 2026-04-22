@@ -1093,64 +1093,184 @@ const EmptyStateTab = (): JSX.Element => (
 
 /* -------------------------- Chat ------------------------- */
 
-const ChatTab = (): JSX.Element => {
-  const [message, setMessage] = useState('');
+const CHAT_MODE_OPTIONS = [
+  { value: 'chat', label: 'Chat' },
+  { value: 'plan', label: 'Plan' },
+] as const;
+
+type ChatMode = (typeof CHAT_MODE_OPTIONS)[number]['value'];
+
+const AttachmentIcon = (): JSX.Element => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.8-8.8a3.5 3.5 0 0 1 5 5L10.5 17a2 2 0 0 1-2.8-2.8l7.5-7.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const EmptyChatIcon = (): JSX.Element => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+type ChatChromeProps = {
+  message: string;
+  onMessageChange: (value: string) => void;
+  mode: ChatMode;
+  onModeChange: (next: ChatMode) => void;
+  showHistory: boolean;
+};
+
+const ChatPaneChrome = ({
+  message,
+  onMessageChange,
+  mode,
+  onModeChange,
+  showHistory,
+}: ChatChromeProps): JSX.Element => {
+  const modelId = MODEL_PICKER_ITEMS[0]?.id;
+  const modelName = MODEL_PICKER_ITEMS[0]?.name ?? 'Claude Sonnet';
+  const windowSize = MODEL_PICKER_ITEMS[0]?.contextWindow ?? 200_000;
   return (
-    <div className="ds-chat">
-      <div className="ds-chat__memory">
-        <StatusDot state="claude" />
-        <span className="ds-chat__memory-text">
-          Memory loaded · 3 recent entities · vault indexed 4m ago
-        </span>
-        <Badge variant="skill" size="small">
-          coach
-        </Badge>
-      </div>
-
-      <div className="ds-chat__log">
-        <div className="ds-msg ds-msg--user">
-          Pull yesterday&apos;s spend anomalies from Ramp, draft a Slack summary.
-        </div>
-
-        <div className="ds-msg ds-msg--assistant">
-          <div className="ds-msg__meta">
-            <StatusDot state="claude" />
-            <span>OpenCode · gpt-5.4</span>
-            <Badge variant="info" size="small">
-              MCP: ramp
-            </Badge>
+    <div className="ds-chat-frame">
+      <section className="tinker-pane tinker-pane--chat">
+        <header className="tinker-chat-header">
+          <div className="tinker-chat-header__left">
+            <ModelPicker
+              items={MODEL_PICKER_ITEMS}
+              value={modelId}
+              onSelect={() => undefined}
+              emptyLabel="No models available."
+            />
+            <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
+              ⌥T thinking
+            </span>
           </div>
-          <p>Found 4 anomalies over $2k. Top offender: vendor &ldquo;Acme Cloud&rdquo; (+312% vs 7d avg). Drafting summary.</p>
-          <Row>
-            <Button variant="primary" size="s">
-              Post to #finance
-            </Button>
+          <div className="tinker-chat-header__right">
+            <ContextBadge
+              percent={57}
+              tokens={Math.round(windowSize * 0.57)}
+              windowSize={windowSize}
+              model={modelName}
+            />
+            <div className="tinker-chat-header__slot">
+              <SegmentedControl
+                options={[...CHAT_MODE_OPTIONS]}
+                value={mode}
+                onChange={onModeChange}
+                label="Chat mode"
+              />
+            </div>
+            <Badge variant="default" size="small">
+              OpenCode is ready.
+            </Badge>
             <Button variant="ghost" size="s">
-              Edit draft
+              New chat tab
             </Button>
-            <ClickableBadge variant="info">To-Dos · 2/3</ClickableBadge>
-          </Row>
+          </div>
+        </header>
+
+        <div className="tinker-chat-frame">
+          <div className="tinker-chat-log" tabIndex={-1}>
+            {showHistory ? (
+              <>
+                <div className="tinker-message tinker-message--user">
+                  Pull yesterday&apos;s spend anomalies from Ramp, draft a Slack summary.
+                </div>
+                <div className="tinker-message tinker-message--assistant">
+                  <p className="tinker-message-text">
+                    Found 4 anomalies over $2k. Top offender: vendor &ldquo;Acme Cloud&rdquo;
+                    (+312% vs 7d avg). Drafting summary.
+                  </p>
+                </div>
+                <div className="tinker-message tinker-message--system">
+                  Scheduling daily sweep at 08:00 · see Today pane
+                </div>
+              </>
+            ) : (
+              <EmptyState
+                title="Start a conversation"
+                description="Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE."
+                icon={<EmptyChatIcon />}
+              />
+            )}
+          </div>
         </div>
 
-        <div className="ds-msg ds-msg--system">
-          <StatusDot state="pulse" />
-          <span>Scheduling daily sweep at 08:00 · see Today pane</span>
+        <div className="tinker-composer-card__wrap">
+          <div className="tinker-composer-card">
+            <div className="tinker-composer-card__body">
+              <Textarea
+                rows={4}
+                resize="none"
+                placeholder="Ask about the vault, your project, or the next change to make."
+                value={message}
+                onChange={(event) => onMessageChange(event.target.value)}
+              />
+            </div>
+            <div className="tinker-composer-card__footer">
+              <div className="tinker-composer-card__footer-left">
+                <IconButton
+                  variant="ghost"
+                  size="s"
+                  icon={<AttachmentIcon />}
+                  label="Attachments coming soon"
+                  aria-disabled
+                  disabled
+                />
+              </div>
+              <div className="tinker-composer-card__footer-right">
+                <Button
+                  variant="primary"
+                  size="m"
+                  disabled={message.trim().length === 0}
+                >
+                  Send message
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
+    </div>
+  );
+};
 
-      <div className="ds-chat__composer">
-        <Textarea
-          rows={3}
-          resize="none"
-          placeholder="Message the workspace…"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
+const ChatTab = (): JSX.Element => {
+  const [withHistoryMessage, setWithHistoryMessage] = useState('');
+  const [emptyMessage, setEmptyMessage] = useState('');
+  const [mode, setMode] = useState<ChatMode>('chat');
+  return (
+    <div className="ds-sections">
+      <Section label="Chat — with history">
+        <ChatPaneChrome
+          message={withHistoryMessage}
+          onMessageChange={setWithHistoryMessage}
+          mode={mode}
+          onModeChange={setMode}
+          showHistory
         />
-        <IconButton variant="ghost" size="m" icon={<SettingsIcon />} label="Composer settings" />
-        <Button variant="primary" size="m" leadingIcon={<PlusIcon />}>
-          Send
-        </Button>
-      </div>
+      </Section>
+
+      <Section label="Chat — empty state (first message)">
+        <ChatPaneChrome
+          message={emptyMessage}
+          onMessageChange={setEmptyMessage}
+          mode={mode}
+          onModeChange={setMode}
+          showHistory={false}
+        />
+      </Section>
     </div>
   );
 };

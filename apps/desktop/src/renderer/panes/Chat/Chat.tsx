@@ -8,9 +8,18 @@ import {
   useState,
   type JSX,
   type KeyboardEvent,
+  type ReactNode,
 } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
-import { Badge, Button, EmptyState, ModelPicker, Textarea } from '@tinker/design';
+import {
+  Badge,
+  Button,
+  ContextBadge,
+  EmptyState,
+  IconButton,
+  ModelPicker,
+  Textarea,
+} from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
 import { resolveRelevantEntities } from '@tinker/memory';
 import type { SkillStore } from '@tinker/shared-types';
@@ -49,7 +58,21 @@ type ChatProps = {
   onFileWritten?: (path: string) => void;
   onOpenNewChat?: () => void;
   onMemoryCommitted?: () => void;
+  modeToggleSlot?: ReactNode;
+  reasoningPickerSlot?: ReactNode;
 };
+
+const AttachmentIcon = (): JSX.Element => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.8-8.8a3.5 3.5 0 0 1 5 5L10.5 17a2 2 0 0 1-2.8-2.8l7.5-7.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessageRecord[] => {
   return messages.map(({ info, parts }) => {
@@ -129,6 +152,8 @@ export const Chat = ({
   onFileWritten,
   onOpenNewChat,
   onMemoryCommitted,
+  modeToggleSlot,
+  reasoningPickerSlot,
 }: ChatProps): JSX.Element => {
   const client = useMemo(
     () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
@@ -599,83 +624,89 @@ export const Chat = ({
     }
   };
 
+  const hasHeaderSlotContent = Boolean(modeToggleSlot) || Boolean(reasoningPickerSlot);
+
   return (
-    <section className="tinker-pane">
-      <header className="tinker-pane-header">
-        <div>
-          <p className="tinker-eyebrow">Chat</p>
-          <h2>Talk to OpenCode directly</h2>
-        </div>
-        <div className="tinker-inline-actions">
-          {onOpenNewChat ? (
-            <Button variant="secondary" size="s" onClick={onOpenNewChat}>
-              New chat tab
-            </Button>
-          ) : null}
+    <section className="tinker-pane tinker-pane--chat">
+      <header className="tinker-chat-header">
+        <div className="tinker-chat-header__left">
+          <ModelPicker
+            items={modelOptions}
+            value={selectedModelId}
+            onSelect={setSelectedModelId}
+            loading={modelOptionsLoading}
+            disabled={busy}
+            emptyLabel="No models available in OpenCode."
+          />
           <span className="tinker-chat-legend" title="Toggle thinking + tool disclosures (Alt+T)">
             ⌥T thinking
           </span>
+        </div>
+        <div className="tinker-chat-header__right">
+          {selectedModel ? (
+            // TODO(TIN-174): wire real token + window values from the active session stream.
+            <ContextBadge
+              percent={57}
+              tokens={Math.round((selectedModel.contextWindow ?? 0) * 0.57)}
+              windowSize={selectedModel.contextWindow ?? 0}
+              model={selectedModel.name}
+            />
+          ) : null}
+          <div
+            className="tinker-chat-header__slot"
+            aria-hidden={!hasHeaderSlotContent}
+          >
+            {modeToggleSlot}
+            {reasoningPickerSlot}
+          </div>
           <Badge variant="default" size="small">
             {status}
           </Badge>
+          {onOpenNewChat ? (
+            <Button variant="ghost" size="s" onClick={onOpenNewChat}>
+              New chat tab
+            </Button>
+          ) : null}
         </div>
       </header>
 
-      <div
-        className="tinker-chat-log"
-        ref={setLogScroller}
-        onScroll={historyWindow.handleScroll}
-        tabIndex={-1}
-      >
-        {messages.length === 0 ? (
-          <EmptyState
-            title={modelConnected ? 'Start a conversation' : 'No model connected'}
-            description={
-              modelConnected
-                ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
-                : 'Connect an AI model in Settings before sending a message.'
-            }
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            }
-          />
-        ) : null}
+      <div className="tinker-chat-frame">
+        <div
+          className="tinker-chat-log"
+          ref={setLogScroller}
+          onScroll={historyWindow.handleScroll}
+          tabIndex={-1}
+        >
+          {messages.length === 0 ? (
+            <EmptyState
+              title={modelConnected ? 'Start a conversation' : 'No model connected'}
+              description={
+                modelConnected
+                  ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+                  : 'Connect an AI model in Settings before sending a message.'
+              }
+              icon={
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v8c0 1.38-1.12 2.5-2.5 2.5H10l-4 3v-3H6.5C5.12 17 4 15.88 4 14.5v-8Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              }
+            />
+          ) : null}
 
-        {historyWindow.renderedMessages.flatMap((message) =>
-          message.blocks.map((block) => {
-            if (block.kind === 'text') {
-              return (
-                <ChatMessage
-                  key={block.partID}
-                  role={message.role}
-                  text={block.text}
-                />
-              );
-            }
-
-            return (
-              <MessageBlock
-                key={block.partID}
-                block={block}
-                isOpen={isDisclosureOpen(block.partID)}
-                onToggle={(next) => handleDisclosureToggle(block.partID, next)}
-              />
-            );
-          }),
-        )}
-
-        {draftBlocks.length > 0
-          ? draftBlocks.map((block) => {
+          {historyWindow.renderedMessages.flatMap((message) =>
+            message.blocks.map((block) => {
               if (block.kind === 'text') {
                 return (
-                  <ChatMessage key={block.partID} role="assistant" text={block.text} streaming />
+                  <ChatMessage
+                    key={block.partID}
+                    role={message.role}
+                    text={block.text}
+                  />
                 );
               }
 
@@ -687,39 +718,73 @@ export const Chat = ({
                   onToggle={(next) => handleDisclosureToggle(block.partID, next)}
                 />
               );
-            })
-          : null}
+            }),
+          )}
+
+          {draftBlocks.length > 0
+            ? draftBlocks.map((block) => {
+                if (block.kind === 'text') {
+                  return (
+                    <ChatMessage key={block.partID} role="assistant" text={block.text} streaming />
+                  );
+                }
+
+                return (
+                  <MessageBlock
+                    key={block.partID}
+                    block={block}
+                    isOpen={isDisclosureOpen(block.partID)}
+                    onToggle={(next) => handleDisclosureToggle(block.partID, next)}
+                  />
+                );
+              })
+            : null}
+        </div>
       </div>
 
-      <div className={`tinker-composer${busy ? ' tinker-composer--busy' : ''}`}>
-        <Textarea
-          ref={composerRef}
-          value={input}
-          rows={4}
-          resize="none"
-          placeholder="Ask about the vault, your project, or the next change to make."
-          onChange={(event) => setInput(event.currentTarget.value)}
-          onKeyDown={handleComposerKeyDown}
-          disabled={busy || !modelConnected}
-        />
-        <div className="tinker-inline-actions tinker-composer-actions">
-          <ModelPicker
-            items={modelOptions}
-            value={selectedModelId}
-            onSelect={setSelectedModelId}
-            loading={modelOptionsLoading}
-            disabled={busy}
-            emptyLabel="No models available in OpenCode."
-          />
-          {busy ? (
-            <Button variant="danger" onClick={() => void abortActiveStream()}>
-              Stop
-            </Button>
-          ) : (
-            <Button variant="primary" onClick={sendMessage} disabled={!modelConnected || input.trim().length === 0}>
-              Send message
-            </Button>
-          )}
+      <div className="tinker-composer-card__wrap">
+        <div
+          className={`tinker-composer-card${busy ? ' tinker-composer-card--busy' : ''}`}
+        >
+          <div className="tinker-composer-card__body">
+            <Textarea
+              ref={composerRef}
+              value={input}
+              rows={4}
+              resize="none"
+              placeholder="Ask about the vault, your project, or the next change to make."
+              onChange={(event) => setInput(event.currentTarget.value)}
+              onKeyDown={handleComposerKeyDown}
+              disabled={busy || !modelConnected}
+            />
+          </div>
+          <div className="tinker-composer-card__footer">
+            <div className="tinker-composer-card__footer-left">
+              <IconButton
+                variant="ghost"
+                size="s"
+                icon={<AttachmentIcon />}
+                label="Attachments coming soon"
+                aria-disabled
+                disabled
+              />
+            </div>
+            <div className="tinker-composer-card__footer-right">
+              {busy ? (
+                <Button variant="danger" onClick={() => void abortActiveStream()}>
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={sendMessage}
+                  disabled={!modelConnected || input.trim().length === 0}
+                >
+                  Send message
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </section>
