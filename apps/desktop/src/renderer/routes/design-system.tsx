@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type JSX, type ReactNode } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
 import {
   Avatar,
   Badge,
@@ -8,6 +8,7 @@ import {
   ConnectionGate,
   ConnectionSplash,
   ContextBadge,
+  ContextPill,
   EmptyState,
   IconButton,
   KeyboardHint,
@@ -39,6 +40,7 @@ import {
 } from '../workspace/components/SettingsShell/index.js';
 import { AccountPanel } from '../workspace/components/AccountPanel/index.js';
 import { Titlebar } from '../workspace/components/Titlebar/index.js';
+import { FolderPill } from '../panes/Chat/components/FolderPill/index.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
 import type { ReasoningLevel } from '@tinker/shared-types';
@@ -48,7 +50,6 @@ import './design-system.css';
 type PlaygroundTab =
   | 'colors'
   | 'typography'
-  | 'type-roles'
   | 'spacing'
   | 'components'
   | 'modelpicker'
@@ -56,6 +57,7 @@ type PlaygroundTab =
   | 'toast'
   | 'empty'
   | 'chat'
+  | 'chat-composer'
   | 'settings-shell'
   | 'sign-in'
   | 'titlebar';
@@ -63,7 +65,6 @@ type PlaygroundTab =
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
   { value: 'typography', label: 'Typography' },
-  { value: 'type-roles', label: 'Type Roles (Paper 9J-0)' },
   { value: 'spacing', label: 'Spacing' },
   { value: 'components', label: 'Components' },
   { value: 'modelpicker', label: 'Model Picker' },
@@ -71,6 +72,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'toast', label: 'Toast' },
   { value: 'empty', label: 'Empty State' },
   { value: 'chat', label: 'Chat' },
+  { value: 'chat-composer', label: 'Chat Composer' },
   { value: 'settings-shell', label: 'Settings Shell' },
   { value: 'sign-in', label: 'Sign In' },
   { value: 'titlebar', label: 'Titlebar' },
@@ -914,152 +916,6 @@ const TypographyTab = (): JSX.Element => (
   </div>
 );
 
-/* ---------------------- Type Roles ----------------------- */
-
-type TypeRoleRow = {
-  role: string;
-  sample: string;
-  sizeVar: string;
-  weightVar: string;
-  lineHeightVar: string;
-  fontFamily: 'sans' | 'mono';
-  uppercase?: boolean;
-  letterSpacingVar?: string;
-  tokenSummary: string;
-};
-
-const TYPE_ROLE_ROWS: ReadonlyArray<TypeRoleRow> = [
-  {
-    role: 'Display',
-    sample: 'Aa · Host Grotesk 700 · 28',
-    sizeVar: '--font-size-display',
-    weightVar: '--font-weight-display',
-    lineHeightVar: '--line-height-display',
-    fontFamily: 'sans',
-    tokenSummary: 'size-display · weight-display · lh-display',
-  },
-  {
-    role: 'H2',
-    sample: 'Aa · Host Grotesk 600 · 20',
-    sizeVar: '--font-size-h2',
-    weightVar: '--font-weight-h2',
-    lineHeightVar: '--line-height-h2',
-    fontFamily: 'sans',
-    tokenSummary: 'size-h2 · weight-h2 · lh-h2',
-  },
-  {
-    role: 'H3',
-    sample: 'Aa · Host Grotesk 500 · 16',
-    sizeVar: '--font-size-h3',
-    weightVar: '--font-weight-h3',
-    lineHeightVar: '--line-height-h3',
-    fontFamily: 'sans',
-    tokenSummary: 'size-h3 · weight-h3 · lh-h3',
-  },
-  {
-    role: 'Body',
-    sample: 'Aa · Host Grotesk 400 · 14 — body copy sits here, comfortable line-height 1.45.',
-    sizeVar: '--font-size-body',
-    weightVar: '--font-weight-body',
-    lineHeightVar: '--line-height-body',
-    fontFamily: 'sans',
-    tokenSummary: 'size-body · weight-body · lh-body',
-  },
-  {
-    role: 'Secondary',
-    sample: 'Aa · 13 secondary · metadata, captions',
-    sizeVar: '--font-size-secondary',
-    weightVar: '--font-weight-regular',
-    lineHeightVar: '--line-height-secondary',
-    fontFamily: 'sans',
-    tokenSummary: 'size-secondary · weight-regular · lh-secondary',
-  },
-  {
-    role: 'Label',
-    sample: 'Aa · 11 label · uppercase 0.08em',
-    sizeVar: '--font-size-label',
-    weightVar: '--font-weight-medium',
-    lineHeightVar: '--line-height-label',
-    fontFamily: 'sans',
-    uppercase: true,
-    letterSpacingVar: '--letter-spacing-label',
-    tokenSummary: 'size-label · weight-medium · lh-label · letter-spacing-label',
-  },
-  {
-    role: 'Mono',
-    sample: 'Aa · JetBrains Mono 400 · 12 — tabular-nums 012,345',
-    sizeVar: '--font-size-mono',
-    weightVar: '--font-weight-regular',
-    lineHeightVar: '--line-height-mono',
-    fontFamily: 'mono',
-    tokenSummary: 'size-mono · weight-regular · lh-mono · font-mono',
-  },
-];
-
-const TypeRoleSample = ({ row }: { row: TypeRoleRow }): JSX.Element => {
-  const style: CSSProperties = {
-    fontFamily: row.fontFamily === 'mono' ? 'var(--font-mono)' : 'var(--font-sans)',
-    fontSize: `var(${row.sizeVar})`,
-    fontWeight: `var(${row.weightVar})` as unknown as number,
-    lineHeight: `var(${row.lineHeightVar})`,
-    color: 'var(--color-text-primary)',
-  };
-  if (row.uppercase) {
-    style.textTransform = 'uppercase';
-  }
-  if (row.letterSpacingVar) {
-    style.letterSpacing = `var(${row.letterSpacingVar})`;
-  }
-  if (row.fontFamily === 'mono') {
-    style.fontVariantNumeric = 'tabular-nums';
-  }
-  return <div style={style}>{row.sample}</div>;
-};
-
-const TypeRolesTab = (): JSX.Element => (
-  <div className="ds-sections">
-    <Section label="Paper 9J-0 parity · 7 roles">
-      <p className="ds-type-roles-lede">
-        Mirrors the TEXT section on Paper artboard 9J-0 ("Tinker Tokens — Light"). Each row
-        exercises a role token group — size, weight, and line-height wired to the new
-        <code> --font-*-{'{'}role{'}'}</code> vars. Light mode is the default; the display
-        weight shifts to 600 under <code>[data-theme="dark"]</code>.
-      </p>
-      <div className="ds-type-roles-list">
-        {TYPE_ROLE_ROWS.map((row) => (
-          <div key={row.role} className="ds-type-role-row">
-            <span className="ds-type-role-row__label">{row.role}</span>
-            <div className="ds-type-role-row__sample">
-              <TypeRoleSample row={row} />
-            </div>
-            <span className="ds-type-role-row__tokens">{row.tokenSummary}</span>
-          </div>
-        ))}
-      </div>
-    </Section>
-
-    <Section label="Dark preview (display shifts to weight 600)">
-      <div className="ds-type-roles-dark" data-theme="dark">
-        <p className="ds-type-roles-lede">
-          Same rows re-rendered inside a <code>data-theme="dark"</code> scope to verify the
-          display weight flips per Paper 6M-0.
-        </p>
-        <div className="ds-type-roles-list">
-          {TYPE_ROLE_ROWS.map((row) => (
-            <div key={row.role} className="ds-type-role-row">
-              <span className="ds-type-role-row__label">{row.role}</span>
-              <div className="ds-type-role-row__sample">
-                <TypeRoleSample row={row} />
-              </div>
-              <span className="ds-type-role-row__tokens">{row.tokenSummary}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Section>
-  </div>
-);
-
 /* ------------------------ Spacing ------------------------ */
 
 const SPACE_SCALE: ReadonlyArray<{ name: string; varName: string; px: string }> = [
@@ -1484,6 +1340,140 @@ const ChatTab = (): JSX.Element => {
   );
 };
 
+/* -------------------- Chat Composer -------------------- */
+
+const ChatComposerTab = (): JSX.Element => {
+  const [idleMsg, setIdleMsg] = useState('');
+  const [streamMsg, setStreamMsg] = useState('Generating response…');
+  const [disabledMsg, setDisabledMsg] = useState('');
+  const [mode, setMode] = useState<'build' | 'plan'>('build');
+
+  return (
+    <div className="ds-sections">
+      <Section label="Idle">
+        <div className="ds-chat-composer-frame">
+          <PromptComposer
+            value={idleMsg}
+            onChange={setIdleMsg}
+            onSubmit={() => undefined}
+            placeholder="Reply…"
+            contextSlot={
+              <ContextPill percent={4} tokens={8_000} windowSize={200_000} model="claude-sonnet-4-6" />
+            }
+            statusSlot={
+              <>
+                <StatusDot state="halo" />
+                <button type="button" className="tinker-chat-kebab" aria-label="Pane options">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="4" cy="8" r="1" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1" fill="currentColor" />
+                    <circle cx="12" cy="8" r="1" fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            }
+            controls={
+              <>
+                <ComposerChip label={mode === 'build' ? 'Auto Accept' : 'Plan'} variant={mode === 'build' ? 'primary' : 'default'} onClick={() => setMode(mode === 'build' ? 'plan' : 'build')} />
+                <ModelPicker
+                  items={MODEL_PICKER_ITEMS}
+                  value={MODEL_PICKER_ITEMS[0]?.id}
+                  onSelect={() => undefined}
+                  variant="dock"
+                />
+                <ComposerChip label="Default" />
+              </>
+            }
+            trailingSlot={<FolderPill />}
+          />
+        </div>
+      </Section>
+
+      <Section label="Streaming">
+        <div className="ds-chat-composer-frame">
+          <PromptComposer
+            value={streamMsg}
+            onChange={setStreamMsg}
+            onSubmit={() => undefined}
+            onAbort={() => undefined}
+            busy
+            placeholder="Reply…"
+            contextSlot={
+              <ContextPill percent={58} tokens={116_000} windowSize={200_000} model="claude-sonnet-4-6" />
+            }
+            statusSlot={
+              <>
+                <StatusDot state="pulse" />
+                <button type="button" className="tinker-chat-kebab" aria-label="Pane options">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="4" cy="8" r="1" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1" fill="currentColor" />
+                    <circle cx="12" cy="8" r="1" fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            }
+            controls={
+              <>
+                <ComposerChip label="Auto Accept" variant="primary" />
+                <ModelPicker
+                  items={MODEL_PICKER_ITEMS}
+                  value={MODEL_PICKER_ITEMS[0]?.id}
+                  onSelect={() => undefined}
+                  variant="dock"
+                />
+                <ComposerChip label="Default" />
+              </>
+            }
+            trailingSlot={<FolderPill />}
+          />
+        </div>
+      </Section>
+
+      <Section label="Disabled">
+        <div className="ds-chat-composer-frame">
+          <PromptComposer
+            value={disabledMsg}
+            onChange={setDisabledMsg}
+            onSubmit={() => undefined}
+            disabled
+            placeholder="Reply…"
+            contextSlot={
+              <ContextPill percent={0} tokens={0} windowSize={200_000} model="claude-sonnet-4-6" />
+            }
+            statusSlot={
+              <>
+                <StatusDot state="muted" />
+                <button type="button" className="tinker-chat-kebab" aria-label="Pane options">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="4" cy="8" r="1" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1" fill="currentColor" />
+                    <circle cx="12" cy="8" r="1" fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            }
+            controls={
+              <>
+                <ComposerChip label="Auto Accept" variant="primary" disabled />
+                <ModelPicker
+                  items={MODEL_PICKER_ITEMS}
+                  value={MODEL_PICKER_ITEMS[0]?.id}
+                  onSelect={() => undefined}
+                  variant="dock"
+                  disabled
+                />
+                <ComposerChip label="Default" disabled />
+              </>
+            }
+            trailingSlot={<FolderPill disabled />}
+          />
+        </div>
+      </Section>
+    </div>
+  );
+};
+
 /* -------------------- Settings Shell --------------------- */
 
 const UserIcon = () => (
@@ -1727,8 +1717,6 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <ColorsTab />;
     case 'typography':
       return <TypographyTab />;
-    case 'type-roles':
-      return <TypeRolesTab />;
     case 'spacing':
       return <SpacingTab />;
     case 'components':
@@ -1743,6 +1731,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <EmptyStateTab />;
     case 'chat':
       return <ChatTab />;
+    case 'chat-composer':
+      return <ChatComposerTab />;
     case 'settings-shell':
       return <SettingsShellTab />;
     case 'sign-in':
