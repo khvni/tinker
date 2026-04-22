@@ -38,13 +38,25 @@ import {
 } from './useCurrentUser.js';
 import { Workspace } from './workspace/Workspace.js';
 
+type BindingKey = string;
+
+const bindingKey = (folderPath: string, memorySubdir: string, userId: string): BindingKey =>
+  `${folderPath}\0${memorySubdir}\0${userId}`;
+
+const defaultConnection = (state: ReadyAppState): OpencodeConnection =>
+  defaultConnection(state)!;
+
+const connectionFor = (state: ReadyAppState, key: BindingKey): OpencodeConnection =>
+  state.opencodes[key] ?? defaultConnection(state);
+
 type ReadyAppState = {
   status: 'ready';
   layoutStore: LayoutStore;
   memoryStore: MemoryStore;
   skillStore: SkillStore;
   schedulerStore: ScheduledJobStore;
-  opencode: OpencodeConnection;
+  opencodes: Record<BindingKey, OpencodeConnection>;
+  defaultBindingKey: BindingKey;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
   modelConnected: boolean;
@@ -383,7 +395,10 @@ export const App = (): JSX.Element => {
         ? current
         : {
             ...current,
-            opencode: nextState.opencode,
+            opencodes: {
+              ...current.opencodes,
+              [current.defaultBindingKey]: nextState.opencode,
+            },
             mcpStatus: {
               ...current.mcpStatus,
               [EXA_MCP_NAME]: EXA_CHECKING_STATUS,
@@ -428,13 +443,15 @@ export const App = (): JSX.Element => {
             return;
           }
 
+          const previewKey = bindingKey('', '', 'preview');
           setState({
             status: 'ready',
             layoutStore,
             memoryStore,
             skillStore,
             schedulerStore,
-            opencode: WEB_PREVIEW_CONNECTION,
+            opencodes: { [previewKey]: WEB_PREVIEW_CONNECTION },
+            defaultBindingKey: previewKey,
             mcpStatus: {},
             vaultPath: null,
             modelConnected: false,
@@ -465,6 +482,9 @@ export const App = (): JSX.Element => {
         }
 
         const modelConnected = await probeModelConnection(opencode, storedVaultPath);
+        const home = await homeDir();
+        const guestMemoryPath = await getActiveMemoryPath(GUEST_USER_ID);
+        const defaultKey = bindingKey(home, guestMemoryPath, GUEST_USER_ID);
 
         if (!active) {
           return;
@@ -476,7 +496,8 @@ export const App = (): JSX.Element => {
           memoryStore,
           skillStore,
           schedulerStore,
-          opencode,
+          opencodes: { [defaultKey]: opencode },
+          defaultBindingKey: defaultKey,
           mcpStatus: {},
           vaultPath: storedVaultPath,
           modelConnected,
@@ -509,7 +530,7 @@ export const App = (): JSX.Element => {
     let active = true;
     const activeSessions = currentUserState.sessions;
     const activeVaultPath = state.vaultPath;
-    const activeBaseUrl = state.opencode.baseUrl;
+    const activeBaseUrl = defaultConnection(state)?.baseUrl;
 
     void (async () => {
       await syncCurrentUserMemoryPath(activeSessions);
@@ -520,11 +541,14 @@ export const App = (): JSX.Element => {
         }
 
         setState((current) =>
-          current.status !== 'ready' || current.opencode.baseUrl !== activeBaseUrl
+          current.status !== 'ready' || current.opencodes[current.defaultBindingKey]?.baseUrl !== activeBaseUrl
             ? current
             : {
                 ...current,
-                opencode: nextState.opencode,
+                opencodes: {
+                  ...current.opencodes,
+                  [current.defaultBindingKey]: nextState.opencode,
+                },
                 modelConnected: nextState.modelConnected,
               },
         );
@@ -641,7 +665,7 @@ export const App = (): JSX.Element => {
     const engine = createSchedulerEngine({
       jobStore: state.schedulerStore,
       vaultService: state.vaultPath ? vaultService : null,
-      createClient: () => createWorkspaceClient(state.opencode, getOpencodeDirectory(state.vaultPath)),
+      createClient: () => createWorkspaceClient(defaultConnection(state), getOpencodeDirectory(state.vaultPath)),
       notify,
       onMutation: bumpSchedulerRevision,
     });
@@ -658,7 +682,7 @@ export const App = (): JSX.Element => {
   }, [
     nativeRuntime,
     state.status,
-    state.status === 'ready' ? state.opencode : null,
+    state.status === 'ready' ? defaultConnection(state) : null,
     state.status === 'ready' ? state.schedulerStore : null,
     state.status === 'ready' ? state.vaultPath : null,
     vaultService,
@@ -694,7 +718,7 @@ export const App = (): JSX.Element => {
 
       setMemorySweepBusy(true);
       try {
-        const result = await runDailyMemorySweepIfDue(state.opencode, state.vaultPath, { force });
+        const result = await runDailyMemorySweepIfDue(defaultConnection(state), state.vaultPath, { force });
         if (!active) {
           return;
         }
@@ -737,9 +761,9 @@ export const App = (): JSX.Element => {
     nativeRuntime,
     state.status,
     state.status === 'ready' ? state.modelConnected : false,
-    state.status === 'ready' ? state.opencode.baseUrl : null,
-    state.status === 'ready' ? state.opencode.username : null,
-    state.status === 'ready' ? state.opencode.password : null,
+    state.status === 'ready' ? defaultConnection(state).baseUrl : null,
+    state.status === 'ready' ? defaultConnection(state).username : null,
+    state.status === 'ready' ? defaultConnection(state).password : null,
     state.status === 'ready' ? state.vaultPath : null,
   ]);
 
@@ -748,7 +772,7 @@ export const App = (): JSX.Element => {
       return;
     }
 
-    const connection = state.opencode;
+    const connection = defaultConnection(state);
     const vaultPath = state.vaultPath;
     const directory = getOpencodeDirectory(vaultPath);
     const githubSession = currentUserState.sessions.github;
@@ -759,7 +783,7 @@ export const App = (): JSX.Element => {
     // boot health check resolves. The per-pane polling hook swings qmd +
     // smart-connections to their real states once it runs.
     setState((current) =>
-      current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl
+      current.status !== 'ready' || defaultConnection(current).baseUrl !== connection.baseUrl
         ? current
         : {
             ...current,
@@ -782,7 +806,7 @@ export const App = (): JSX.Element => {
       }
 
       setState((current) =>
-        current.status !== 'ready' || current.opencode.baseUrl !== connection.baseUrl
+        current.status !== 'ready' || defaultConnection(current).baseUrl !== connection.baseUrl
           ? current
           : {
               ...current,
@@ -800,9 +824,9 @@ export const App = (): JSX.Element => {
   }, [
     nativeRuntime,
     state.status,
-    state.status === 'ready' ? state.opencode.baseUrl : null,
-    state.status === 'ready' ? state.opencode.username : null,
-    state.status === 'ready' ? state.opencode.password : null,
+    state.status === 'ready' ? defaultConnection(state).baseUrl : null,
+    state.status === 'ready' ? defaultConnection(state).username : null,
+    state.status === 'ready' ? defaultConnection(state).password : null,
     currentUserState.status === 'ready' ? currentUserState.sessions.github?.scopes.join(',') : null,
   ]);
 
@@ -878,7 +902,10 @@ export const App = (): JSX.Element => {
           ? current
           : {
               ...current,
-              opencode: nextState.opencode,
+              opencodes: {
+                ...current.opencodes,
+                [current.defaultBindingKey]: nextState.opencode,
+              },
               vaultPath: config.path,
               modelConnected: nextState.modelConnected,
               vaultRevision: current.vaultRevision + 1,
@@ -919,7 +946,7 @@ export const App = (): JSX.Element => {
 
     setMemorySweepBusy(true);
     try {
-      const result = await runDailyMemorySweepIfDue(state.opencode, state.vaultPath, { force: true });
+      const result = await runDailyMemorySweepIfDue(defaultConnection(state), state.vaultPath, { force: true });
       setMemorySweepState(result.state);
       if (result.changed) {
         handleMemoryCommitted();
@@ -938,7 +965,7 @@ export const App = (): JSX.Element => {
 
     try {
       requireNativeRuntime('Connecting AI model');
-      await connectModelProvider(state.opencode, state.vaultPath);
+      await connectModelProvider(defaultConnection(state), state.vaultPath);
       setState((current) =>
         current.status !== 'ready'
           ? current
@@ -961,7 +988,7 @@ export const App = (): JSX.Element => {
 
     try {
       requireNativeRuntime('Disconnecting AI model');
-      await disconnectModelProvider(state.opencode, state.vaultPath);
+      await disconnectModelProvider(defaultConnection(state), state.vaultPath);
       setState((current) =>
         current.status !== 'ready'
           ? current
@@ -995,7 +1022,7 @@ export const App = (): JSX.Element => {
       if (providerNeedsWorkspaceRefresh(provider)) {
         await refreshWorkspaceConnection(nextState.sessions);
       } else {
-        const reloaded = await reloadConnectionState(state.opencode, state.vaultPath);
+        const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
         await syncCurrentUserMemoryPath(reloaded.sessions);
         setState((current) =>
           current.status !== 'ready'
@@ -1028,7 +1055,7 @@ export const App = (): JSX.Element => {
       if (providerNeedsWorkspaceRefresh(provider)) {
         await refreshWorkspaceConnection(nextState.sessions);
       } else {
-        const reloaded = await reloadConnectionState(state.opencode, state.vaultPath);
+        const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
         await syncCurrentUserMemoryPath(reloaded.sessions);
         setState((current) =>
           current.status !== 'ready'
@@ -1070,7 +1097,7 @@ export const App = (): JSX.Element => {
       if (providersToClear.includes('github')) {
         await refreshWorkspaceConnection(nextUserState.sessions);
       } else {
-        const reloaded = await reloadConnectionState(state.opencode, state.vaultPath);
+        const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
         await syncCurrentUserMemoryPath(reloaded.sessions);
         setState((current) =>
           current.status !== 'ready'
@@ -1153,7 +1180,7 @@ export const App = (): JSX.Element => {
         githubAuthMessage={providerMessages.github}
         microsoftAuthBusy={providerBusy.microsoft}
         microsoftAuthMessage={providerMessages.microsoft}
-        opencode={state.opencode}
+        opencode={defaultConnection(state)}
         sessions={currentSessions}
         mcpStatus={state.mcpStatus}
         vaultPath={state.vaultPath}
