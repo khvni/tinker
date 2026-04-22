@@ -23,7 +23,7 @@ pub const MICROSOFT_SESSION_ACCOUNT: &str = "microsoft-session";
 
 const AUTH_SIDECAR_MANIFEST_NAME: &str = "auth-sidecar.json";
 const BETTER_AUTH_TIMEOUT: TokioDuration = TokioDuration::from_secs(180);
-const BETTER_AUTH_HEALTH_TIMEOUT: TokioDuration = TokioDuration::from_secs(3);
+const BETTER_AUTH_HEALTH_TIMEOUT: TokioDuration = TokioDuration::from_secs(20);
 const BETTER_AUTH_HEALTH_POLL_INTERVAL: TokioDuration = TokioDuration::from_millis(100);
 const BETTER_AUTH_SESSION_POLL_DELAY: TokioDuration = TokioDuration::from_millis(500);
 const BETTER_AUTH_SECRET_HEADER: &str = "x-tinker-bridge-secret";

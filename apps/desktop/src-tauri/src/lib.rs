@@ -355,7 +355,9 @@ pub fn run() {
         ])
         .setup(|app| {
             tauri::async_runtime::block_on(async {
-                commands::auth::start_auth_sidecar(app.handle().clone()).await?;
+                if let Err(error) = commands::auth::start_auth_sidecar(app.handle().clone()).await {
+                    eprintln!("[better-auth] sidecar warm-start failed (will retry on demand): {error}");
+                }
                 if let Err(error) = commands::opencode::reconcile_opencode_manifests(&app.handle()).await {
                     eprintln!("[opencode] orphan manifest cleanup failed: {error}");
                 }
