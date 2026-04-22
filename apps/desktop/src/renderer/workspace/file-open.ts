@@ -30,6 +30,10 @@ const getPaneMimeForPath = (absolutePath: string): string => {
       return 'application/json';
     case '.md':
       return 'text/markdown';
+    case '.ppt':
+      return 'application/vnd.ms-powerpoint';
+    case '.pptx':
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
     case '.mjs':
     case '.js':
       return 'text/javascript';
