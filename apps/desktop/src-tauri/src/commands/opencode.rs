@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::{Path, PathBuf}};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use rand::{rngs::OsRng, RngCore};
@@ -11,6 +11,8 @@ use tokio::time::{sleep, timeout, Duration, Instant};
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const HEALTH_POLL_TIMEOUT: Duration = Duration::from_secs(10);
 const LISTEN_ANNOUNCE_TIMEOUT: Duration = Duration::from_secs(10);
+const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
+const PROCESS_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -225,6 +227,115 @@ pub async fn start_opencode(
   Ok(OpencodeHandle { base_url, pid })
 }
 
+#[cfg(unix)]
+fn process_alive(pid: u32) -> bool {
+  // `kill(pid, 0)` performs permission checks without sending a signal.
+  // Returns 0 if the process exists (and we may signal it). On failure,
+  // ESRCH means the pid is gone; anything else (e.g. EPERM) implies the
+  // process still exists but we cannot signal it — treat as alive.
+  let res = unsafe { libc::kill(pid as libc::pid_t, 0) };
+  if res == 0 {
+    true
+  } else {
+    std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
+  }
+}
+
+#[cfg(unix)]
+fn send_unix_signal(pid: u32, signal: libc::c_int) -> Result<(), String> {
+  let res = unsafe { libc::kill(pid as libc::pid_t, signal) };
+  if res == 0 {
+    return Ok(());
+  }
+  let err = std::io::Error::last_os_error();
+  // Process already exited between the caller's check and our kill call —
+  // idempotent stop, not an error.
+  if err.raw_os_error() == Some(libc::ESRCH) {
+    return Ok(());
+  }
+  Err(format!("kill(pid={pid}, signal={signal}): {err}"))
+}
+
+#[cfg(unix)]
+fn send_term(pid: u32) -> Result<(), String> {
+  send_unix_signal(pid, libc::SIGTERM)
+}
+
+#[cfg(unix)]
+fn send_kill(pid: u32) -> Result<(), String> {
+  send_unix_signal(pid, libc::SIGKILL)
+}
+
+#[cfg(not(unix))]
+compile_error!("stop_opencode is unix-only for MVP (macOS + Linux). See decisions.md D25.");
+
+fn remove_manifest_for_pid(manifests_dir: &Path, pid: u32) -> Result<(), String> {
+  let entries = match fs::read_dir(manifests_dir) {
+    Ok(entries) => entries,
+    // No manifests dir yet = nothing to remove.
+    Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+    Err(err) => return Err(format!("read {manifests_dir:?}: {err}")),
+  };
+
+  for entry in entries {
+    let entry = entry.map_err(|e| format!("iter {manifests_dir:?}: {e}"))?;
+    let path = entry.path();
+    if path.extension().and_then(|e| e.to_str()) != Some("json") {
+      continue;
+    }
+    let Ok(content) = fs::read_to_string(&path) else {
+      continue;
+    };
+    let Ok(manifest) = serde_json::from_str::<OpencodeManifest>(&content) else {
+      continue;
+    };
+    if manifest.pid == pid {
+      fs::remove_file(&path).map_err(|e| format!("remove manifest {path:?}: {e}"))?;
+      return Ok(());
+    }
+  }
+  Ok(())
+}
+
+async fn stop_opencode_inner(manifests_dir: PathBuf, pid: u32) -> Result<(), String> {
+  // 1. Ask the process to exit. No-op if it's already gone.
+  send_term(pid)?;
+
+  // 2. Wait up to GRACEFUL_SHUTDOWN_TIMEOUT for a clean exit.
+  let deadline = Instant::now() + GRACEFUL_SHUTDOWN_TIMEOUT;
+  while Instant::now() < deadline {
+    if !process_alive(pid) {
+      break;
+    }
+    sleep(PROCESS_POLL_INTERVAL).await;
+  }
+
+  // 3. Force-kill if still running after the grace period.
+  if process_alive(pid) {
+    send_kill(pid)?;
+  }
+
+  // 4. Remove the manifest file keyed by pid. No match = already cleaned.
+  remove_manifest_for_pid(&manifests_dir, pid)?;
+
+  Ok(())
+}
+
+#[tauri::command]
+pub async fn stop_opencode(app: AppHandle, pid: u32) -> Result<(), String> {
+  // kill(2) treats pid <= 0 as "broadcast to process group." Reject at the
+  // boundary so a renderer bug can never terminate unrelated processes.
+  if pid == 0 {
+    return Err("stop_opencode: pid must be non-zero".to_string());
+  }
+  let home = app
+    .path()
+    .home_dir()
+    .map_err(|e| format!("resolve home dir: {e}"))?;
+  let manifests = manifests_dir(&home)?;
+  stop_opencode_inner(manifests, pid).await
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -290,5 +401,138 @@ mod tests {
     fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
+  }
+
+  fn write_manifest(dir: &Path, session_id: &str, pid: u32) -> PathBuf {
+    let manifest = OpencodeManifest {
+      pid,
+      port: 1,
+      secret: "s".into(),
+      folder_path: "/tmp".into(),
+      user_id: "u".into(),
+      memory_subdir: "/tmp/u".into(),
+      base_url: "http://127.0.0.1:1".into(),
+      session_id: session_id.into(),
+    };
+    let path = dir.join(format!("{session_id}.json"));
+    fs::write(&path, serde_json::to_string(&manifest).unwrap()).unwrap();
+    path
+  }
+
+  #[test]
+  fn remove_manifest_for_pid_removes_matching_only() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let keep = write_manifest(tmp.path(), "keep", 100);
+    let drop = write_manifest(tmp.path(), "drop", 200);
+
+    remove_manifest_for_pid(tmp.path(), 200).expect("remove");
+
+    assert!(keep.exists(), "unrelated manifest survives");
+    assert!(!drop.exists(), "matching manifest is removed");
+  }
+
+  #[test]
+  fn remove_manifest_for_pid_is_idempotent_when_no_match() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let keep = write_manifest(tmp.path(), "keep", 100);
+
+    remove_manifest_for_pid(tmp.path(), 999).expect("ok on miss");
+
+    assert!(keep.exists());
+  }
+
+  #[test]
+  fn remove_manifest_for_pid_ignores_missing_dir() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let missing = tmp.path().join("does-not-exist");
+    remove_manifest_for_pid(&missing, 42).expect("missing dir is ok");
+  }
+
+  #[test]
+  fn remove_manifest_for_pid_skips_malformed_files() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let bogus = tmp.path().join("bogus.json");
+    fs::write(&bogus, "{not json").unwrap();
+    let target = write_manifest(tmp.path(), "sess", 7);
+
+    remove_manifest_for_pid(tmp.path(), 7).expect("remove");
+
+    assert!(bogus.exists(), "malformed file untouched");
+    assert!(!target.exists());
+  }
+
+  #[cfg(unix)]
+  #[tokio::test]
+  async fn stop_opencode_inner_is_idempotent_for_dead_pid() {
+    use std::process::{Command, Stdio};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    // Spawn + reap a real child so its pid is guaranteed no longer alive,
+    // then try stopping it. PID 0 and negative values are forbidden because
+    // `kill(2)` treats them as broadcast to the process group.
+    let mut child = Command::new("true")
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .spawn()
+      .expect("spawn true");
+    let pid = child.id();
+    child.wait().expect("reap");
+    assert!(!process_alive(pid), "helper already exited");
+
+    stop_opencode_inner(tmp.path().to_path_buf(), pid)
+      .await
+      .expect("idempotent stop");
+  }
+
+  #[cfg(unix)]
+  #[tokio::test]
+  async fn stop_opencode_inner_terminates_live_process_and_removes_manifest() {
+    use std::process::{Command, Stdio};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let mut child = Command::new("sleep")
+      .arg("30")
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .spawn()
+      .expect("spawn sleep");
+    let pid = child.id();
+    let manifest_path = write_manifest(tmp.path(), "live", pid);
+
+    stop_opencode_inner(tmp.path().to_path_buf(), pid)
+      .await
+      .expect("stop");
+
+    // Reap the zombie so the test doesn't leak.
+    let _ = child.wait();
+
+    assert!(!process_alive(pid), "process is gone");
+    assert!(!manifest_path.exists(), "manifest removed");
+  }
+
+  #[cfg(unix)]
+  #[tokio::test]
+  async fn stop_opencode_inner_force_kills_process_that_ignores_sigterm() {
+    use std::process::{Command, Stdio};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    // A shell that traps SIGTERM and keeps running forces the SIGKILL path.
+    let mut child = Command::new("sh")
+      .args(["-c", "trap '' TERM; sleep 30"])
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .spawn()
+      .expect("spawn trapping shell");
+    let pid = child.id();
+
+    stop_opencode_inner(tmp.path().to_path_buf(), pid)
+      .await
+      .expect("stop");
+    let _ = child.wait();
+
+    assert!(!process_alive(pid), "SIGKILL fallback killed the process");
   }
 }
