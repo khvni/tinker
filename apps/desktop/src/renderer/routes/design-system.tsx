@@ -38,6 +38,8 @@ import { AttachmentIcon } from '../panes/Chat/AttachmentIcon.js';
 import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
 import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
 import { SignIn } from './SignIn/index.js';
+import { Titlebar } from '../workspace/components/Titlebar/index.js';
+import { WorkspaceSidebar } from '../workspace/components/WorkspaceSidebar/index.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -51,7 +53,8 @@ type PlaygroundTab =
   | 'empty'
   | 'chat'
   | 'settings-shell'
-  | 'sign-in';
+  | 'sign-in'
+  | 'shell';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
@@ -65,6 +68,7 @@ const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'chat', label: 'Chat' },
   { value: 'settings-shell', label: 'Settings Shell' },
   { value: 'sign-in', label: 'Sign In' },
+  { value: 'shell', label: 'Shell' },
 ];
 
 const BADGE_VARIANTS: ReadonlyArray<{ variant: BadgeVariant; label: string }> = [
@@ -1489,6 +1493,53 @@ const SettingsShellTab = (): JSX.Element => (
   </div>
 );
 
+const ShellTab = (): JSX.Element => {
+  const noop = (): void => {};
+  return (
+    <div className="ds-sections">
+      <Section label="Titlebar + WorkspaceSidebar (Paper 9I-0)">
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: 420,
+            border: '1px solid var(--color-border-default)',
+            borderRadius: 'var(--radius-md)',
+            overflow: 'hidden',
+          }}
+        >
+          <Titlebar title="Tinker" />
+          <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+            <WorkspaceSidebar
+              userInitial="K"
+              showDojoBadge
+              onOpenChat={noop}
+              onOpenMemory={noop}
+              onOpenSettings={noop}
+              onOpenAccount={noop}
+            />
+            <div style={{ flex: 1, padding: 'var(--space-5)', color: 'var(--color-text-muted)' }}>
+              ContentArea · PanesWorkspace renders here in the real shell.
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section label="Sidebar solo (no session context)">
+        <div style={{ height: 420, border: '1px solid var(--color-border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden', display: 'flex' }}>
+          <WorkspaceSidebar
+            userInitial="T"
+            onOpenChat={noop}
+            onOpenMemory={noop}
+            onOpenSettings={noop}
+            onOpenAccount={noop}
+          />
+        </div>
+      </Section>
+    </div>
+  );
+};
+
 const SignInTab = (): JSX.Element => (
   <div className="ds-sections">
     <Section label="Idle (provider picker)">
@@ -1539,6 +1590,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <SettingsShellTab />;
     case 'sign-in':
       return <SignInTab />;
+    case 'shell':
+      return <ShellTab />;
   }
 };
 

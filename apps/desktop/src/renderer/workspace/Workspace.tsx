@@ -8,7 +8,6 @@ import {
   Workspace as PanesWorkspace,
 } from '@tinker/panes';
 import '@tinker/panes/styles.css';
-import { Badge, Button } from '@tinker/design';
 import type { MemoryRunState } from '@tinker/memory';
 import {
   createDefaultWorkspacePreferences,
@@ -23,15 +22,25 @@ import {
 } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, type OpencodeConnection } from '../../bindings.js';
 import { resolveWorkspaceFilePath } from '../file-links.js';
-import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
 import type { MCPStatus } from '../integrations.js';
 import { isAbsolutePath, getPanelTitleForPath } from '../renderers/file-utils.js';
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
 import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
+import { Titlebar } from './components/Titlebar/index.js';
+import { WorkspaceSidebar } from './components/WorkspaceSidebar/index.js';
 import { openNewChatPanel } from './chat-panels.js';
 import { openWorkspaceFile } from './file-open.js';
 import { createDefaultWorkspaceState } from './layout.default.js';
 import { getRenderer } from './pane-registry.js';
+
+const WORKSPACE_TITLE = 'Tinker';
+
+const deriveUserInitial = (sessions: SSOStatus, currentUserId: string): string => {
+  const email = sessions.google?.email ?? sessions.github?.email ?? sessions.microsoft?.email;
+  const source = email ?? currentUserId;
+  const firstChar = source.trim().charAt(0);
+  return (firstChar !== '' ? firstChar : 'T').toUpperCase();
+};
 
 const LAYOUT_SAVE_DEBOUNCE_MS = 300;
 
@@ -107,7 +116,6 @@ export const Workspace = ({
   modelConnected,
   opencode,
   sessions,
-  mcpStatus,
   vaultPath,
   activeSkillsRevision,
   onMemoryCommitted,
@@ -329,44 +337,25 @@ export const Workspace = ({
     ],
   );
 
+  const userInitial = deriveUserInitial(sessions, currentUserId);
+
   return (
     <main className="tinker-workspace-shell">
-      <header className="tinker-header">
-        <div>
-          <p className="tinker-eyebrow">Workspace</p>
-          <h1>Tinker</h1>
+      <Titlebar title={WORKSPACE_TITLE} />
+      <div className="tinker-workspace-shell__row">
+        <WorkspaceSidebar
+          userInitial={userInitial}
+          onOpenChat={openNewChatPane}
+          onOpenMemory={openMemoryPane}
+          onOpenSettings={openSettingsPane}
+          onOpenAccount={openSettingsPane}
+        />
+        <div className="tinker-workspace-shell__content">
+          <ChatPaneRuntimeContext.Provider value={chatPaneRuntime}>
+            <PanesWorkspace store={workspaceStore} registry={registry} ariaLabel="Tinker workspace" />
+          </ChatPaneRuntimeContext.Provider>
         </div>
-        <div className="tinker-inline-actions">
-          <Button variant="secondary" size="s" onClick={openNewChatPane}>
-            New chat
-          </Button>
-          <Button variant="secondary" size="s" onClick={openMemoryPane}>
-            Memory
-          </Button>
-          <Button variant="secondary" size="s" onClick={openSettingsPane}>
-            Settings
-          </Button>
-        </div>
-        <div className="tinker-header-meta">
-          <Badge variant={modelConnected ? 'success' : 'default'} size="small">
-            {modelConnected ? 'Model connected' : 'Model disconnected'}
-          </Badge>
-          <Badge variant="default" size="small">
-            {sessions.google?.email ?? sessions.github?.email ?? sessions.microsoft?.email ?? 'Offline mode'}
-          </Badge>
-          <Badge variant="default" size="small">
-            {vaultPath ?? 'No vault selected'}
-          </Badge>
-        </div>
-      </header>
-
-      <div className="tinker-workspace-integrations">
-        <IntegrationsStrip compact mcpStatus={mcpStatus} sessions={sessions} />
       </div>
-
-      <ChatPaneRuntimeContext.Provider value={chatPaneRuntime}>
-        <PanesWorkspace store={workspaceStore} registry={registry} ariaLabel="Tinker workspace" />
-      </ChatPaneRuntimeContext.Provider>
     </main>
   );
 };

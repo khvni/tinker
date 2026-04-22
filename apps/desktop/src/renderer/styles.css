@@ -91,37 +91,26 @@ textarea {
 }
 
 .tinker-workspace-shell {
-  display: grid;
-  grid-template-rows: auto auto 1fr;
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  min-height: 0;
   background: var(--color-bg-primary);
 }
 
-.tinker-header {
+.tinker-workspace-shell__row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-elevated);
+  flex: 1 1 0;
+  min-height: 0;
 }
 
-.tinker-header h1 {
-  margin: 0;
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.tinker-header-meta {
+.tinker-workspace-shell__content {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
   display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.tinker-workspace-integrations {
-  padding: var(--space-3) var(--space-5) 0;
+  flex-direction: column;
+  background: var(--color-bg-primary);
 }
 
 .tinker-pane {
@@ -1290,10 +1279,6 @@ textarea {
 
   .tinker-card {
     padding: var(--space-5);
-  }
-
-  .tinker-workspace-integrations {
-    padding: var(--space-3) var(--space-4) 0;
   }
 
   .tinker-integrations-strip__header {
