@@ -884,6 +884,175 @@ textarea {
   margin-top: var(--space-1);
 }
 
+.tinker-message--assistant {
+  white-space: normal;
+}
+
+.tinker-message--assistant .tinker-chat-markdown {
+  color: var(--color-text-primary);
+  line-height: var(--line-height-relaxed);
+}
+
+.tinker-message--assistant .tinker-chat-markdown > :first-child {
+  margin-top: 0;
+}
+
+.tinker-message--assistant .tinker-chat-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.tinker-message--assistant .tinker-chat-markdown p {
+  margin: 0 0 var(--space-2);
+  white-space: pre-wrap;
+}
+
+.tinker-message--assistant .tinker-chat-markdown h1,
+.tinker-message--assistant .tinker-chat-markdown h2,
+.tinker-message--assistant .tinker-chat-markdown h3,
+.tinker-message--assistant .tinker-chat-markdown h4,
+.tinker-message--assistant .tinker-chat-markdown h5,
+.tinker-message--assistant .tinker-chat-markdown h6 {
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.tinker-message--assistant .tinker-chat-markdown ul,
+.tinker-message--assistant .tinker-chat-markdown ol {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
+}
+
+.tinker-message--assistant .tinker-chat-markdown li + li {
+  margin-top: var(--space-1);
+}
+
+.tinker-message--assistant .tinker-chat-markdown li > input[type='checkbox'] {
+  margin-right: var(--space-2);
+}
+
+.tinker-message--assistant .tinker-chat-markdown blockquote {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-accent-ring);
+  background: var(--color-bg-panel);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.tinker-message--assistant .tinker-chat-markdown a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.tinker-message--assistant .tinker-chat-markdown img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.tinker-message--assistant .tinker-chat-markdown code:not(pre code) {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.tinker-message--assistant .tinker-chat-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-2);
+}
+
+.tinker-message--assistant .tinker-chat-markdown th,
+.tinker-message--assistant .tinker-chat-markdown td {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tinker-message--assistant .tinker-chat-markdown th {
+  background: var(--color-bg-panel);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tinker-message--assistant .tinker-chat-markdown hr {
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  margin: var(--space-3) 0;
+}
+
+.tinker-chat-codeblock {
+  position: relative;
+  margin: var(--space-2) 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-panel);
+  overflow: hidden;
+}
+
+.tinker-chat-codeblock__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.tinker-chat-codeblock__lang {
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.tinker-chat-codeblock__copy {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.tinker-chat-codeblock:hover .tinker-chat-codeblock__copy,
+.tinker-chat-codeblock__copy:focus-visible {
+  opacity: 1;
+}
+
+.tinker-chat-codeblock__pre {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  overflow: auto;
+  background: var(--color-bg-panel);
+  white-space: pre;
+}
+
+.tinker-chat-codeblock__pre > .tinker-code-content {
+  display: block;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.65;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.tinker-chat-message-actions {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.tinker-message--assistant:hover .tinker-chat-message-actions,
+.tinker-chat-message-actions:focus-within {
+  opacity: 1;
+}
+
+.tinker-message--streaming .tinker-chat-message-actions {
+  display: none;
+}
+
 @media (max-width: 960px) {
   .tinker-scheduler-grid {
     grid-template-columns: 1fr;

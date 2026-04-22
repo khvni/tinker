@@ -15,9 +15,10 @@ import {
   type WorkspaceModelOption,
 } from '../opencode.js';
 import { useDockviewApi } from '../workspace/DockviewContext.js';
+import { ChatMessage, useStreamingMarkdown } from './ChatMessage/index.js';
 import { useSessionHistoryWindow } from './useSessionHistoryWindow.js';
 
-type ChatMessage = {
+type ChatMessageRecord = {
   id: string;
   role: 'user' | 'assistant' | 'system';
   text: string;
@@ -46,7 +47,7 @@ const deriveSkillDescription = (text: string): string => {
   return cleaned.length > 160 ? `${cleaned.slice(0, 157)}…` : cleaned;
 };
 
-const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessage[] => {
+const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessageRecord[] => {
   return messages.map(({ info, parts }) => {
     const text = parts
       .filter((part): part is Extract<Part, { type: 'text' }> => part.type === 'text')
@@ -61,8 +62,8 @@ const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): Chat
   });
 };
 
-const mergeHistoryMessages = (olderMessages: readonly ChatMessage[], newerMessages: readonly ChatMessage[]): ChatMessage[] => {
-  const merged = new Map<string, ChatMessage>();
+const mergeHistoryMessages = (olderMessages: readonly ChatMessageRecord[], newerMessages: readonly ChatMessageRecord[]): ChatMessageRecord[] => {
+  const merged = new Map<string, ChatMessageRecord>();
 
   for (const message of olderMessages) {
     merged.set(message.id, message);
@@ -90,10 +91,10 @@ export const Chat = ({
     [opencode.baseUrl, opencode.password, opencode.username, vaultPath],
   );
   const dockviewApi = useDockviewApi();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessageRecord[]>([]);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [draft, setDraft] = useState('');
+  const streaming = useStreamingMarkdown();
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [modelOptions, setModelOptions] = useState<ReadonlyArray<WorkspaceModelOption>>([]);
@@ -174,12 +175,12 @@ export const Chat = ({
       void client.session.abort({ sessionID: existing });
     }
     setMessages([]);
-    setDraft('');
+    streaming.reset();
     setHistoryCursor(null);
     setHistoryLoading(false);
-  }, [activeSkillsRevision, client]);
+  }, [activeSkillsRevision, client, streaming]);
 
-  const loadHistoryPage = async (sessionID: string, before?: string): Promise<{ messages: ChatMessage[]; cursor: string | null }> => {
+  const loadHistoryPage = async (sessionID: string, before?: string): Promise<{ messages: ChatMessageRecord[]; cursor: string | null }> => {
     const history = await client.session.messages({
       sessionID,
       limit: 100,
@@ -192,7 +193,7 @@ export const Chat = ({
     };
   };
 
-  const refreshHistory = async (sessionID: string): Promise<{ messages: ChatMessage[]; cursor: string | null } | null> => {
+  const refreshHistory = async (sessionID: string): Promise<{ messages: ChatMessageRecord[]; cursor: string | null } | null> => {
     const page = await loadHistoryPage(sessionID);
     if (!mountedRef.current || sessionIDRef.current !== sessionID) {
       return null;
@@ -298,7 +299,7 @@ export const Chat = ({
     });
   };
 
-  const handleSaveAsSkill = (message: ChatMessage): void => {
+  const handleSaveAsSkill = (message: ChatMessageRecord): void => {
     const seed: SkillDraft = {
       slug: deriveSkillSlug(message.text),
       description: deriveSkillDescription(message.text),
@@ -317,7 +318,7 @@ export const Chat = ({
     setStatus('Waiting for OpenCode…');
     setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', text }]);
     setInput('');
-    setDraft('');
+    streaming.reset();
 
     try {
       const activeSessionID = await ensureSession();
@@ -333,7 +334,7 @@ export const Chat = ({
           }
 
           if (event.type === 'token') {
-            setDraft((current) => current + event.text);
+            streaming.append(event.text);
           } else if (event.type === 'tool_call') {
             setStatus(`Running ${event.name}…`);
           } else if (event.type === 'tool_result') {
@@ -365,7 +366,7 @@ export const Chat = ({
 
       const historyPage = await refreshHistory(activeSessionID);
       if (mountedRef.current) {
-        setDraft('');
+        streaming.reset();
       }
 
       const assistantMessage = historyPage?.messages
@@ -439,19 +440,19 @@ export const Chat = ({
         ) : null}
 
         {historyWindow.renderedMessages.map((message) => (
-          <div key={message.id} className={`tinker-message tinker-message--${message.role}`}>
-            <p className="tinker-message-text">{message.text}</p>
-            {message.role === 'assistant' && message.text.trim().length > 0 ? (
-              <div className="tinker-message-actions">
-                <Button variant="ghost" size="s" onClick={() => handleSaveAsSkill(message)}>
-                  Save as skill
-                </Button>
-              </div>
-            ) : null}
-          </div>
+          <ChatMessage
+            key={message.id}
+            role={message.role}
+            text={message.text}
+            {...(message.role === 'assistant'
+              ? { onSaveAsSkill: () => handleSaveAsSkill(message) }
+              : {})}
+          />
         ))}
 
-        {draft ? <div className="tinker-message tinker-message--assistant">{draft}</div> : null}
+        {streaming.text.length > 0 ? (
+          <ChatMessage role="assistant" text={streaming.text} streaming />
+        ) : null}
       </div>
 
       <div className="tinker-composer">
