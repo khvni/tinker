@@ -179,7 +179,7 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | ID | Task | Size | Depends on | Status | Notes |
 |----|------|------|------------|--------|-------|
 | X.1 | Repo-wide: add `.cursor/rules` or `.github/copilot-instructions.md` pointing async agents at this file + D25 + claim rules. | S | — | not started | Agent-onramp. |
-| X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | in progress | TIN-90 · [khvni/tin-90-workspace · ETA 2026-04-21] |
+| X.2 | CI gate: `pnpm -r typecheck && pnpm -r test` in GitHub Actions. Block merge on fail. | S | — | review | TIN-90 · PR #29 · branch `khvni/tin-90-workspace`. |
 | X.3 | `pnpm tauri dev` smoke test: app launches → first-run picker → folder → workspace → one chat round-trip. Document in `docs/development.md`. | S | M2 done, M4.2 done | not started | Manual verification checklist. |
 
 ### MVP Acceptance Checklist (merge to `main` → tag `v0.1.0`)
