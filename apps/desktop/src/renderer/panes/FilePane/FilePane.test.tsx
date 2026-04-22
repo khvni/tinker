@@ -76,6 +76,22 @@ describe('FilePane', () => {
     expect(mimeToRenderer[MARKDOWN_EDITOR_MIME]).toBeDefined();
   });
 
+  it('routes pptx files through the explicit external-preview fallback', () => {
+    const markup = renderToStaticMarkup(
+      <FilePane
+        data={{
+          kind: 'file',
+          path: '/tmp/deck.pptx',
+          mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        }}
+      />,
+    );
+
+    expect(markup).toContain('PPTX preview');
+    expect(markup).toContain('Inline PowerPoint preview is unavailable.');
+    expect(markup).toContain('Open externally');
+  });
+
   it('opens unsupported files through the OS shell helper', async () => {
     await openFileExternally('/tmp/archive.bin');
 
