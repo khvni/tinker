@@ -90,7 +90,7 @@ describe('<PdfRenderer>', () => {
         clearRect: vi.fn(),
         setTransform: vi.fn(),
       } as unknown as CanvasRenderingContext2D;
-    });
+    }) as unknown as HTMLCanvasElement['getContext'];
 
     pdfTestMocks.readFileMock.mockResolvedValue(new Uint8Array([0x25, 0x50, 0x44, 0x46]));
     pdfTestMocks.getViewportMock.mockImplementation(({ scale }: { scale: number }) => ({
