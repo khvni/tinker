@@ -33,6 +33,7 @@ const _bogusKind: TinkerPaneKind = 'not-a-pane';
 // ────────────────────────────────────────────────────────────────────────────
 
 const _chatData: TinkerPaneData = { kind: 'chat' };
+const _chatDataWithSession: TinkerPaneData = { kind: 'chat', sessionId: 'session-123' };
 const _fileData: TinkerPaneData = { kind: 'file', path: '/tmp/a.md', mime: 'text/markdown' };
 const _settingsData: TinkerPaneData = { kind: 'settings' };
 const _memoryData: TinkerPaneData = { kind: 'memory' };
@@ -50,7 +51,7 @@ const _badFilePathType: TinkerPaneData = { kind: 'file', path: 123, mime: 'text/
 // @ts-expect-error — unknown kind rejected
 const _badKindData: TinkerPaneData = { kind: 'nope' };
 
-// @ts-expect-error — `chat` carries no `path`; excess property rejected by fresh literal check
+// @ts-expect-error — `chat` does not carry arbitrary extra props
 const _chatWithExtras: TinkerPaneData = { kind: 'chat', path: '/x' };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ void _settingsKind;
 void _memoryKind;
 void _bogusKind;
 void _chatData;
+void _chatDataWithSession;
 void _fileData;
 void _settingsData;
 void _memoryData;

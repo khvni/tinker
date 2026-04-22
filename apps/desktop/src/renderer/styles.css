@@ -142,6 +142,36 @@ textarea {
   gap: var(--space-4);
 }
 
+.tinker-chat-header {
+  align-items: flex-start;
+}
+
+.tinker-chat-header-controls {
+  justify-content: flex-end;
+}
+
+.tinker-chat-header-controls > .tk-modelpicker,
+.tinker-chat-header-controls > .tk-segmented,
+.tinker-chat-header-controls > .tk-context-badge,
+.tinker-chat-header-controls > .tk-badge,
+.tinker-chat-header-controls > .tk-button {
+  flex-shrink: 0;
+}
+
+.tinker-chat-header-controls > .tk-badge {
+  max-width: min(100%, 320px);
+}
+
+@media (max-width: 960px) {
+  .tinker-chat-header {
+    flex-direction: column;
+  }
+
+  .tinker-chat-header-controls {
+    justify-content: flex-start;
+  }
+}
+
 .tinker-pane-header h2 {
   margin: 0;
   font-size: var(--font-size-lg);
@@ -224,7 +254,7 @@ textarea {
 }
 
 .tinker-composer-actions {
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 .tinker-list {

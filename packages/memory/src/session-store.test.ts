@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Session } from '@tinker/shared-types';
+import { DEFAULT_SESSION_MODE, type Session } from '@tinker/shared-types';
 import { getDatabase } from './database.js';
 import {
   createSession,
@@ -7,6 +7,7 @@ import {
   getSession,
   hydrateSessionRow,
   listSessionsForUser,
+  updateSession,
   updateLastActive,
   type SessionRow,
 } from './session-store.js';
@@ -26,7 +27,9 @@ const BASE_SESSION: Session = {
   folderPath: '/tmp/alpha',
   createdAt: '2026-04-21T00:00:00.000Z',
   lastActiveAt: '2026-04-21T00:10:00.000Z',
+  mode: DEFAULT_SESSION_MODE,
   modelId: 'openai/gpt-4.1',
+  reasoningLevel: 'medium',
 };
 
 const toRow = (session: Session): SessionRow => ({
@@ -35,7 +38,9 @@ const toRow = (session: Session): SessionRow => ({
   folder_path: session.folderPath,
   created_at: session.createdAt,
   last_active_at: session.lastActiveAt,
+  mode: session.mode,
   model_id: session.modelId ?? null,
+  reasoning_level: session.reasoningLevel ?? null,
 });
 
 const createFakeDatabase = (): FakeDatabase => {
@@ -45,13 +50,15 @@ const createFakeDatabase = (): FakeDatabase => {
   return {
     async execute(query: string, bindValues?: unknown[]): Promise<void> {
       if (query.includes('INSERT INTO sessions')) {
-        const [id, userId, folderPath, createdAt, lastActiveAt, modelId] = (bindValues ?? []) as [
+        const [id, userId, folderPath, createdAt, lastActiveAt, mode, modelId, reasoningLevel] = (bindValues ?? []) as [
           string,
           Session['userId'],
           string,
           string,
           string,
+          Session['mode'],
           string | null,
+          Exclude<Session['reasoningLevel'], undefined> | null,
         ];
 
         if (!userIds.has(userId)) {
@@ -64,22 +71,44 @@ const createFakeDatabase = (): FakeDatabase => {
           folder_path: folderPath,
           created_at: createdAt,
           last_active_at: lastActiveAt,
+          mode,
           model_id: modelId,
+          reasoning_level: reasoningLevel,
         });
         return;
       }
 
       if (query.includes('UPDATE sessions')) {
-        const [id, lastActiveAt] = (bindValues ?? []) as [string, string];
+        const [id, ...values] = (bindValues ?? []) as [string, ...unknown[]];
         const existing = sessions.get(id);
         if (!existing) {
           return;
         }
 
-        sessions.set(id, {
-          ...existing,
-          last_active_at: lastActiveAt,
+        const next = { ...existing };
+        const [assignmentBlock] = query.split('WHERE');
+        const assignments = assignmentBlock
+          ?.split('SET')[1]
+          ?.split(',')
+          .map((assignment) => assignment.trim().split('=')[0]?.trim())
+          .filter((assignment): assignment is keyof SessionRow => assignment !== undefined) ?? [];
+
+        assignments.forEach((assignment, index) => {
+          const value = values[index] ?? null;
+          if (assignment === 'folder_path' && typeof value === 'string') {
+            next.folder_path = value;
+          } else if (assignment === 'last_active_at' && typeof value === 'string') {
+            next.last_active_at = value;
+          } else if (assignment === 'mode' && typeof value === 'string') {
+            next.mode = value as Session['mode'];
+          } else if (assignment === 'model_id') {
+            next.model_id = value as string | null;
+          } else if (assignment === 'reasoning_level') {
+            next.reasoning_level = value as Exclude<Session['reasoningLevel'], undefined> | null;
+          }
         });
+
+        sessions.set(id, next);
         return;
       }
 
@@ -136,6 +165,7 @@ describe('hydrateSessionRow', () => {
       hydrateSessionRow({
         ...toRow(BASE_SESSION),
         model_id: null,
+        reasoning_level: null,
       }),
     ).toEqual({
       id: BASE_SESSION.id,
@@ -143,6 +173,7 @@ describe('hydrateSessionRow', () => {
       folderPath: BASE_SESSION.folderPath,
       createdAt: BASE_SESSION.createdAt,
       lastActiveAt: BASE_SESSION.lastActiveAt,
+      mode: BASE_SESSION.mode,
     });
   });
 });
@@ -197,6 +228,41 @@ describe('session-store helpers', () => {
     await expect(getSession(BASE_SESSION.id)).resolves.toEqual({
       ...BASE_SESSION,
       lastActiveAt: '2026-04-23T00:00:00.000Z',
+    });
+  });
+
+  it('updates persisted model, mode, and reasoning fields together', async () => {
+    await createSession(BASE_SESSION);
+
+    await updateSession(BASE_SESSION.id, {
+      mode: 'plan',
+      modelId: 'anthropic/claude-sonnet-4',
+      reasoningLevel: 'high',
+    });
+
+    await expect(getSession(BASE_SESSION.id)).resolves.toEqual({
+      ...BASE_SESSION,
+      mode: 'plan',
+      modelId: 'anthropic/claude-sonnet-4',
+      reasoningLevel: 'high',
+    });
+  });
+
+  it('can clear nullable session preferences without touching mode', async () => {
+    await createSession(BASE_SESSION);
+
+    await updateSession(BASE_SESSION.id, {
+      modelId: null,
+      reasoningLevel: null,
+    });
+
+    await expect(getSession(BASE_SESSION.id)).resolves.toEqual({
+      id: BASE_SESSION.id,
+      userId: BASE_SESSION.userId,
+      folderPath: BASE_SESSION.folderPath,
+      createdAt: BASE_SESSION.createdAt,
+      lastActiveAt: BASE_SESSION.lastActiveAt,
+      mode: DEFAULT_SESSION_MODE,
     });
   });
 

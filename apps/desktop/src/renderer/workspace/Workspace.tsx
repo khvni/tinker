@@ -26,6 +26,7 @@ import { IntegrationsStrip } from '../components/IntegrationsStrip.js';
 import type { MCPStatus } from '../integrations.js';
 import { isAbsolutePath, getPanelTitleForPath } from '../renderers/file-utils.js';
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
+import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
 import { openNewChatPanel } from './chat-panels.js';
 import { openWorkspaceFile } from './file-open.js';
 import { createDefaultWorkspaceState } from './layout.default.js';
@@ -34,6 +35,7 @@ import { getRenderer } from './pane-registry.js';
 const LAYOUT_SAVE_DEBOUNCE_MS = 300;
 
 type WorkspaceProps = {
+  currentUserId: string;
   layoutStore: LayoutStore;
   memoryStore: MemoryStore;
   schedulerStore: ScheduledJobStore;
@@ -98,6 +100,7 @@ const requirePaneData = <K extends TinkerPaneKind>(
 };
 
 export const Workspace = ({
+  currentUserId,
   layoutStore,
   skillStore,
   modelConnected,
@@ -156,6 +159,23 @@ export const Workspace = ({
   const openNewChatPane = useCallback((): void => {
     openNewChatPanel(workspaceStore);
   }, [workspaceStore]);
+
+  const persistChatPaneSessionId = useCallback(
+    (tabId: string, paneId: string, sessionId: string): void => {
+      workspaceStore.getState().actions.updatePaneData(tabId, paneId, (data) => {
+        const chatPaneData = requirePaneData('chat', data);
+        if (chatPaneData.sessionId === sessionId) {
+          return chatPaneData;
+        }
+
+        return {
+          ...chatPaneData,
+          sessionId,
+        };
+      });
+    },
+    [workspaceStore],
+  );
 
   const handleAgentFileWritten = useCallback(
     (reportedPath: string): void => {
@@ -274,7 +294,13 @@ export const Workspace = ({
       chat: {
         kind: 'chat',
         defaultTitle: 'Chat',
-        render: ({ pane }) => <>{getRenderer('chat')(requirePaneData('chat', pane.data))}</>,
+        render: ({ pane, tabId }) => (
+          <RegisteredChatPane
+            tabId={tabId}
+            paneId={pane.id}
+            paneData={requirePaneData('chat', pane.data)}
+          />
+        ),
       },
       file: {
         kind: 'file',
@@ -299,19 +325,23 @@ export const Workspace = ({
       skillStore,
       modelConnected,
       opencode,
+      currentUserId,
       vaultPath,
       activeSkillsRevision,
       onFileWritten: handleAgentFileWritten,
       onOpenNewChat: openNewChatPane,
       onMemoryCommitted,
+      persistPaneSessionId: persistChatPaneSessionId,
     }),
     [
       activeSkillsRevision,
+      currentUserId,
       handleAgentFileWritten,
       modelConnected,
       onMemoryCommitted,
       openNewChatPane,
       opencode,
+      persistChatPaneSessionId,
       skillStore,
       vaultPath,
     ],

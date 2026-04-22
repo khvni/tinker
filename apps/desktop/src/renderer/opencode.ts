@@ -1,6 +1,18 @@
 import { createOpencodeClient } from '@opencode-ai/sdk/v2/client';
 import type { ModelPickerItem } from '@tinker/design';
+import type { ReasoningLevel } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../bindings.js';
+
+type ProviderModelCapabilities = {
+  readonly reasoning?: boolean | string | null;
+};
+
+type ProviderModelVariantSummary =
+  | string
+  | {
+      readonly id?: string;
+      readonly name?: string;
+    };
 
 type ProviderModelSummary = {
   readonly id: string;
@@ -8,6 +20,8 @@ type ProviderModelSummary = {
   readonly limit: {
     readonly context: number;
   };
+  readonly capabilities?: ProviderModelCapabilities;
+  readonly variants?: ReadonlyArray<ProviderModelVariantSummary> | Readonly<Record<string, unknown>>;
 };
 
 type ProviderSummary = {
@@ -22,6 +36,9 @@ type ProviderAuthMethodSummary = {
 
 export type WorkspaceModelOption = ModelPickerItem & {
   readonly modelId: string;
+  readonly storedId: string;
+  readonly supportsReasoning: boolean;
+  readonly reasoningVariants: Readonly<Partial<Record<ReasoningLevel, string>>>;
 };
 
 export type OauthProviderSelection = {
@@ -39,6 +56,75 @@ const trimLatestSuffix = (name: string): string => {
 
 const buildModelOptionId = (providerId: string, modelId: string): string => {
   return `${providerId}:${modelId}`;
+};
+
+const buildStoredModelId = (providerId: string, modelId: string): string => {
+  return `${providerId}/${modelId}`;
+};
+
+const REASONING_VARIANT_ALIASES: Readonly<Record<ReasoningLevel, ReadonlyArray<string>>> = {
+  low: ['low', 'minimal', 'light'],
+  medium: ['medium', 'balanced', 'default', 'standard', 'normal'],
+  high: ['high', 'max', 'deep', 'extended'],
+};
+
+const normalizeVariantName = (value: string): string => {
+  return value.trim().toLowerCase();
+};
+
+const collectVariantNames = (
+  variants: ProviderModelSummary['variants'],
+): ReadonlyArray<string> => {
+  if (variants === undefined) {
+    return [];
+  }
+
+  if (Array.isArray(variants)) {
+    return variants.flatMap((variant) => {
+      if (typeof variant === 'string') {
+        return [variant];
+      }
+
+      if (typeof variant.id === 'string') {
+        return [variant.id];
+      }
+
+      if (typeof variant.name === 'string') {
+        return [variant.name];
+      }
+
+      return [];
+    });
+  }
+
+  return Object.keys(variants);
+};
+
+const findReasoningVariant = (
+  variantNames: ReadonlyArray<string>,
+  aliases: ReadonlyArray<string>,
+): string | undefined => {
+  return variantNames.find((name) => {
+    const normalized = normalizeVariantName(name);
+    return aliases.some((alias) => normalized === alias || normalized.includes(alias));
+  });
+};
+
+const buildReasoningVariants = (
+  model: ProviderModelSummary,
+): WorkspaceModelOption['reasoningVariants'] => {
+  const variantNames = collectVariantNames(model.variants);
+  const supportsReasoning = Boolean(model.capabilities?.reasoning) || variantNames.length > 0;
+
+  if (!supportsReasoning) {
+    return {};
+  }
+
+  return {
+    low: findReasoningVariant(variantNames, REASONING_VARIANT_ALIASES.low) ?? 'low',
+    medium: findReasoningVariant(variantNames, REASONING_VARIANT_ALIASES.medium) ?? 'medium',
+    high: findReasoningVariant(variantNames, REASONING_VARIANT_ALIASES.high) ?? 'high',
+  };
 };
 
 const getAuthorizationHeader = (connection: OpencodeConnection): string => {
@@ -64,10 +150,14 @@ export const buildModelPickerItems = (
       return {
         id: buildModelOptionId(provider.id, model.id),
         modelId: model.id,
+        storedId: buildStoredModelId(provider.id, model.id),
         providerId: provider.id,
         providerName: provider.name,
         name: normalizedName.length > 0 ? normalizedName : model.id,
         contextWindow: model.limit.context,
+        supportsReasoning:
+          Boolean(model.capabilities?.reasoning) || collectVariantNames(model.variants).length > 0,
+        reasoningVariants: buildReasoningVariants(model),
       };
     }),
   );
@@ -97,6 +187,24 @@ export const findModelOptionById = (
   id: string | undefined,
 ): WorkspaceModelOption | undefined => {
   return items.find((item) => item.id === id);
+};
+
+export const findModelOptionByStoredId = (
+  items: ReadonlyArray<WorkspaceModelOption>,
+  storedId: string | undefined,
+): WorkspaceModelOption | undefined => {
+  return items.find((item) => item.storedId === storedId);
+};
+
+export const resolveReasoningVariant = (
+  item: WorkspaceModelOption | undefined,
+  reasoningLevel: ReasoningLevel | undefined,
+): string | undefined => {
+  if (!item?.supportsReasoning || reasoningLevel === undefined) {
+    return undefined;
+  }
+
+  return item.reasoningVariants[reasoningLevel] ?? reasoningLevel;
 };
 
 export const pickFirstOauthProvider = (

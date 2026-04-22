@@ -21,7 +21,9 @@ type Expect<T extends true> = T;
 type _ChatRendererData = Parameters<PaneRenderer<'chat'>>[0];
 type _FileRendererData = Parameters<PaneRenderer<'file'>>[0];
 
-type _ChatDataEq = Expect<AssertEqual<_ChatRendererData, { readonly kind: 'chat' }>>;
+type _ChatDataEq = Expect<
+  AssertEqual<_ChatRendererData, { readonly kind: 'chat'; readonly sessionId?: string }>
+>;
 type _FileDataEq = Expect<
   AssertEqual<
     _FileRendererData,

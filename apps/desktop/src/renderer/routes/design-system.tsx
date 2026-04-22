@@ -31,6 +31,8 @@ import {
   SettingsShell,
   type SettingsShellSection,
 } from '../workspace/components/SettingsShell/index.js';
+import { ModeToggle } from '../panes/Chat/components/ModeToggle/index.js';
+import { ReasoningPicker } from '../panes/Chat/components/ReasoningPicker/index.js';
 import './design-system.css';
 
 type PlaygroundTab =
@@ -592,6 +594,9 @@ const MODEL_PICKER_ITEMS: ReadonlyArray<ModelPickerItem> = [
 
 const ModelPickerTab = (): JSX.Element => {
   const [openValue, setOpenValue] = useState<string | undefined>('anthropic:claude-sonnet-4');
+  const [mode, setMode] = useState<'build' | 'plan'>('build');
+  const [reasoning, setReasoning] = useState<'low' | 'medium' | 'high'>('medium');
+
   return (
     <div className="ds-sections">
       <Section label="Closed">
@@ -652,6 +657,36 @@ const ModelPickerTab = (): JSX.Element => {
             />
           </div>
         </Row>
+      </Section>
+
+      <Section label="Chat header controls">
+        <Row>
+          <ModelPicker
+            items={MODEL_PICKER_ITEMS}
+            value={openValue}
+            onSelect={setOpenValue}
+          />
+          <ModeToggle value={mode} onChange={setMode} />
+          <ReasoningPicker value={reasoning} onChange={setReasoning} />
+          <ContextBadge
+            percent={58}
+            tokens={116_000}
+            windowSize={200_000}
+            model="Anthropic Claude Sonnet 4"
+          />
+          <Badge variant={mode === 'plan' ? 'info' : 'default'}>
+            {mode === 'plan' ? 'Plan · read-only' : 'Build · can edit'}
+          </Badge>
+        </Row>
+        <Row>
+          <ModeToggle value="build" onChange={() => undefined} />
+          <Badge variant="default">Build state</Badge>
+          <ModeToggle value="plan" onChange={() => undefined} />
+          <Badge variant="info">Plan state</Badge>
+        </Row>
+        <p className="ds-status-item__label">
+          Reasoning picker renders only for reasoning-capable models in the live chat pane.
+        </p>
       </Section>
     </div>
   );

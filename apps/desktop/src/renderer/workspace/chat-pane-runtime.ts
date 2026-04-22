@@ -1,7 +1,17 @@
 import { createContext, useContext, type ComponentProps } from 'react';
+import type { Session } from '@tinker/shared-types';
 import { Chat } from '../panes/Chat/index.js';
 
-export type ChatPaneRuntime = ComponentProps<typeof Chat>;
+export type ChatPaneRuntime = Omit<
+  ComponentProps<typeof Chat>,
+  'paneSessionId' | 'onPersistSessionId'
+> & {
+  persistPaneSessionId?: (
+    tabId: string,
+    paneId: string,
+    sessionId: Session['id'],
+  ) => void;
+};
 
 export const ChatPaneRuntimeContext = createContext<ChatPaneRuntime | null>(null);
 

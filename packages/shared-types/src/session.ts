@@ -1,6 +1,6 @@
 export type User = {
   id: string;
-  provider: 'google' | 'github' | 'microsoft';
+  provider: 'local' | 'google' | 'github' | 'microsoft';
   providerUserId: string;
   displayName: string;
   avatarUrl?: string;
@@ -9,11 +9,21 @@ export type User = {
   lastSeenAt: string;
 };
 
+export const SESSION_MODES = ['build', 'plan'] as const;
+export type SessionMode = (typeof SESSION_MODES)[number];
+export const DEFAULT_SESSION_MODE: SessionMode = 'build';
+
+export const REASONING_LEVELS = ['low', 'medium', 'high'] as const;
+export type ReasoningLevel = (typeof REASONING_LEVELS)[number];
+export const DEFAULT_REASONING_LEVEL: ReasoningLevel = 'medium';
+
 export type Session = {
   id: string;
   userId: User['id'];
   folderPath: string;
   createdAt: string;
   lastActiveAt: string;
+  mode: SessionMode;
   modelId?: string;
+  reasoningLevel?: ReasoningLevel;
 };

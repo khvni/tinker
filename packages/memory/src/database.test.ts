@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { DATABASE_SCHEMA } from './database.js';
+import Database, { type QueryResult } from '@tauri-apps/plugin-sql';
+import { describe, expect, it, vi } from 'vitest';
+import { DATABASE_SCHEMA, ensureSessionTableColumns } from './database.js';
 
 describe('DATABASE_SCHEMA', () => {
   it('creates the users table with the shared-user columns', () => {
@@ -31,6 +32,8 @@ describe('DATABASE_SCHEMA', () => {
           statement.includes('user_id TEXT NOT NULL') &&
           statement.includes('folder_path TEXT NOT NULL') &&
           statement.includes('last_active_at TEXT NOT NULL') &&
+          statement.includes("mode TEXT NOT NULL DEFAULT 'build'") &&
+          statement.includes('reasoning_level TEXT') &&
           statement.includes('FOREIGN KEY (user_id) REFERENCES users(id)'),
       ),
     ).toBe(true);
@@ -44,5 +47,46 @@ describe('DATABASE_SCHEMA', () => {
           statement.includes('ON sessions (user_id, last_active_at)'),
       ),
     ).toBe(true);
+  });
+
+  it('adds missing session preference columns on older databases', async () => {
+    const execute = vi.fn<Database['execute']>().mockResolvedValue({
+      rowsAffected: 0,
+    } satisfies QueryResult);
+    const select = vi.fn().mockResolvedValue([
+      { name: 'id' },
+      { name: 'user_id' },
+      { name: 'folder_path' },
+    ]);
+
+    await ensureSessionTableColumns({
+      execute,
+      select,
+    } as unknown as Pick<Database, 'execute' | 'select'>);
+
+    expect(execute).toHaveBeenCalledWith(
+      "ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'build'",
+    );
+    expect(execute).toHaveBeenCalledWith('ALTER TABLE sessions ADD COLUMN reasoning_level TEXT');
+  });
+
+  it('skips session preference migrations when columns already exist', async () => {
+    const execute = vi.fn<Database['execute']>().mockResolvedValue({
+      rowsAffected: 0,
+    } satisfies QueryResult);
+    const select = vi.fn().mockResolvedValue([
+      { name: 'id' },
+      { name: 'user_id' },
+      { name: 'folder_path' },
+      { name: 'mode' },
+      { name: 'reasoning_level' },
+    ]);
+
+    await ensureSessionTableColumns({
+      execute,
+      select,
+    } as unknown as Pick<Database, 'execute' | 'select'>);
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   buildModelPickerItems,
   findModelOptionById,
+  findModelOptionByStoredId,
   pickDefaultModelOptionId,
   pickFirstOauthProvider,
+  resolveReasoningVariant,
 } from './opencode.js';
 
 const providers = [
@@ -15,6 +17,8 @@ const providers = [
         id: 'claude-sonnet-4',
         name: 'Claude Sonnet 4 (latest)',
         limit: { context: 200_000 },
+        capabilities: { reasoning: true },
+        variants: ['low', 'medium', 'high'],
       },
       'claude-haiku-4': {
         id: 'claude-haiku-4',
@@ -42,26 +46,39 @@ describe('buildModelPickerItems', () => {
       {
         id: 'anthropic:claude-sonnet-4',
         modelId: 'claude-sonnet-4',
+        storedId: 'anthropic/claude-sonnet-4',
         providerId: 'anthropic',
         providerName: 'Anthropic',
         name: 'Claude Sonnet 4',
         contextWindow: 200_000,
+        supportsReasoning: true,
+        reasoningVariants: {
+          low: 'low',
+          medium: 'medium',
+          high: 'high',
+        },
       },
       {
         id: 'anthropic:claude-haiku-4',
         modelId: 'claude-haiku-4',
+        storedId: 'anthropic/claude-haiku-4',
         providerId: 'anthropic',
         providerName: 'Anthropic',
         name: 'Claude Haiku 4',
         contextWindow: 200_000,
+        supportsReasoning: false,
+        reasoningVariants: {},
       },
       {
         id: 'openai:gpt-4.1',
         modelId: 'gpt-4.1',
+        storedId: 'openai/gpt-4.1',
         providerId: 'openai',
         providerName: 'OpenAI',
         name: 'GPT-4.1',
         contextWindow: 128_000,
+        supportsReasoning: false,
+        reasoningVariants: {},
       },
     ]);
   });
@@ -84,11 +101,40 @@ describe('findModelOptionById', () => {
     expect(findModelOptionById(items, 'anthropic:claude-haiku-4')).toEqual({
       id: 'anthropic:claude-haiku-4',
       modelId: 'claude-haiku-4',
+      storedId: 'anthropic/claude-haiku-4',
       providerId: 'anthropic',
       providerName: 'Anthropic',
       name: 'Claude Haiku 4',
       contextWindow: 200_000,
+      supportsReasoning: false,
+      reasoningVariants: {},
     });
+  });
+});
+
+describe('findModelOptionByStoredId', () => {
+  it('matches persisted provider/model ids from SQLite', () => {
+    const items = buildModelPickerItems(providers);
+
+    expect(findModelOptionByStoredId(items, 'anthropic/claude-sonnet-4')?.id).toBe(
+      'anthropic:claude-sonnet-4',
+    );
+  });
+});
+
+describe('resolveReasoningVariant', () => {
+  it('returns the OpenCode variant matching the selected reasoning level', () => {
+    const items = buildModelPickerItems(providers);
+    const model = findModelOptionByStoredId(items, 'anthropic/claude-sonnet-4');
+
+    expect(resolveReasoningVariant(model, 'high')).toBe('high');
+  });
+
+  it('returns undefined for non-reasoning models', () => {
+    const items = buildModelPickerItems(providers);
+    const model = findModelOptionByStoredId(items, 'openai/gpt-4.1');
+
+    expect(resolveReasoningVariant(model, 'medium')).toBeUndefined();
   });
 });
 
