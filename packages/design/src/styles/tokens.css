@@ -16,13 +16,14 @@
 :root {
   color-scheme: light;
 
-  /* bg — cool neutral canvas, warm cream on elevated surfaces (D23 layer reversal) */
-  --color-bg-primary: #f4f3f2;
-  --color-bg-elevated: #fefcf8;
-  --color-bg-panel: #ebe9e6;
+  /* bg — warm bookish cream ground, white elevated cards (Paper 9J-0) */
+  --color-bg-primary: #fefcf8;
+  --color-bg-elevated: #ffffff;
+  --color-bg-panel: #f9f5ec;
   --color-bg-input: #fefcf8;
-  --color-bg-hover: #ecebe9;
+  --color-bg-hover: #f4efe4;
   --color-bg-sidebar: #f9f5ec;
+  --color-bg-hover: #f4efe4;
 
   /* border (ink alpha) */
   --color-border-subtle: rgba(26, 22, 18, 0.06);

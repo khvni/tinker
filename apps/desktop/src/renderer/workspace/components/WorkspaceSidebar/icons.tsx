@@ -2,27 +2,6 @@ import type { JSX } from 'react';
 
 const INK = 'var(--color-text-secondary)';
 const MUTED = 'var(--color-text-muted)';
-const ACTIVE = 'var(--color-accent-strong)';
-
-export const WorkspacesIcon = (): JSX.Element => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="2" y="2" width="6" height="6" rx="1.2" stroke={ACTIVE} strokeWidth="1.4" />
-    <rect x="10" y="2" width="6" height="6" rx="1.2" stroke={ACTIVE} strokeWidth="1.4" />
-    <rect x="2" y="10" width="6" height="6" rx="1.2" stroke={ACTIVE} strokeWidth="1.4" />
-    <rect x="10" y="10" width="6" height="6" rx="1.2" stroke={ACTIVE} strokeWidth="1.4" />
-  </svg>
-);
-
-export const ExplorerIcon = (): JSX.Element => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path
-      d="M2.5 5.25c0-.69.56-1.25 1.25-1.25h3l1.5 1.75h5.5c.69 0 1.25.56 1.25 1.25v6.25c0 .69-.56 1.25-1.25 1.25H3.75c-.69 0-1.25-.56-1.25-1.25V5.25z"
-      stroke={INK}
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 export const ChatsIcon = (): JSX.Element => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -32,24 +11,6 @@ export const ChatsIcon = (): JSX.Element => (
       strokeWidth="1.4"
       strokeLinejoin="round"
     />
-  </svg>
-);
-
-export const SkillsIcon = (): JSX.Element => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M9 1.5l1.8 4.7 4.7 1.8-4.7 1.8L9 14.5l-1.8-4.7L2.5 8l4.7-1.8L9 1.5z" stroke={INK} strokeWidth="1.4" strokeLinejoin="round" />
-    <path d="M14.25 11l.75 2 2 .75-2 .75-.75 2-.75-2-2-.75 2-.75.75-2z" stroke={INK} strokeWidth="1.2" strokeLinejoin="round" />
-  </svg>
-);
-
-export const AgentsIcon = (): JSX.Element => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="3" y="5.5" width="12" height="9" rx="2" stroke={INK} strokeWidth="1.4" />
-    <path d="M9 3v2.5" stroke={INK} strokeWidth="1.4" strokeLinecap="round" />
-    <circle cx="9" cy="2.5" r="0.75" fill={INK} />
-    <circle cx="6.5" cy="9.5" r="1" fill={INK} />
-    <circle cx="11.5" cy="9.5" r="1" fill={INK} />
-    <path d="M6.5 12.25h5" stroke={INK} strokeWidth="1.2" strokeLinecap="round" />
   </svg>
 );
 
@@ -79,19 +40,6 @@ export const NewTabIcon = (): JSX.Element => (
   </svg>
 );
 
-export const PlaybookIcon = (): JSX.Element => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M9 2L2.5 5v4.5c0 3.5 2.6 6.3 6.5 7 3.9-.7 6.5-3.5 6.5-7V5L9 2z" stroke={INK} strokeWidth="1.4" strokeLinejoin="round" />
-    <path d="M6.5 9l2 2 3.5-4" stroke={INK} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-export const AnalyticsIcon = (): JSX.Element => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M3 15V9.5M7 15V4M11 15v-6.5M15 15v-9" stroke={INK} strokeWidth="1.4" strokeLinecap="round" />
-  </svg>
-);
-
 export const SettingsIcon = (): JSX.Element => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <circle cx="9" cy="9" r="2.25" stroke={INK} strokeWidth="1.4" />
@@ -100,19 +48,5 @@ export const SettingsIcon = (): JSX.Element => (
       stroke={INK}
       strokeWidth="1.3"
     />
-  </svg>
-);
-
-export const LeftPaneIcon = (): JSX.Element => (
-  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="1.5" y="2.5" width="12" height="10" rx="1.5" stroke={MUTED} strokeWidth="1.2" />
-    <line x1="6" y1="2.5" x2="6" y2="12.5" stroke={MUTED} strokeWidth="1.2" />
-  </svg>
-);
-
-export const RightPaneIcon = (): JSX.Element => (
-  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="1.5" y="2.5" width="12" height="10" rx="1.5" stroke={MUTED} strokeWidth="1.2" />
-    <line x1="9.5" y1="2.5" x2="9.5" y2="12.5" stroke={MUTED} strokeWidth="1.2" />
   </svg>
 );

@@ -5,38 +5,54 @@ import './Titlebar.css';
 
 export type TitlebarProps = {
   sessionFolderPath: string | null;
-  onNewSession: () => void;
-  onOpenSettings: () => void;
-  onOpenMemory: () => void;
+  isLeftRailVisible: boolean;
+  isRightInspectorVisible: boolean;
+  onToggleLeftRail: () => void;
+  onToggleRightInspector: () => void;
 };
 
 const basename = (path: string): string => getPanelTitleForPath(path.replace(/[\\/]+$/u, ''));
 
-const PlusIcon = (): JSX.Element => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 5v14M5 12h14" />
+// Paper 9Q-0: 15×15 glyph with 12×10 rounded-rect panel outline + a divider line.
+// LEFT-rail-toggle places the divider toward the left edge of the panel. Stroke uses
+// currentColor so the wrapping IconButton's text-token color drives fill at rest/hover.
+const LeftPaneToggleIcon = (): JSX.Element => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 15 15"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    style={{ flexShrink: 0 }}
+  >
+    <rect x="1.5" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="6" y1="2.5" x2="6" y2="12.5" stroke="currentColor" strokeWidth="1.2" />
   </svg>
 );
 
-const BookIcon = (): JSX.Element => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19v15H5.5A1.5 1.5 0 0 0 4 19.5V4.5Z" />
-    <path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H19" />
-  </svg>
-);
-
-const SettingsIcon = (): JSX.Element => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.5 12a7.5 7.5 0 0 0-.12-1.32l2-1.55-2-3.46-2.36.94a7.5 7.5 0 0 0-2.28-1.32L14.4 3h-4.8l-.34 2.29a7.5 7.5 0 0 0-2.28 1.32l-2.36-.94-2 3.46 2 1.55a7.5 7.5 0 0 0 0 2.64l-2 1.55 2 3.46 2.36-.94a7.5 7.5 0 0 0 2.28 1.32L9.6 21h4.8l.34-2.29a7.5 7.5 0 0 0 2.28-1.32l2.36.94 2-3.46-2-1.55c.08-.43.12-.87.12-1.32Z" />
+// RIGHT-inspector-toggle mirrors the left glyph with the divider biased right.
+const RightPaneToggleIcon = (): JSX.Element => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 15 15"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    style={{ flexShrink: 0 }}
+  >
+    <rect x="1.5" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="9.5" y1="2.5" x2="9.5" y2="12.5" stroke="currentColor" strokeWidth="1.2" />
   </svg>
 );
 
 export const Titlebar = ({
   sessionFolderPath,
-  onNewSession,
-  onOpenSettings,
-  onOpenMemory,
+  isLeftRailVisible,
+  isRightInspectorVisible,
+  onToggleLeftRail,
+  onToggleRightInspector,
 }: TitlebarProps): JSX.Element => {
   const crumb = sessionFolderPath !== null ? basename(sessionFolderPath) : null;
 
@@ -62,23 +78,18 @@ export const Titlebar = ({
         <IconButton
           variant="ghost"
           size="s"
-          icon={<PlusIcon />}
-          label="New chat"
-          onClick={onNewSession}
+          icon={<LeftPaneToggleIcon />}
+          label="Toggle left sidebar"
+          aria-pressed={!isLeftRailVisible}
+          onClick={onToggleLeftRail}
         />
         <IconButton
           variant="ghost"
           size="s"
-          icon={<BookIcon />}
-          label="Memory"
-          onClick={onOpenMemory}
-        />
-        <IconButton
-          variant="ghost"
-          size="s"
-          icon={<SettingsIcon />}
-          label="Settings"
-          onClick={onOpenSettings}
+          icon={<RightPaneToggleIcon />}
+          label="Toggle right inspector"
+          aria-pressed={!isRightInspectorVisible}
+          onClick={onToggleRightInspector}
         />
       </div>
     </header>

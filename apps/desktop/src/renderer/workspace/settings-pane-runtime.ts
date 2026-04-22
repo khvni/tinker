@@ -27,6 +27,12 @@ export type SettingsPaneRuntime = {
   readonly opencode: OpencodeConnection | null;
   readonly vaultPath: string | null;
   readonly mcpSeedStatuses: Partial<Record<BuiltinMcpName, MCPStatus>>;
+  // One-shot navigation hint. When set, SettingsPane seeds SettingsShell with this
+  // section id on its next render, then calls `onPendingSectionConsumed` so the hint
+  // is cleared and subsequent local-state nav wins. Avoids controlled-mode plumbing
+  // just for "open Settings and jump to Connections".
+  readonly pendingSectionId: string | null;
+  onPendingSectionConsumed(): void;
   onWorkspacePreferencesChange(nextPreferences: WorkspacePreferences): void;
   onSignOut(session: SSOSession): Promise<void>;
   onContinueAsGuest(): Promise<void>;

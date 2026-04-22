@@ -22,6 +22,14 @@
 .tinker-workspace-shell__sidebar {
   flex-shrink: 0;
   display: flex;
+  width: 52px;
+  overflow: hidden;
+  transition: width var(--duration-base) var(--ease-standard);
+}
+
+.tinker-workspace-shell__sidebar[data-collapsed='true'] {
+  width: 0;
+  border-right: none;
 }
 
 .tinker-workspace-shell__content {
@@ -30,4 +38,19 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.tinker-workspace-shell__inspector {
+  flex-shrink: 0;
+  display: flex;
+  width: 280px;
+  overflow: hidden;
+  border-left: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-elevated);
+  transition: width var(--duration-base) var(--ease-standard);
+}
+
+.tinker-workspace-shell__inspector[data-collapsed='true'] {
+  width: 0;
+  border-left: none;
 }

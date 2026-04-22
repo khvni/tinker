@@ -59,7 +59,7 @@ describe('hydrateLayoutRow', () => {
           activeTabId: null,
         },
         updatedAt: '2026-04-15T00:00:00.000Z',
-        preferences: { autoOpenAgentWrittenFiles: false },
+        preferences: { autoOpenAgentWrittenFiles: false, isLeftRailVisible: true, isRightInspectorVisible: false },
       }),
       updated_at: '2026-04-15T00:00:00.000Z',
     };
@@ -72,7 +72,7 @@ describe('hydrateLayoutRow', () => {
         activeTabId: null,
       },
       updatedAt: '2026-04-15T00:00:00.000Z',
-      preferences: { autoOpenAgentWrittenFiles: false },
+      preferences: { autoOpenAgentWrittenFiles: false, isLeftRailVisible: true, isRightInspectorVisible: false },
     });
   });
 
@@ -91,7 +91,7 @@ describe('hydrateLayoutRow', () => {
         activeTabId: null,
       },
       updatedAt: '2026-04-15T00:00:00.000Z',
-      preferences: { autoOpenAgentWrittenFiles: true },
+      preferences: { autoOpenAgentWrittenFiles: true, isLeftRailVisible: true, isRightInspectorVisible: false },
     });
   });
 });

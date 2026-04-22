@@ -277,6 +277,23 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
   - Do not warm-start Better Auth from Tauri `setup()`.
   - Sign-out returns the app to guest workspace mode, not a sign-in gate.
 
+### `[2026-04-22]` D28 — Light tokens follow Paper 9J-0 exactly
+
+- **Decision**: The `:root` light-theme surface tokens (`--color-bg-primary`, `--color-bg-elevated`, `--color-bg-panel`, `--color-bg-input`, `--color-bg-hover`) now match Paper 9J-0 1:1. This implicitly reopens D15 by reasserting the dual-theme direction (D23) and picks a single convention so the token layer stops contradicting the written brief.
+  - `bg-primary: #fefcf8` — warm cream canvas (supersedes `#f4f3f2`)
+  - `bg-elevated: #ffffff` — pure white cards / modals
+  - `bg-panel: #f9f5ec` — deeper cream for sidebar / rail surfaces
+  - `bg-input: #fefcf8` — inputs sit on the cream canvas (kept per audit §5; elevated surfaces handle white)
+  - `bg-hover: #f4efe4` — cream hover lift (darker than primary)
+- **Why**: The prior `:root` block carried a comment ("cool neutral canvas … D23 layer reversal") that described a stale intermediate state and contradicted D23 as written (bookish cream ground, white elevated surfaces). Paper 9J-0 is the designer-authored source of truth; the audit in `agent-knowledge/reference/paper-design-audit.md` documents the drift. Pick one convention and document it — tokens follow Paper.
+- **How to apply**:
+  - Add or change a surface token in `packages/design/src/styles/tokens.css` only. Never inline the hex in renderer code.
+  - The design-system playground swatch data array (`SURFACE_SWATCHES` in `apps/desktop/src/renderer/routes/design-system.tsx`) mirrors these values as documentation labels — keep it in lockstep when tokens move.
+  - `[data-theme="dark"]` is untouched — the audit confirms dark is already 1:1 with Paper 6M-0.
+  - Accent / text / semantic values are also already Paper-aligned and stay put.
+  - `--color-toggle-knob: #ffffff` matches the new elevated token by value — leave it literal since it is a component-local theme token, not a semantic role.
+- **Follow-up**: author a dark-mode Paper artboard so future dark-token drift can be audited against a reference the same way light is today. Filed outside this decision; track via a post-MVP design task.
+
 ## Open Questions (not yet decided)
 
 - **Scheduler implementation**: in-process TypeScript cron vs. OS-level (launchd/Task Scheduler/systemd). Leaning in-process for cross-platform simplicity; revisit when app sleep/wake behavior is tested.

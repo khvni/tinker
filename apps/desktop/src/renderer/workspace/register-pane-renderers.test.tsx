@@ -33,6 +33,8 @@ const settingsRuntime: SettingsPaneRuntime = {
   opencode: null,
   vaultPath: null,
   mcpSeedStatuses: {},
+  pendingSectionId: null,
+  onPendingSectionConsumed: vi.fn(),
   onSignOut: vi.fn().mockResolvedValue(undefined),
   onContinueAsGuest: vi.fn().mockResolvedValue(undefined),
   onConnectGoogle: vi.fn().mockResolvedValue(undefined),

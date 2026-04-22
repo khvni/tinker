@@ -124,6 +124,7 @@ export const MemorySettingsPanel = ({
               checked={workspacePreferences.autoOpenAgentWrittenFiles}
               onChange={(next) => {
                 onWorkspacePreferencesChange({
+                  ...workspacePreferences,
                   autoOpenAgentWrittenFiles: next,
                 });
               }}

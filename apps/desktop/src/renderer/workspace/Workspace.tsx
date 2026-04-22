@@ -180,6 +180,7 @@ export const Workspace = ({
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(
     createDefaultWorkspacePreferences(),
   );
+  const [pendingSettingsSectionId, setPendingSettingsSectionId] = useState<string | null>(null);
 
   const activeRailItem = useWorkspaceSelector<TinkerPaneData, TinkerPaneKind | null>(
     workspaceStore,
@@ -289,6 +290,66 @@ export const Workspace = ({
     scheduleLayoutSave();
   }, [scheduleLayoutSave]);
 
+  const toggleLeftRail = useCallback((): void => {
+    const current = workspacePreferencesRef.current;
+    handleWorkspacePreferencesChange({
+      ...current,
+      isLeftRailVisible: !current.isLeftRailVisible,
+    });
+  }, [handleWorkspacePreferencesChange]);
+
+  const toggleRightInspector = useCallback((): void => {
+    const current = workspacePreferencesRef.current;
+    handleWorkspacePreferencesChange({
+      ...current,
+      isRightInspectorVisible: !current.isRightInspectorVisible,
+    });
+  }, [handleWorkspacePreferencesChange]);
+
+  // Keyboard shortcuts: mod+b toggles the left rail, mod+alt+b toggles the right
+  // inspector. Anomalyco's OpenCode desktop uses the same mod+b convention
+  // (reference/anomalyco-opencode-desktop-layout.md). We treat Meta (mac) and Ctrl
+  // (win/linux) as interchangeable to keep one binding across platforms, and skip
+  // when the user is typing inside a form field so shortcuts don't eat keystrokes.
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        return true;
+      }
+      return target.isContentEditable;
+    };
+
+    const handler = (event: KeyboardEvent): void => {
+      if (event.key.toLowerCase() !== 'b') {
+        return;
+      }
+      if (!(event.metaKey || event.ctrlKey)) {
+        return;
+      }
+      if (event.shiftKey) {
+        return;
+      }
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+      event.preventDefault();
+      if (event.altKey) {
+        toggleRightInspector();
+      } else {
+        toggleLeftRail();
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+    };
+  }, [toggleLeftRail, toggleRightInspector]);
+
   useEffect(() => {
     let active = true;
     const unsubscribe = workspaceStore.subscribe(() => {
@@ -302,7 +363,13 @@ export const Workspace = ({
           return;
         }
 
-        const nextPreferences = savedLayout?.preferences ?? createDefaultWorkspacePreferences();
+        // Merge saved preferences on top of current defaults so older snapshots that
+        // predate newly-added keys (e.g. isLeftRailVisible) fall back cleanly instead
+        // of collapsing to `undefined`. Simpler than a schema bump.
+        const nextPreferences: WorkspacePreferences = {
+          ...createDefaultWorkspacePreferences(),
+          ...(savedLayout?.preferences ?? {}),
+        };
         workspacePreferencesRef.current = nextPreferences;
         setWorkspacePreferences(nextPreferences);
 
@@ -365,6 +432,15 @@ export const Workspace = ({
   const openMemoryPane = useCallback((): void => {
     openOrFocusPane('memory');
   }, [openOrFocusPane]);
+
+  const openConnectionsSection = useCallback((): void => {
+    setPendingSettingsSectionId('connections');
+    openOrFocusPane('settings');
+  }, [openOrFocusPane]);
+
+  const handlePendingSettingsSectionConsumed = useCallback((): void => {
+    setPendingSettingsSectionId(null);
+  }, []);
 
   const registry = useMemo<PaneRegistry<TinkerPaneData>>(() => {
     return {
@@ -504,6 +580,8 @@ export const Workspace = ({
       onConnectMicrosoft,
       onConnectModel,
       onDisconnectModel,
+      pendingSectionId: pendingSettingsSectionId,
+      onPendingSectionConsumed: handlePendingSettingsSectionConsumed,
       onWorkspacePreferencesChange: handleWorkspacePreferencesChange,
       onRequestRespawn: onRequestMcpRespawn,
     };
@@ -536,6 +614,8 @@ export const Workspace = ({
     onDisconnectModel,
     workspacePreferences,
     handleWorkspacePreferencesChange,
+    pendingSettingsSectionId,
+    handlePendingSettingsSectionConsumed,
     opencode,
     vaultPath,
     mcpStatus,
@@ -550,12 +630,15 @@ export const Workspace = ({
 
   return (
     <WorkspaceShell
+      isLeftRailVisible={workspacePreferences.isLeftRailVisible}
+      isRightInspectorVisible={workspacePreferences.isRightInspectorVisible}
       titlebar={
         <Titlebar
           sessionFolderPath={vaultPath}
-          onNewSession={openNewChatPane}
-          onOpenMemory={openMemoryPane}
-          onOpenSettings={openSettingsPane}
+          isLeftRailVisible={workspacePreferences.isLeftRailVisible}
+          isRightInspectorVisible={workspacePreferences.isRightInspectorVisible}
+          onToggleLeftRail={toggleLeftRail}
+          onToggleRightInspector={toggleRightInspector}
         />
       }
       sidebar={
@@ -568,6 +651,7 @@ export const Workspace = ({
           onOpenMemory={openMemoryPane}
           onOpenSettings={openSettingsPane}
           onOpenAccount={openSettingsPane}
+          onOpenConnections={openConnectionsSection}
         />
       }
     >

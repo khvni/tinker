@@ -53,11 +53,21 @@
   white-space: nowrap;
 }
 
+/* Paper 9Q-0: WindowActions is a 68×15 flex cluster, 10 px gap, two 15 px glyphs, end-aligned. */
 .tinker-titlebar__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-2);
+  gap: 10px;
   flex-shrink: 0;
-  min-width: 68px;
+  width: 68px;
+}
+
+.tinker-titlebar__actions svg {
+  color: var(--color-text-secondary);
+}
+
+.tinker-titlebar__actions .tk-iconbutton:hover:not(.tk-iconbutton--disabled) svg,
+.tinker-titlebar__actions .tk-iconbutton[aria-pressed="false"] svg {
+  color: var(--color-text-primary);
 }

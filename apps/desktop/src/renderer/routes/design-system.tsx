@@ -779,7 +779,7 @@ const SURFACE_SWATCHES: ReadonlyArray<Swatch> = [
   { name: 'bg-primary', varName: '--color-bg-primary', hex: '#fefcf8', note: 'canvas · dark #1a1612' },
   { name: 'bg-elevated', varName: '--color-bg-elevated', hex: '#ffffff', note: 'cards / modals · dark #221d17' },
   { name: 'bg-panel', varName: '--color-bg-panel', hex: '#f9f5ec', note: 'sidebar · dark #16120e' },
-  { name: 'bg-input', varName: '--color-bg-input', hex: '#ffffff', note: 'inputs · dark #120f0c' },
+  { name: 'bg-input', varName: '--color-bg-input', hex: '#fefcf8', note: 'inputs · dark #120f0c' },
   { name: 'bg-hover', varName: '--color-bg-hover', hex: '#f4efe4', note: 'interactive hover · dark #25201a' },
 ];
 
@@ -1700,18 +1700,30 @@ const TitlebarTab = (): JSX.Element => (
     <Section label="No session — bare brand">
       <Titlebar
         sessionFolderPath={null}
-        onNewSession={() => undefined}
-        onOpenMemory={() => undefined}
-        onOpenSettings={() => undefined}
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
       />
     </Section>
 
     <Section label="With session folder crumb">
       <Titlebar
         sessionFolderPath="/Users/khani/Desktop/projects/tinker"
-        onNewSession={() => undefined}
-        onOpenMemory={() => undefined}
-        onOpenSettings={() => undefined}
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
+      />
+    </Section>
+
+    <Section label="Left rail collapsed (left toggle aria-pressed)">
+      <Titlebar
+        sessionFolderPath="/Users/khani/Desktop/projects/tinker"
+        isLeftRailVisible={false}
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
       />
     </Section>
 
@@ -1719,9 +1731,10 @@ const TitlebarTab = (): JSX.Element => (
       <div data-theme="dark" style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-4)' }}>
         <Titlebar
           sessionFolderPath="/Users/khani/Desktop/projects/tinker"
-          onNewSession={() => undefined}
-          onOpenMemory={() => undefined}
-          onOpenSettings={() => undefined}
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
         />
       </div>
     </Section>

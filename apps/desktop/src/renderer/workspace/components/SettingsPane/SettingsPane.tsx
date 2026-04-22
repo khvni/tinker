@@ -1,4 +1,4 @@
-import { useMemo, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { MemorySettingsPanel } from '../MemorySettingsPanel/index.js';
 import { SettingsShell, type SettingsShellSection } from '../SettingsShell/index.js';
 import { useSettingsPaneRuntime } from '../../settings-pane-runtime.js';
@@ -8,6 +8,20 @@ import { ModelSection } from './components/ModelSection/index.js';
 
 export const SettingsPane = (): JSX.Element => {
   const runtime = useSettingsPaneRuntime();
+  const [activeSectionId, setActiveSectionId] = useState<string>('account');
+  const consumedRef = useRef<string | null>(null);
+
+  // When the rail nav (e.g. Connections item) opens this pane with a target section,
+  // the runtime carries a one-shot `pendingSectionId`. Consume it exactly once then
+  // let local state drive subsequent nav so the user can still click around freely.
+  useEffect(() => {
+    const pending = runtime.pendingSectionId;
+    if (pending && pending !== consumedRef.current) {
+      consumedRef.current = pending;
+      setActiveSectionId(pending);
+      runtime.onPendingSectionConsumed();
+    }
+  }, [runtime]);
 
   const sections = useMemo<ReadonlyArray<SettingsShellSection>>(
     () => [
@@ -74,5 +88,13 @@ export const SettingsPane = (): JSX.Element => {
     [runtime],
   );
 
-  return <SettingsShell title="Settings" sections={sections} defaultActiveSectionId="account" />;
+  return (
+    <SettingsShell
+      title="Settings"
+      sections={sections}
+      activeSectionId={activeSectionId}
+      scrollTargetSectionId={runtime.pendingSectionId ?? undefined}
+      onActiveSectionChange={setActiveSectionId}
+    />
+  );
 };
