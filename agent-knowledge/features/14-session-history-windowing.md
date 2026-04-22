@@ -8,39 +8,37 @@ deferred: post-mvp
 
 # Feature 14 — Session history windowing
 
-**Status**: spec drafted `[2026-04-19]`. Integrates with [[11-host-service]] session endpoints + Chat pane (post-migration per [[10-tinker-panes]]).
+**Status**: spec drafted `[2026-04-19]`; reusable React hook shipped in TIN-152 `[2026-04-21]`. Full post-MVP session-surface integration still deferred.
 
 ## Why
 
-Chat panes hit a wall on long sessions: rendering 200+ turns blocks paint. OpenCode desktop (`anomalyco/opencode`) solved this cleanly with a bounded window + batch reveal. Port the pattern.
+Chat panes hit a wall on long sessions: rendering hundreds of messages blocks paint. OpenCode desktop (`anomalyco/opencode`) solved this cleanly with a bounded window + batch reveal. TIN-152 ports the core behavior into the current React chat surface without pulling in the larger post-MVP session stack.
 
 ## Rules
 
-- Initial paint caps at `INITIAL_TURNS = 10` most-recent user turns.
-- Scrolling upward within `SCROLL_THRESHOLD = 200px` of the top reveals `BATCH = 8` older turns.
-- Prefetch kicks in when `BATCH * 2` turns remain above the window. Prefetch cooldown `400ms`; prefetch gives up after `PREFETCH_NO_GROWTH_LIMIT = 2` consecutive responses with zero new turns (the session has been fully loaded).
-- "Load all history" button exists but does NOT trigger a single paint — it reveals all cached turns first, then pages older history one batch at a time.
+- Initial paint caps at `WINDOW_SIZE = 100` most-recent messages.
+- Scrolling upward within `SCROLL_THRESHOLD = 200px` of the top reveals `BATCH = 25` cached older messages.
+- When the rendered window is already at the oldest cached message and `cursor.before` exists, scrolling upward loads one older page via `session.messages({ before })` and reveals one batch from that page while preserving scroll position.
+- The hook exports cursor state (`before`, `hasMore`, `isLoading`, `loadMore`) so richer post-MVP session surfaces can opt into buttons, jump controls, or host-backed pagination without reimplementing window math.
 
 ## API
 
 ```ts
-// In the Chat pane renderer
 const window = useSessionHistoryWindow({
   sessionId,
-  messagesReady,
-  loaded,
-  visibleUserMessages,
-  historyHasMore,
-  historyIsLoading,
-  loadOlder: (sessionId) => hostClient.session.loadOlder(sessionId),
-  userScrolled,
-  scroller,
+  messages,
+  cursor,
+  isLoading,
+  loadMore: (before) => loadOlder(before),
 });
 
 // window: {
-//   renderedMessages: UserMessage[];
-//   loadAndRevealAll: () => Promise<void>;
-//   revealMoreTurns: () => void;
+//   renderedMessages: Message[];
+//   range: { start, end, total };
+//   cursor: { before, hasMore, isLoading, loadMore };
+//   revealOlder: () => void;
+//   handleScroll: (event) => void;
+//   setScroller: (node) => void;
 // }
 ```
 
@@ -52,11 +50,11 @@ Host-service already paginates messages from OpenCode. The window only manages w
 
 ## Testing
 
-- Fake scroller + synthetic session with 200 turns.
-- Assert: initial paint length = 10.
-- Assert: scroll-up by threshold reveals 8.
-- Assert: `loadAndRevealAll` drains cache first, then pages history in batches.
-- Assert: `prefetchNoGrowth` bails after 2 empty responses.
+- Synthetic session with 200 messages.
+- Assert: initial paint length = 100.
+- Assert: scroll-up by threshold reveals 25 cached messages.
+- Assert: older-page load keeps viewport anchored by scroll-height delta.
+- Assert: cursor API exposes `before`, `hasMore`, `isLoading`, and `loadMore`.
 
 ## Reference
 

@@ -15,6 +15,7 @@ import {
   type WorkspaceModelOption,
 } from '../opencode.js';
 import { useDockviewApi } from '../workspace/DockviewContext.js';
+import { useSessionHistoryWindow } from './useSessionHistoryWindow.js';
 
 type ChatMessage = {
   id: string;
@@ -60,6 +61,20 @@ const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): Chat
   });
 };
 
+const mergeHistoryMessages = (olderMessages: readonly ChatMessage[], newerMessages: readonly ChatMessage[]): ChatMessage[] => {
+  const merged = new Map<string, ChatMessage>();
+
+  for (const message of olderMessages) {
+    merged.set(message.id, message);
+  }
+
+  for (const message of newerMessages) {
+    merged.set(message.id, message);
+  }
+
+  return [...merged.values()].sort((left, right) => left.id.localeCompare(right.id));
+};
+
 export const Chat = ({
   skillStore,
   modelConnected,
@@ -76,6 +91,8 @@ export const Chat = ({
   );
   const dockviewApi = useDockviewApi();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [draft, setDraft] = useState('');
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -156,7 +173,66 @@ export const Chat = ({
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
+    setMessages([]);
+    setDraft('');
+    setHistoryCursor(null);
+    setHistoryLoading(false);
   }, [activeSkillsRevision, client]);
+
+  const loadHistoryPage = async (sessionID: string, before?: string): Promise<{ messages: ChatMessage[]; cursor: string | null }> => {
+    const history = await client.session.messages({
+      sessionID,
+      limit: 100,
+      ...(before ? { before } : {}),
+    });
+
+    return {
+      messages: formatMessages(history.data ?? []),
+      cursor: history.response.headers.get('x-next-cursor') ?? null,
+    };
+  };
+
+  const refreshHistory = async (sessionID: string): Promise<{ messages: ChatMessage[]; cursor: string | null } | null> => {
+    const page = await loadHistoryPage(sessionID);
+    if (!mountedRef.current || sessionIDRef.current !== sessionID) {
+      return null;
+    }
+
+    setMessages(page.messages);
+    setHistoryCursor(page.cursor);
+    return page;
+  };
+
+  const loadOlderHistory = async (before: string): Promise<void> => {
+    const activeSessionID = sessionIDRef.current;
+    if (!activeSessionID || historyLoading) {
+      return;
+    }
+
+    setHistoryLoading(true);
+
+    try {
+      const page = await loadHistoryPage(activeSessionID, before);
+      if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
+        return;
+      }
+
+      setMessages((current) => mergeHistoryMessages(page.messages, current));
+      setHistoryCursor(page.cursor);
+    } finally {
+      if (mountedRef.current && sessionIDRef.current === activeSessionID) {
+        setHistoryLoading(false);
+      }
+    }
+  };
+
+  const historyWindow = useSessionHistoryWindow({
+    sessionId: sessionIDRef.current,
+    messages,
+    cursor: historyCursor,
+    isLoading: historyLoading,
+    loadMore: loadOlderHistory,
+  });
 
   const ensureSession = async (): Promise<string> => {
     if (sessionIDRef.current) {
@@ -287,13 +363,12 @@ export const Chat = ({
       });
       await consumeStream;
 
-      const history = await client.session.messages({ sessionID: activeSessionID, limit: 24 });
+      const historyPage = await refreshHistory(activeSessionID);
       if (mountedRef.current) {
-        setMessages(formatMessages(history.data ?? []));
         setDraft('');
       }
 
-      const assistantMessage = formatMessages(history.data ?? [])
+      const assistantMessage = historyPage?.messages
         .filter((message) => message.role === 'assistant')
         .at(-1)?.text;
       if (assistantMessage && vaultPath) {
@@ -354,7 +429,7 @@ export const Chat = ({
         </div>
       </header>
 
-      <div className="tinker-chat-log">
+      <div className="tinker-chat-log" ref={historyWindow.setScroller} onScroll={historyWindow.handleScroll}>
         {messages.length === 0 ? (
           <div className="tinker-message tinker-message--system">
             {modelConnected
@@ -363,7 +438,7 @@ export const Chat = ({
           </div>
         ) : null}
 
-        {messages.map((message) => (
+        {historyWindow.renderedMessages.map((message) => (
           <div key={message.id} className={`tinker-message tinker-message--${message.role}`}>
             <p className="tinker-message-text">{message.text}</p>
             {message.role === 'assistant' && message.text.trim().length > 0 ? (
