@@ -8,6 +8,8 @@ deferred: post-mvp
 ---
 
 > **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** Depends on Playbook ([[02-playbook-skill-marketplace]]) which is also deferred. Do not start work until MVP ships.
+>
+> **[2026-04-21] Exception — `TIN-127` may land as a narrow unblocker slice.** User explicitly approved shipping the shared `RoleProfile` contract plus inference from MCP connections + skill-install history so future Coach work has a typed foundation. This does **not** reopen Coach UI, recommendations surfaces, or the broader Playbook dependency chain.
 
 # Feature 05 — Coach Skill Discovery
 

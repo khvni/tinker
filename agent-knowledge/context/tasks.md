@@ -160,13 +160,8 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 |----|------|------|------------|--------|-------|
 | 8.1 | **Research**: confirm Better Auth v1 config shape for Google + GitHub + Microsoft providers on a Tauri desktop app — loopback redirect URI format, PKCE flow, session/refresh-token handoff. Deliverable: `agent-knowledge/reference/better-auth-config.md` with exact config snippets + redirect URI registrations per provider. | M | — | done | TIN-74 · PR #23 merged 2026-04-22. Unblocks 8.2–8.4. |
 | 8.2 | Add `User` type in `@tinker/shared-types`: `{ id, provider, providerUserId, displayName, avatarUrl?: string, email?: string, createdAt, lastSeenAt }`. | S | — | done | TIN-75 · PR #27 merged 2026-04-22. |
-<<<<<<< HEAD
 | 8.3 | SQLite `users` table in `@tinker/memory/database.ts` (columns mirror `User` type, unique composite index on `(provider, provider_user_id)`). CRUD helpers in new `packages/memory/src/user-store.ts`. | M | 8.2 | review | TIN-76 · PR #36 opened 2026-04-22. Seeds on every successful sign-in (upsert). |
 | 8.4 | `@tinker/auth-sidecar` wire Google provider per 8.1: provider config, loopback URI, PKCE flow, callback handler. Sidecar exposes HTTP endpoints `POST /auth/start`, `GET /auth/callback`, `POST /auth/logout`, `GET /auth/session`. | M | 8.1 | review | TIN-77 · PR #48. Sidecar now uses ticketed `/auth/*` polling flow; Rust callback listener deleted. |
-=======
-| 8.3 | SQLite `users` table in `@tinker/memory/database.ts` (columns mirror `User` type, unique composite index on `(provider, provider_user_id)`). CRUD helpers in new `packages/memory/src/user-store.ts`. | M | 8.2 | review | TIN-76 · PR #36 opened 2026-04-22. Seeds on every successful sign-in (upsert). |
-| 8.4 | `@tinker/auth-sidecar` wire Google provider per 8.1: provider config, loopback URI, PKCE flow, callback handler. Sidecar exposes HTTP endpoints `POST /auth/start`, `GET /auth/callback`, `POST /auth/logout`, `GET /auth/session`. | M | 8.1 | not started | Extend existing `packages/auth-sidecar/src/main.ts`. |
->>>>>>> origin/main
 | 8.5 | `@tinker/auth-sidecar` wire GitHub provider per 8.1. | S | 8.4 | not started | Config-only once 8.4 lands. |
 | 8.6 | `@tinker/auth-sidecar` wire Microsoft (consumer) provider per 8.1. | S | 8.4 | not started | Consumer/personal only. No tenant federation. |
 | 8.7 | Rust Tauri command `start_auth_sidecar() -> Result<AuthHandle, Error>` spawns the auth sidecar + returns base URL. Rust binds OS-level loopback redirect URIs needed by the sidecar (Google, GitHub, Microsoft). | M | 8.4 | not started | Mirrors OpenCode sidecar lifecycle (coordinator pattern D22). |
@@ -226,6 +221,8 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | 13 | Vertical workspace sidebar | [[13-workspace-sidebar]] | Depends on multi-workspace UX which MVP doesn't have. Package scaffold landed via TIN-149 — PR #45 review — not wired into `App.tsx`; dead code per D25. |
 | 14 | Session history windowing | [[14-session-history-windowing]] | review — TIN-152 · PR #51. Perf feature. Revisit at >1000 messages/session. |
 | 15 | Connection gate (full splash + retry) | [[15-connection-gate]] | Minimal variant in M7.8 covers MVP. |
+
+- [2026-04-21] Exception slice: `TIN-127` ("Coach — role profile + tool map") is in `review` via PR #53. This lands shared `RoleProfile` types + inference only; full Feature 05 remains post-MVP.
 
 ### Post-MVP active slices
 
