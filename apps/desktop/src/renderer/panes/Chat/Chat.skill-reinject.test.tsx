@@ -53,7 +53,10 @@ vi.mock('@tinker/bridge', () => ({
     (async function* () {
       // no-op
     })(),
-  createChatHistoryWriter: () => ({ append: () => Promise.resolve(), close: () => Promise.resolve() }),
+  createChatHistoryWriter: () => ({
+    appendEvent: () => undefined,
+    dispose: () => Promise.resolve(),
+  }),
   findLatestChatHistorySessionId: (...args: unknown[]) => {
     if (mocks.findLatestChatHistorySessionId) {
       return mocks.findLatestChatHistorySessionId(...args) as Promise<string | null>;
@@ -64,19 +67,18 @@ vi.mock('@tinker/bridge', () => ({
 }));
 
 vi.mock('@tinker/memory', () => ({
-  resolveRelevantEntities: () => Promise.resolve([]),
+  appendMemoryCapture: () => Promise.resolve(false),
   createSession: () => Promise.resolve(),
   findLatestSessionForFolder: () => Promise.resolve(null),
+  getActiveMemoryPath: () => Promise.resolve('/memory/test-user'),
+  listSessionsForUser: () => Promise.resolve([]),
+  subscribeMemoryPathChanged: () => () => undefined,
   updateLastActive: () => Promise.resolve(),
   isGitAvailable: () => Promise.resolve(false),
   syncSkills: () => Promise.resolve({ pulled: [], pushed: [], conflicts: [], message: '' }),
   slugify: (value: string) =>
     value.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '') || 'skill',
   isValidSkillSlug: (value: string) => /^[a-z0-9][a-z0-9-]*$/u.test(value),
-}));
-
-vi.mock('../../memory.js', () => ({
-  captureConversationMemory: () => Promise.resolve(null),
 }));
 
 // Silence CSS imports.
