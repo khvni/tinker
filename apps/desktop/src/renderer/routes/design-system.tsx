@@ -1520,6 +1520,7 @@ const SignInTab = (): JSX.Element => (
           nativeRuntimeAvailable
           providerMessages={{}}
           onSignIn={() => new Promise<void>(() => {})}
+          onContinueAsGuest={async () => {}}
         />
       </div>
     </Section>
@@ -1530,6 +1531,7 @@ const SignInTab = (): JSX.Element => (
           nativeRuntimeAvailable={false}
           providerMessages={{}}
           onSignIn={async () => {}}
+          onContinueAsGuest={async () => {}}
         />
       </div>
     </Section>

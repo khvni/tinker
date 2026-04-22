@@ -20,6 +20,7 @@ import {
   type SSOStatus,
   type TinkerPaneData,
   type TinkerPaneKind,
+  type User,
   type WorkspacePreferences,
 } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../bindings.js';
@@ -46,6 +47,11 @@ const DESKTOP_WORKSPACE_ATTENTION_ID = 'desktop-workspace';
 
 type WorkspaceProps = {
   currentUserId: string;
+  currentUserName: string;
+  currentUserProvider: User['provider'];
+  currentUserEmail: string | null;
+  currentUserAvatarUrl: string | null;
+  nativeRuntimeAvailable: boolean;
   layoutStore: LayoutStore;
   memoryStore: MemoryStore;
   schedulerStore: ScheduledJobStore;
@@ -54,6 +60,8 @@ type WorkspaceProps = {
   modelConnected: boolean;
   modelAuthBusy: boolean;
   modelAuthMessage: string | null;
+  guestBusy: boolean;
+  guestMessage: string | null;
   googleAuthBusy: boolean;
   googleAuthMessage: string | null;
   githubAuthBusy: boolean;
@@ -68,8 +76,10 @@ type WorkspaceProps = {
   activeSkillsRevision: number;
   memorySweepState: MemoryRunState | null;
   memorySweepBusy: boolean;
+  onContinueAsGuest(): Promise<void>;
   sessionFolderBusy: boolean;
   onSelectSessionFolder(): Promise<void>;
+  onContinueAsGuest(): Promise<void>;
   onConnectModel(): Promise<void>;
   onDisconnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
@@ -114,9 +124,20 @@ const requirePaneData = <K extends TinkerPaneKind>(
 
 export const Workspace = ({
   currentUserId,
+  currentUserName,
+  currentUserProvider,
+  currentUserEmail,
+  currentUserAvatarUrl,
+  nativeRuntimeAvailable,
   layoutStore,
   skillStore,
   modelConnected,
+  modelAuthBusy,
+  modelAuthMessage,
+  guestBusy,
+  guestMessage,
+  sessionFolderBusy,
+  onSelectSessionFolder,
   googleAuthBusy,
   googleAuthMessage,
   githubAuthBusy,
@@ -128,8 +149,12 @@ export const Workspace = ({
   vaultPath,
   vaultRevision,
   activeSkillsRevision,
-  sessionFolderBusy,
-  onSelectSessionFolder,
+  onContinueAsGuest,
+  onConnectModel,
+  onDisconnectModel,
+  onConnectGoogle,
+  onConnectGithub,
+  onConnectMicrosoft,
   onDisconnectGoogle,
   onDisconnectGithub,
   onDisconnectMicrosoft,
@@ -429,21 +454,52 @@ export const Workspace = ({
     }
 
     return {
+      nativeRuntimeAvailable,
+      currentUserName,
+      currentUserProvider,
+      currentUserEmail,
+      currentUserAvatarUrl,
       sessions,
       activeSession,
       signOutBusy: activeSession ? busyByProvider[activeSession.provider] : false,
       signOutMessage: activeSession ? messageByProvider[activeSession.provider] : null,
-      workspacePreferences,
-      onWorkspacePreferencesChange: handleWorkspacePreferencesChange,
-      onSignOut: async (session: SSOSession) => {
-        await disconnectByProvider[session.provider]();
+      guestBusy,
+      guestMessage,
+      providerBusy: {
+        google: googleAuthBusy,
+        github: githubAuthBusy,
+        microsoft: microsoftAuthBusy,
       },
+      providerMessages: {
+        google: googleAuthMessage,
+        github: githubAuthMessage,
+        microsoft: microsoftAuthMessage,
+      },
+      modelConnected,
+      modelAuthBusy,
+      modelAuthMessage,
+      workspacePreferences,
       opencode,
       vaultPath,
       mcpSeedStatuses,
+      onSignOut: async (session: SSOSession) => {
+        await disconnectByProvider[session.provider]();
+      },
+      onContinueAsGuest,
+      onConnectGoogle,
+      onConnectGithub,
+      onConnectMicrosoft,
+      onConnectModel,
+      onDisconnectModel,
+      onWorkspacePreferencesChange: handleWorkspacePreferencesChange,
       onRequestRespawn: onRequestMcpRespawn,
     };
   }, [
+    nativeRuntimeAvailable,
+    currentUserName,
+    currentUserProvider,
+    currentUserEmail,
+    currentUserAvatarUrl,
     sessions,
     googleAuthBusy,
     googleAuthMessage,
@@ -451,9 +507,20 @@ export const Workspace = ({
     githubAuthMessage,
     microsoftAuthBusy,
     microsoftAuthMessage,
+    guestBusy,
+    guestMessage,
+    modelConnected,
+    modelAuthBusy,
+    modelAuthMessage,
+    onContinueAsGuest,
+    onConnectGoogle,
+    onConnectGithub,
+    onConnectMicrosoft,
+    onConnectModel,
     onDisconnectGoogle,
     onDisconnectGithub,
     onDisconnectMicrosoft,
+    onDisconnectModel,
     workspacePreferences,
     handleWorkspacePreferencesChange,
     opencode,

@@ -13,16 +13,34 @@ import {
 const emptySessions: SSOStatus = { google: null, github: null, microsoft: null };
 
 const settingsRuntime: SettingsPaneRuntime = {
+  nativeRuntimeAvailable: true,
+  currentUserName: 'Guest',
+  currentUserProvider: 'local',
+  currentUserEmail: null,
+  currentUserAvatarUrl: null,
   sessions: emptySessions,
   activeSession: null,
   signOutBusy: false,
   signOutMessage: null,
+  guestBusy: false,
+  guestMessage: null,
+  providerBusy: { google: false, github: false, microsoft: false },
+  providerMessages: { google: null, github: null, microsoft: null },
+  modelConnected: false,
+  modelAuthBusy: false,
+  modelAuthMessage: null,
   workspacePreferences: createDefaultWorkspacePreferences(),
-  onWorkspacePreferencesChange: vi.fn(),
-  onSignOut: vi.fn(),
   opencode: null,
   vaultPath: null,
   mcpSeedStatuses: {},
+  onSignOut: vi.fn().mockResolvedValue(undefined),
+  onContinueAsGuest: vi.fn().mockResolvedValue(undefined),
+  onConnectGoogle: vi.fn().mockResolvedValue(undefined),
+  onConnectGithub: vi.fn().mockResolvedValue(undefined),
+  onConnectMicrosoft: vi.fn().mockResolvedValue(undefined),
+  onConnectModel: vi.fn().mockResolvedValue(undefined),
+  onDisconnectModel: vi.fn().mockResolvedValue(undefined),
+  onWorkspacePreferencesChange: vi.fn(),
   onRequestRespawn: vi.fn().mockResolvedValue(undefined),
 };
 
@@ -49,8 +67,9 @@ describe('registerWorkspacePaneRenderers', () => {
     );
 
     expect(settingsMarkup).toContain('Account');
+    expect(settingsMarkup).toContain('Model');
     expect(settingsMarkup).toContain('Memory');
-    expect(settingsMarkup).toContain('Not signed in');
+    expect(settingsMarkup).toContain('Connections');
     expect(memoryMarkup).toContain('Memory files');
     expect(memoryMarkup).toContain('tinker-memory-pane');
     expect(memoryMarkup).toContain('Loading…');

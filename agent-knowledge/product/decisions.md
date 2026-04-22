@@ -266,6 +266,17 @@ Log of what's explicitly OUT of scope or deferred, with reasoning. Coding agents
 - **Supersedes**: TIN-20 (M2.6 first-run folder picker screen) — closed as superseded by TIN-187. The folder-picker-as-screen idea is replaced by folder-picker-in-composer.
 - **Touches**: `apps/desktop/src/renderer/App.tsx` (route), `apps/desktop/src/renderer/panes/Chat/Composer.tsx` (button), `packages/memory/src/sessions.ts` (placeholder user_id), `tinker-prd.md` §2.2 + §2.8, `agent-knowledge/features/21-mvp-session-folder.md`.
 
+### `[2026-04-22]` D27 — Workspace boots as guest; Better Auth starts on demand
+
+- **Decision**: Cold boot lands directly in Workspace under a local `guest` identity. Better Auth is no longer part of boot. The auth sidecar starts only when the user explicitly clicks Google / GitHub / Microsoft from Settings → Account. Operationalises the TIN-188 half of D26.
+- **Why**: Boot-time sign-in and setup screens added friction and broke the "first useful outcome happens in the product" rule. The workspace is useful before identity is configured.
+- **How to apply**:
+  - Always ensure a `users` row exists for `id='guest'`, `provider='local'`, `provider_user_id='guest'`.
+  - When no provider session is active, `guest` is the current user for session FKs, memory subdir resolution, and layout persistence.
+  - Settings → Account is the sanctioned entry point for consumer sign-in from the workspace.
+  - Do not warm-start Better Auth from Tauri `setup()`.
+  - Sign-out returns the app to guest workspace mode, not a sign-in gate.
+
 ## Open Questions (not yet decided)
 
 - **Scheduler implementation**: in-process TypeScript cron vs. OS-level (launchd/Task Scheduler/systemd). Leaning in-process for cross-platform simplicity; revisit when app sleep/wake behavior is tested.

@@ -127,6 +127,35 @@ export const getUserByProvider = async (
   return hydrateUserRow(rows[0]);
 };
 
+export const migrateLocalUserIdentity = async (legacyId: string, newId: string): Promise<void> => {
+  if (legacyId === newId) {
+    return;
+  }
+
+  const database = await getDatabase();
+  const [legacyRows, existingRows] = await Promise.all([
+    database.select<Pick<UserRow, 'id'>[]>(`SELECT id FROM users WHERE id = $1 LIMIT 1`, [legacyId]),
+    database.select<Pick<UserRow, 'id'>[]>(`SELECT id FROM users WHERE id = $1 LIMIT 1`, [newId]),
+  ]);
+
+  if (legacyRows.length === 0 || existingRows.length > 0) {
+    return;
+  }
+
+  await database.execute(
+    `UPDATE users SET id = $1, provider_user_id = $1 WHERE id = $2`,
+    [newId, legacyId],
+  );
+  await database.execute(
+    `UPDATE layouts SET user_id = $1 WHERE user_id = $2`,
+    [newId, legacyId],
+  );
+  await database.execute(
+    `UPDATE sessions SET user_id = $1 WHERE user_id = $2`,
+    [newId, legacyId],
+  );
+};
+
 export const updateLastSeen = async (id: User['id'], lastSeenAt: User['lastSeenAt']): Promise<void> => {
   const database = await getDatabase();
   await database.execute(

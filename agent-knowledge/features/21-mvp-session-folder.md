@@ -14,7 +14,7 @@ mvp: true
 
 Every chat session is bound to a local folder the user explicitly picks. The OpenCode sidecar runs inside that folder (`--cwd <folder>`), so file references, tool calls, and working context are folder-scoped by default.
 
-This is the MVP's identity model: no sign-in, no account, no OAuth — just "which folder are you working in right now."
+This is the MVP's boot model: no sign-in gate on cold launch. The app opens straight into Workspace as `guest`, and folder choice remains a workspace/session concern.
 
 ## Scope
 
@@ -28,7 +28,7 @@ This is the MVP's identity model: no sign-in, no account, no OAuth — just "whi
 
 ## Out of scope
 
-- Identity / sign-in (Better Auth deferred; [[01-sso-connector-layer]]).
+- Boot-time identity gates. Better Auth starts later from Settings → Account.
 - Multi-session parallelism. MVP allows switching between sessions but only one is "active" (only one sidecar running) at a time.
 - Session sharing / multi-user access to the same folder.
 - Remote sessions / cloud folders.
