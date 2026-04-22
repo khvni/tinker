@@ -10,6 +10,7 @@ describe('registerWorkspacePaneRenderers', () => {
 
   it('registers friendly settings and memory placeholder panes', () => {
     registerWorkspacePaneRenderers();
+    expect(() => registerWorkspacePaneRenderers()).not.toThrow();
 
     const settingsMarkup = renderToStaticMarkup(
       <>{getRenderer('settings')({ kind: 'settings' })}</>,

@@ -1,57 +1,86 @@
-import type { TabKind } from '@tinker/shared-types';
-import { getTabKindForPath, getPanelIdForPath, getPanelTitleForPath } from '../renderers/file-utils.js';
+import type { WorkspaceStore } from '@tinker/panes';
+import type { TinkerPaneData } from '@tinker/shared-types';
+import {
+  getFileExtension,
+  getImageMimeType,
+  getPanelIdForPath,
+  getPanelTitleForPath,
+  isAbsolutePath,
+} from '../renderers/file-utils.js';
 
-type WorkspacePanel = {
-  id: string;
-  api: {
-    updateParameters(params: { path: string }): void;
-    setActive(): void;
-  };
+const createWorkspaceTabId = (): string => {
+  return `workspace-${crypto.randomUUID()}`;
 };
 
-type WorkspaceDockviewApi = {
-  activePanel: { id: string } | null | undefined;
-  panels: WorkspacePanel[];
-  addPanel(panel: {
-    id: string;
-    component: TabKind;
-    title: string;
-    params: { path: string };
-    position?: {
-      referencePanel: string;
-      direction: 'right';
-    };
-  }): void;
+const getPaneMimeForPath = (absolutePath: string): string => {
+  switch (getFileExtension(absolutePath)) {
+    case '.csv':
+      return 'text/csv';
+    case '.gif':
+    case '.jpeg':
+    case '.jpg':
+    case '.png':
+    case '.svg':
+    case '.webp':
+      return getImageMimeType(absolutePath);
+    case '.htm':
+    case '.html':
+      return 'text/html';
+    case '.json':
+      return 'application/json';
+    case '.md':
+      return 'text/markdown';
+    case '.mjs':
+    case '.js':
+      return 'text/javascript';
+    case '.ts':
+      return 'application/typescript';
+    case '.tsx':
+      return 'text/typescript';
+    default:
+      return 'text/plain';
+  }
 };
 
-const getReferencePanelId = (api: WorkspaceDockviewApi): string | null => {
-  return api.activePanel?.id ?? api.panels[0]?.id ?? null;
-};
-
-export const openWorkspaceFile = (api: WorkspaceDockviewApi, absolutePath: string): void => {
-  const component = getTabKindForPath(absolutePath);
-  const panelId = getPanelIdForPath(component, absolutePath);
-  const existingPanel = api.panels.find((panel) => panel.id === panelId);
-
-  if (existingPanel) {
-    existingPanel.api.updateParameters({ path: absolutePath });
-    existingPanel.api.setActive();
+export const openWorkspaceFile = (store: WorkspaceStore<TinkerPaneData>, absolutePath: string): void => {
+  if (!isAbsolutePath(absolutePath)) {
     return;
   }
 
-  const referencePanelId = getReferencePanelId(api);
-  api.addPanel({
-    id: panelId,
-    component,
+  const state = store.getState();
+  for (const tab of state.tabs) {
+    const existingPane = Object.values(tab.panes).find((pane) => {
+      return pane.data.kind === 'file' && pane.data.path === absolutePath;
+    });
+
+    if (!existingPane) {
+      continue;
+    }
+
+    state.actions.activateTab(tab.id);
+    state.actions.focusPane(tab.id, existingPane.id);
+    return;
+  }
+
+  const pane = {
+    id: getPanelIdForPath('file', absolutePath),
+    kind: 'file',
     title: getPanelTitleForPath(absolutePath),
-    params: { path: absolutePath },
-    ...(referencePanelId
-      ? {
-          position: {
-            referencePanel: referencePanelId,
-            direction: 'right' as const,
-          },
-        }
-      : {}),
-  });
+    data: {
+      kind: 'file',
+      path: absolutePath,
+      mime: getPaneMimeForPath(absolutePath),
+    } as const,
+  };
+  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
+
+  if (!activeTab) {
+    state.actions.openTab({
+      id: createWorkspaceTabId(),
+      pane,
+    });
+    return;
+  }
+
+  state.actions.addPane(activeTab.id, pane, { activate: true });
 };
