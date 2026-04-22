@@ -5,6 +5,7 @@ import {
   ClickableBadge,
   ContextBadge,
   IconButton,
+  ModelPicker,
   SearchInput,
   SegmentedControl,
   StatusDot,
@@ -12,18 +13,26 @@ import {
   Textarea,
   Toggle,
   type BadgeVariant,
+  type ModelPickerItem,
   type StatusDotState,
 } from '@tinker/design';
 import '@tinker/design/styles/tokens.css';
 import './design-system.css';
 
-type PlaygroundTab = 'colors' | 'typography' | 'spacing' | 'components' | 'chat';
+type PlaygroundTab =
+  | 'colors'
+  | 'typography'
+  | 'spacing'
+  | 'components'
+  | 'modelpicker'
+  | 'chat';
 
 const TABS: ReadonlyArray<{ value: PlaygroundTab; label: string }> = [
   { value: 'colors', label: 'Colors' },
   { value: 'typography', label: 'Typography' },
   { value: 'spacing', label: 'Spacing' },
   { value: 'components', label: 'Components' },
+  { value: 'modelpicker', label: 'Model Picker' },
   { value: 'chat', label: 'Chat' },
 ];
 
@@ -285,6 +294,163 @@ const ComponentsTab = (): JSX.Element => {
               placeholder="Write more than one line..."
               value={textareaValue}
               onChange={(event) => setTextareaValue(event.target.value)}
+            />
+          </div>
+        </Row>
+      </Section>
+    </div>
+  );
+};
+
+/* --------------------- Model Picker --------------------- */
+
+const MODEL_PICKER_ITEMS: ReadonlyArray<ModelPickerItem> = [
+  {
+    id: 'anthropic:claude-opus-4',
+    providerId: 'anthropic',
+    providerName: 'Anthropic',
+    name: 'Claude Opus 4',
+    contextWindow: 200_000,
+    pricingHint: '$15/Mtok',
+  },
+  {
+    id: 'anthropic:claude-sonnet-4',
+    providerId: 'anthropic',
+    providerName: 'Anthropic',
+    name: 'Claude Sonnet 4',
+    contextWindow: 200_000,
+    pricingHint: '$3/Mtok',
+  },
+  {
+    id: 'anthropic:claude-haiku-4',
+    providerId: 'anthropic',
+    providerName: 'Anthropic',
+    name: 'Claude Haiku 4',
+    contextWindow: 200_000,
+    pricingHint: '$0.25/Mtok',
+  },
+  {
+    id: 'openai:gpt-5',
+    providerId: 'openai',
+    providerName: 'OpenAI',
+    name: 'GPT-5',
+    contextWindow: 1_000_000,
+    pricingHint: '$10/Mtok',
+  },
+  {
+    id: 'openai:gpt-5-mini',
+    providerId: 'openai',
+    providerName: 'OpenAI',
+    name: 'GPT-5 Mini',
+    contextWindow: 400_000,
+    pricingHint: '$0.40/Mtok',
+  },
+  {
+    id: 'openai:o4',
+    providerId: 'openai',
+    providerName: 'OpenAI',
+    name: 'o4',
+    contextWindow: 200_000,
+  },
+  {
+    id: 'google:gemini-2.5-pro',
+    providerId: 'google',
+    providerName: 'Google',
+    name: 'Gemini 2.5 Pro',
+    contextWindow: 2_000_000,
+    pricingHint: '$7/Mtok',
+  },
+  {
+    id: 'google:gemini-2.5-flash',
+    providerId: 'google',
+    providerName: 'Google',
+    name: 'Gemini 2.5 Flash',
+    contextWindow: 1_000_000,
+    pricingHint: '$0.30/Mtok',
+  },
+  {
+    id: 'openrouter:llama-4-scout',
+    providerId: 'openrouter',
+    providerName: 'OpenRouter',
+    name: 'Llama 4 Scout',
+    contextWindow: 128_000,
+  },
+  {
+    id: 'openrouter:qwen-2.5-coder',
+    providerId: 'openrouter',
+    providerName: 'OpenRouter',
+    name: 'Qwen 2.5 Coder',
+    contextWindow: 128_000,
+    pricingHint: '$0.50/Mtok',
+  },
+  {
+    id: 'openrouter:deepseek-v3',
+    providerId: 'openrouter',
+    providerName: 'OpenRouter',
+    name: 'DeepSeek V3',
+    contextWindow: 128_000,
+  },
+];
+
+const ModelPickerTab = (): JSX.Element => {
+  const [openValue, setOpenValue] = useState<string | undefined>('anthropic:claude-sonnet-4');
+  return (
+    <div className="ds-sections">
+      <Section label="Closed">
+        <Row>
+          <ModelPicker
+            items={MODEL_PICKER_ITEMS}
+            onSelect={() => undefined}
+          />
+        </Row>
+      </Section>
+
+      <Section label="Open">
+        <Row>
+          <div className="ds-modelpicker-anchor">
+            <ModelPicker
+              items={MODEL_PICKER_ITEMS}
+              value={openValue}
+              onSelect={setOpenValue}
+              defaultOpen
+            />
+          </div>
+        </Row>
+      </Section>
+
+      <Section label="Loading">
+        <Row>
+          <div className="ds-modelpicker-anchor">
+            <ModelPicker
+              items={[]}
+              onSelect={() => undefined}
+              loading
+              defaultOpen
+            />
+          </div>
+        </Row>
+      </Section>
+
+      <Section label="Empty">
+        <Row>
+          <div className="ds-modelpicker-anchor">
+            <ModelPicker
+              items={[]}
+              onSelect={() => undefined}
+              defaultOpen
+            />
+          </div>
+        </Row>
+      </Section>
+
+      <Section label="Long filter">
+        <Row>
+          <div className="ds-modelpicker-anchor">
+            <ModelPicker
+              items={MODEL_PICKER_ITEMS}
+              onSelect={() => undefined}
+              defaultOpen
+              defaultFilter="deepseek"
             />
           </div>
         </Row>
@@ -569,6 +735,8 @@ const renderTab = (tab: PlaygroundTab): JSX.Element => {
       return <SpacingTab />;
     case 'components':
       return <ComponentsTab />;
+    case 'modelpicker':
+      return <ModelPickerTab />;
     case 'chat':
       return <ChatTab />;
   }

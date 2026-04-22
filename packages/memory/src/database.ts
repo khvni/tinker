@@ -33,6 +33,11 @@ const schema = [
     dockview_model_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS skills (
     slug TEXT PRIMARY KEY,
     title TEXT NOT NULL,

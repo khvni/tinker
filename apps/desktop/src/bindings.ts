@@ -25,3 +25,7 @@ export type OpencodeConnection = {
 export function openFolderPicker(): Promise<string> {
   return invoke<string>('open_folder_picker');
 }
+
+export function stopOpencode(pid: number): Promise<void> {
+  return invoke<void>('stop_opencode', { pid });
+}

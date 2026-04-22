@@ -5,6 +5,7 @@ export * from './memory-pipeline.js';
 export * from './memory-store.js';
 export * from './memory-utils.js';
 export * from './scheduler-store.js';
+export * from './settings-store.js';
 export * from './skill-git.js';
 export * from './skill-parser.js';
 export * from './skill-service.js';

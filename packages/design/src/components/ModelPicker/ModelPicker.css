@@ -1,0 +1,267 @@
+/*
+ * ModelPicker
+ *
+ * Parity with OpenCode Desktop's composer model picker (see
+ * agent-knowledge/reference/opencode-desktop-model-picker.md §I).
+ *
+ * Absolute px literals used here match source-of-truth anatomy:
+ *   - trigger max width 320px (prompt-input.tsx:1541)
+ *   - panel 288 × 320 px (dialog-select-model.tsx:143)
+ *   - row padding 6px 8px (list.css:232)
+ *   - search padding 8px (list.css:59)
+ * All other colors/spacing/radius/font values come from @tinker/design tokens.
+ */
+
+.tk-modelpicker {
+  position: relative;
+  display: inline-flex;
+  font-family: var(--font-sans);
+}
+
+/* ---------------- Trigger pill ---------------- */
+
+.tk-modelpicker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 320px; /* parity: composer pill max width */
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.tk-modelpicker__trigger:hover:not(.tk-modelpicker__trigger--disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-subtle);
+}
+
+.tk-modelpicker__trigger--open {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+.tk-modelpicker__trigger--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tk-modelpicker__trigger-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-soft);
+  opacity: 0.72;
+}
+
+.tk-modelpicker__trigger:hover .tk-modelpicker__trigger-icon,
+.tk-modelpicker__trigger--open .tk-modelpicker__trigger-icon {
+  opacity: 1;
+}
+
+.tk-modelpicker__trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tk-modelpicker__chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+/* ---------------- Popover panel ---------------- */
+
+.tk-modelpicker__panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px); /* parity: 4px gutter top-start placement */
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 288px;  /* parity: panel fixed w-72 */
+  height: 320px; /* parity: panel fixed h-80 */
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.tk-modelpicker__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px; /* parity: list.css:59 search bar */
+  border-radius: var(--radius-md);
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+}
+
+.tk-modelpicker__search-icon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.tk-modelpicker__search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.tk-modelpicker__search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.tk-modelpicker__search-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ---------------- List body ---------------- */
+
+.tk-modelpicker__body {
+  flex: 1;
+  min-height: 0;
+  margin-top: var(--space-2);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.tk-modelpicker__body::-webkit-scrollbar {
+  display: none;
+}
+
+.tk-modelpicker__group + .tk-modelpicker__group {
+  margin-top: var(--space-1);
+}
+
+.tk-modelpicker__group-header {
+  position: sticky;
+  top: 0;
+  padding: 8px 12px 8px 8px; /* parity: list.css:187 group header */
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
+  text-transform: capitalize;
+}
+
+/* ---------------- Row ---------------- */
+
+.tk-modelpicker__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "name meta"
+    "provider meta";
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px; /* parity: list.css:232 row padding */
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  /* parity: ~28px of clearance under sticky group header; uses scale (32px) */
+  scroll-margin-top: var(--space-8);
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.tk-modelpicker__row:focus-visible {
+  outline: none;
+}
+
+.tk-modelpicker__row--active {
+  background: var(--color-bg-hover);
+}
+
+.tk-modelpicker__row[data-selected='true'] {
+  color: var(--color-text-primary);
+}
+
+.tk-modelpicker__row[data-selected='true'] .tk-modelpicker__row-name::after {
+  content: '\2713';
+  margin-left: var(--space-2);
+  color: var(--color-accent-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tk-modelpicker__row-name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.tk-modelpicker__row-provider {
+  grid-area: provider;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.tk-modelpicker__row-meta {
+  grid-area: meta;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.tk-modelpicker__row-context {
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-modelpicker__row-price {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- Status (loading / empty) ---------------- */
+
+.tk-modelpicker__status {
+  padding: var(--space-4) var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
