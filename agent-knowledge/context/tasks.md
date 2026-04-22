@@ -59,6 +59,7 @@ Spec: [[20-mvp-panes-workspace]] · Depends on: `@tinker/panes` (done) · D16
 | 1.10 | Layout snapshot migration: detect old Dockview-shaped JSON in SQLite `layouts` table → delete + re-seed default. Log once. | S | 1.9 | review | TIN-11 · PR #62. One-shot schema migration drops incompatible pre-v1 snapshots. |
 | 1.11 | Workspace sidebar metadata API contract: `GET /workspace.cards` for reads + `POST /workspace.metadata` for contributor pushes. Ship local stub now; keep host-service transport deferred per D25/D17. | S | 1.7 | review | TIN-150 · PR #84. Typed local stub lives in `@tinker/workspace-sidebar` and supports create/update/remove/sort/subscribe flows. |
 | 1.12 | Port workspace shell per Paper `9I-0` + anomalyco architectural shape: mount `WorkspaceSidebar` rail next to `@tinker/panes` content, extract `WorkspaceShell` grid wrapper (D21), reference + spec docs. No `dockview-react`. Panes-only multiplicity preserved; one-pane-per-tab invariant documented. | M | 1.7 | review | TIN-190 · branch `khvni/tin-190`. |
+| 1.13 | Auto-split workspace on first file open: `openFileInWorkspace()` detects default Chat-only layout, splits vertically, opens file in new pane. Deduplicates by focusing existing file panes. | S | 1.4, 1.7 | review | TIN-197 · PR #114 |
 
 ### M2 — Folder-scoped session (every chat starts in a local directory, per-user)
 Spec: [[21-mvp-session-folder]] · Depends on: M1.7 · Sessions are bound to current user from M8.
