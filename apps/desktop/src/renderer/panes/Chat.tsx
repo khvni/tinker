@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2/client';
 import { Badge, Button, ModelPicker, Textarea } from '@tinker/design';
 import { injectActiveSkills, injectMemoryContext, streamSessionEvents } from '@tinker/bridge';
@@ -15,6 +15,7 @@ import {
   type WorkspaceModelOption,
 } from '../opencode.js';
 import { useDockviewApi } from '../workspace/DockviewContext.js';
+import { calculateComposerHeight, shouldAbortComposerKey, shouldSubmitComposerKey } from './chat-composer.js';
 import { useSessionHistoryWindow } from './useSessionHistoryWindow.js';
 
 type ChatMessage = {
@@ -75,6 +76,37 @@ const mergeHistoryMessages = (olderMessages: readonly ChatMessage[], newerMessag
   return [...merged.values()].sort((left, right) => left.id.localeCompare(right.id));
 };
 
+const readPixelValue = (value: string, fallback = 0): number => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const syncComposerHeight = (textarea: HTMLTextAreaElement | null): void => {
+  if (!textarea || typeof window === 'undefined') {
+    return;
+  }
+
+  const styles = window.getComputedStyle(textarea);
+  const fontSize = readPixelValue(styles.fontSize, 16);
+  const lineHeight =
+    styles.lineHeight === 'normal' ? fontSize * 1.5 : readPixelValue(styles.lineHeight, fontSize * 1.5);
+
+  textarea.style.height = 'auto';
+
+  const { height, maxHeight, overflowY } = calculateComposerHeight({
+    scrollHeight: textarea.scrollHeight,
+    lineHeight,
+    paddingTop: readPixelValue(styles.paddingTop),
+    paddingBottom: readPixelValue(styles.paddingBottom),
+    borderTopWidth: readPixelValue(styles.borderTopWidth),
+    borderBottomWidth: readPixelValue(styles.borderBottomWidth),
+  });
+
+  textarea.style.maxHeight = `${maxHeight}px`;
+  textarea.style.height = `${height}px`;
+  textarea.style.overflowY = overflowY;
+};
+
 export const Chat = ({
   skillStore,
   modelConnected,
@@ -103,6 +135,9 @@ export const Chat = ({
   const mountedRef = useRef(true);
   const sessionIDRef = useRef<string | null>(null);
   const memoryCommitRef = useRef<Promise<void>>(Promise.resolve());
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const draftRef = useRef('');
+  const abortRequestedRef = useRef(false);
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
 
   useEffect(() => {
@@ -170,14 +205,20 @@ export const Chat = ({
   useEffect(() => {
     const existing = sessionIDRef.current;
     sessionIDRef.current = null;
+    abortRequestedRef.current = false;
     if (existing) {
       void client.session.abort({ sessionID: existing });
     }
     setMessages([]);
     setDraft('');
+    draftRef.current = '';
     setHistoryCursor(null);
     setHistoryLoading(false);
   }, [activeSkillsRevision, client]);
+
+  useLayoutEffect(() => {
+    syncComposerHeight(composerRef.current);
+  }, [input]);
 
   const loadHistoryPage = async (sessionID: string, before?: string): Promise<{ messages: ChatMessage[]; cursor: string | null }> => {
     const history = await client.session.messages({
@@ -259,6 +300,54 @@ export const Chat = ({
     return session.id;
   };
 
+  const abortActiveStream = async (): Promise<void> => {
+    if (!busy) {
+      return;
+    }
+
+    abortRequestedRef.current = true;
+    setStatus('Stopping…');
+
+    const activeSessionID = sessionIDRef.current;
+    if (!activeSessionID) {
+      return;
+    }
+
+    try {
+      await client.session.abort({ sessionID: activeSessionID });
+    } catch (error) {
+      abortRequestedRef.current = false;
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      console.warn('Failed to abort the active OpenCode session.', error);
+      setStatus('Unable to stop current response.');
+    }
+  };
+
+  useEffect(() => {
+    if (!busy || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleWindowKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (!shouldAbortComposerKey({ key: event.key, isStreaming: busy })) {
+        return;
+      }
+
+      event.preventDefault();
+      void abortActiveStream();
+    };
+
+    window.addEventListener('keydown', handleWindowKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleWindowKeyDown);
+    };
+  }, [busy, client]);
+
   const openPlaybookWithDraft = (seedDraft: SkillDraft): void => {
     if (!dockviewApi) {
       return;
@@ -313,16 +402,32 @@ export const Chat = ({
       return;
     }
 
+    abortRequestedRef.current = false;
     setBusy(true);
     setStatus('Waiting for OpenCode…');
     setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', text }]);
     setInput('');
     setDraft('');
+    draftRef.current = '';
 
     try {
       const activeSessionID = await ensureSession();
+      if (abortRequestedRef.current) {
+        setStatus('OpenCode is ready.');
+        return;
+      }
+
       const relevantEntities = await resolveRelevantEntities(text, 6);
+      if (abortRequestedRef.current) {
+        setStatus('OpenCode is ready.');
+        return;
+      }
+
       await injectMemoryContext(client, activeSessionID, relevantEntities);
+      if (abortRequestedRef.current) {
+        setStatus('OpenCode is ready.');
+        return;
+      }
 
       const stream = streamSessionEvents(client, activeSessionID);
       const toolResults: Array<{ name: string; output: string }> = [];
@@ -333,7 +438,11 @@ export const Chat = ({
           }
 
           if (event.type === 'token') {
-            setDraft((current) => current + event.text);
+            setDraft((current) => {
+              const next = current + event.text;
+              draftRef.current = next;
+              return next;
+            });
           } else if (event.type === 'tool_call') {
             setStatus(`Running ${event.name}…`);
           } else if (event.type === 'tool_result') {
@@ -342,7 +451,7 @@ export const Chat = ({
           } else if (event.type === 'file_written') {
             onFileWritten?.(event.path);
           } else if (event.type === 'error') {
-            setStatus(event.message);
+            setStatus(abortRequestedRef.current ? 'OpenCode is ready.' : event.message);
           } else if (event.type === 'done') {
             setStatus('OpenCode is ready.');
           }
@@ -363,15 +472,37 @@ export const Chat = ({
       });
       await consumeStream;
 
+      const aborted = abortRequestedRef.current;
+      const partialDraft = draftRef.current.trim();
       const historyPage = await refreshHistory(activeSessionID);
-      if (mountedRef.current) {
-        setDraft('');
+      if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
+        return;
+      }
+
+      setDraft('');
+      draftRef.current = '';
+
+      if (aborted && partialDraft.length > 0) {
+        const historyAlreadyHasPartial = historyPage?.messages.some(
+          (message) => message.role === 'assistant' && message.text === partialDraft,
+        );
+
+        if (!historyAlreadyHasPartial) {
+          setMessages((current) => [
+            ...current,
+            {
+              id: `assistant-abort-${Date.now()}`,
+              role: 'assistant',
+              text: partialDraft,
+            },
+          ]);
+        }
       }
 
       const assistantMessage = historyPage?.messages
         .filter((message) => message.role === 'assistant')
         .at(-1)?.text;
-      if (assistantMessage && vaultPath) {
+      if (!aborted && assistantMessage && vaultPath) {
         memoryCommitRef.current = memoryCommitRef.current.then(async () => {
           try {
             const result = await captureConversationMemory(opencode, vaultPath, {
@@ -404,9 +535,32 @@ export const Chat = ({
       ]);
       setStatus('Chat hit an error.');
     } finally {
+      abortRequestedRef.current = false;
       if (mountedRef.current) {
         setBusy(false);
       }
+    }
+  };
+
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (shouldAbortComposerKey({ key: event.key, isStreaming: busy })) {
+      event.preventDefault();
+      void abortActiveStream();
+      return;
+    }
+
+    if (
+      shouldSubmitComposerKey({
+        key: event.key,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        isComposing: event.nativeEvent.isComposing,
+      })
+    ) {
+      event.preventDefault();
+      void sendMessage();
     }
   };
 
@@ -454,15 +608,18 @@ export const Chat = ({
         {draft ? <div className="tinker-message tinker-message--assistant">{draft}</div> : null}
       </div>
 
-      <div className="tinker-composer">
+      <div className={`tinker-composer${busy ? ' tinker-composer--busy' : ''}`}>
         <Textarea
+          ref={composerRef}
           value={input}
           rows={4}
+          resize="none"
           placeholder="Ask about the vault, your project, or the next change to make."
           onChange={(event) => setInput(event.currentTarget.value)}
+          onKeyDown={handleComposerKeyDown}
           disabled={busy || !modelConnected}
         />
-        <div className="tinker-inline-actions">
+        <div className="tinker-inline-actions tinker-composer-actions">
           <ModelPicker
             items={modelOptions}
             value={selectedModelId}
@@ -471,13 +628,15 @@ export const Chat = ({
             disabled={busy}
             emptyLabel="No models available in OpenCode."
           />
-          <Button
-            variant="primary"
-            onClick={sendMessage}
-            disabled={busy || !modelConnected || input.trim().length === 0}
-          >
-            {busy ? 'Streaming…' : 'Send message'}
-          </Button>
+          {busy ? (
+            <Button variant="danger" onClick={() => void abortActiveStream()}>
+              Stop
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={sendMessage} disabled={!modelConnected || input.trim().length === 0}>
+              Send message
+            </Button>
+          )}
         </div>
       </div>
     </section>
