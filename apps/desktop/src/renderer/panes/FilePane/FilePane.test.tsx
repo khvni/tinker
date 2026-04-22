@@ -2,6 +2,7 @@ import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { isValidElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { XLSX_MIME } from '../../renderers/file-utils.js';
 import { getRenderer, resetPaneRegistry } from '../../workspace/pane-registry.js';
 
 vi.mock('@tauri-apps/plugin-shell', () => ({
@@ -89,6 +90,25 @@ describe('FilePane', () => {
     expect(markup).toContain('PPTX preview');
     expect(markup).toContain('Inline PowerPoint preview is unavailable.');
     expect(markup).toContain('Open externally');
+  });
+
+  it('routes xlsx files through the workbook renderer', () => {
+    expect(mimeToRenderer[XLSX_MIME]).toBeDefined();
+
+    const element = FilePane({
+      data: {
+        kind: 'file',
+        path: '/tmp/roadmap.xlsx',
+        mime: XLSX_MIME,
+      },
+    });
+
+    expect(isValidElement(element)).toBe(true);
+    if (!isValidElement(element)) {
+      throw new Error('FilePane did not return a React element for xlsx.');
+    }
+
+    expect(element.type).toBe(mimeToRenderer[XLSX_MIME]);
   });
 
   it('opens unsupported files through the OS shell helper', async () => {
