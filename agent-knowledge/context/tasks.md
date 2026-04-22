@@ -171,7 +171,7 @@ Spec: [[28-mvp-identity]] · Depends on: existing `packages/auth-sidecar` scaffo
 | 8.11 | Settings pane: "Account" section shows current user's name + avatar + provider + `<Button>Sign out</Button>`. Sign-out clears keychain + returns to sign-in screen. | M | 8.10 | not started | Routes through `clear_refresh_token` + resets `useCurrentUser` state. |
 | 8.12 | Auto-sign-in on cold launch: Rust checks keychain for any refresh token → if found, Better Auth sidecar validates → `useCurrentUser` resolves without showing sign-in screen. If invalid, fall through to sign-in. | M | 8.8, 8.10 | not started | Silent sign-in. |
 | 8.13 | Per-user memory subdir creation: on successful sign-in, ensure `<memory_root>/<user-id>/` exists. On user-switch, re-resolve. Triggers M6.9. | S | 8.3, 6.3 | not started | One-liner wired to 8.10's sign-in callback. |
-| 8.14 | Chat-history JSONL file format doc: one line per OpenCode SSE event, `{ ts, event, data }`. Deliverable: short `agent-knowledge/reference/chat-history-format.md`. | S | — | not started | Schema reference for M2.11 + M2.12. |
+| 8.14 | Chat-history JSONL file format doc: one line per OpenCode SSE event, `{ ts, event, data }`. Deliverable: short `agent-knowledge/reference/chat-history-format.md`. | S | — | review (TIN-87, PR pending) | Schema reference for M2.11 + M2.12. |
 | 8.15 | Integration test: sign in as User A → pick folder F → send message → sign out → sign in as User B → folder F session NOT visible in switcher → User B picks folder F → new JSONL created under `.tinker/chats/<user-b-id>/`. Doc result in `docs/mvp-verification.md`. | S | 8.11, 2.7, 2.11 | not started | End-to-end identity-scoping proof. |
 
 ### Cross-cutting (small stuff that any task can inherit)
