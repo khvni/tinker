@@ -247,6 +247,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | Ticket | Feature | Scope | Status | Notes |
 |--------|---------|-------|--------|-------|
 | TIN-112 | 02 | Playbook shared skill schema + markdown frontmatter spec | review | PR #46 |
+| TIN-208 | 02 / cross-cutting | PR #106 integration guard: keep deferred Playbook UI out of `Workspace` / `Titlebar` / pane registration until TIN-203 route split; document merge path + add regression tests. | review | PR #121 · Branch `khvni/tin-208-shell`. No Playbook UI merged here; this codifies the split path for PR #106. |
 | TIN-164 | release | macOS signing + notarization | review | PR #47. Universal macOS release workflow, DMG notarization/stapling, operator docs. |
 | TIN-167 | release | Cross-platform tag-triggered GitHub Release pipeline + updater manifest | review | PR #49. Supersedes TIN-164 scope on `v*` tag trigger; reconcile before merge. |
 | TIN-176 | UI.1 | Paper design source audit + tokens.css parity report | review | `agent-knowledge/reference/paper-design-audit.md`. Dark tokens 1:1 match; light surface tokens drift (D23 layer reversal inverted in code). Blocks downstream UI cleanup chain. |
