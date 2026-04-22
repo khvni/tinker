@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 import type { TinkerPaneData } from '@tinker/shared-types';
-import { MemoryPane } from './components/MemoryPane/index.js';
+import { MemoryPane } from '../panes/MemoryPane/index.js';
 import { getRenderer, registerPane } from './pane-registry.js';
 
 const renderSettingsPane = (
