@@ -10,6 +10,7 @@ type RegisteredChatPaneProps = {
   paneId?: string;
   paneData?: Extract<TinkerPaneData, { readonly kind: 'chat' }>;
   onAttentionSignal?: (reason: FlashReason) => void;
+  onSelectSessionFolder?: () => Promise<void> | void;
   onDuplicatePane?: () => void;
   onClosePane?: () => void;
 };
@@ -20,20 +21,37 @@ export const RegisteredChatPane = ({
   paneId,
   paneData,
   onAttentionSignal,
+  onSelectSessionFolder: propOnSelectSessionFolder,
   onDuplicatePane,
   onClosePane,
 }: RegisteredChatPaneProps): JSX.Element => {
   const runtime = useChatPaneRuntime();
-  const { persistPaneSessionId, ...chatRuntime } = runtime;
+  const {
+    persistPaneSessionId,
+    getConnectionForPane,
+    releaseConnectionForPane,
+    onSelectSessionFolder: runtimeOnSelectSessionFolder,
+    ...chatRuntime
+  } = runtime;
+
+  const paneDataWithDefaults = paneData ?? ({ kind: 'chat' } as Extract<TinkerPaneData, { readonly kind: 'chat' }>);
+  const opencode = getConnectionForPane ? getConnectionForPane(paneDataWithDefaults) : chatRuntime.opencode;
 
   return (
     <Chat
       {...chatRuntime}
+      opencode={opencode}
       {...(isActive !== undefined ? { paneIsActive: isActive } : {})}
       {...(onAttentionSignal ? { onAttentionSignal } : {})}
       {...(onDuplicatePane ? { onDuplicatePane } : {})}
       {...(onClosePane ? { onClosePane } : {})}
       {...(paneData?.sessionId ? { paneSessionId: paneData.sessionId } : {})}
+      onSelectSessionFolder={propOnSelectSessionFolder ?? runtimeOnSelectSessionFolder}
+      onReleaseOpencode={() => {
+        if (releaseConnectionForPane) {
+          void releaseConnectionForPane(paneDataWithDefaults);
+        }
+      }}
       {...(persistPaneSessionId && tabId && paneId
         ? {
             onPersistSessionId: (sessionId: string) =>

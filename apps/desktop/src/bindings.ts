@@ -22,6 +22,7 @@ export type OpencodeConnection = {
   baseUrl: string;
   username: string;
   password: string;
+  pid?: number;
 };
 
 export type AuthHandle = {

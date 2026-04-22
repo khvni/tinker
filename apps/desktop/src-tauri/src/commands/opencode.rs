@@ -25,6 +25,8 @@ const OPENCODE_SERVER_USERNAME: &str = "tinker";
 pub struct OpencodeHandle {
   pub base_url: String,
   pub pid: u32,
+  pub username: String,
+  pub password: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -173,6 +175,52 @@ async fn wait_for_listening(rx: &mut Receiver<CommandEvent>) -> Result<String, S
   }
 }
 
+/// Canonicalises `folder_path`, falling back to the caller-provided value when
+/// the path does not yet exist on disk. Anchoring the manifest key against a
+/// canonical path means two string-different paths (symlinks, trailing slash,
+/// `.` segments) pointing at the same inode share a sidecar.
+fn canonical_folder_path(folder_path: &str) -> String {
+  match fs::canonicalize(folder_path) {
+    Ok(path) => path.to_string_lossy().into_owned(),
+    Err(_) => folder_path.to_string(),
+  }
+}
+
+/// Returns the first manifest whose `(folder_path, user_id, memory_subdir)`
+/// matches and whose recorded pid is still alive + whose `/health` endpoint
+/// is responsive. Callers use this to skip the spawn path when an existing
+/// sidecar already serves the requested binding key.
+async fn find_live_matching(
+  manifests_dir: &Path,
+  folder: &str,
+  user: &str,
+  memory: &str,
+) -> Result<Option<OpencodeManifest>, String> {
+  for (_, manifest) in list_manifests(manifests_dir)? {
+    if manifest.folder_path != folder
+      || manifest.user_id != user
+      || manifest.memory_subdir != memory
+    {
+      continue;
+    }
+    if !process_alive(manifest.pid) {
+      continue;
+    }
+    // TODO(TIN-192): integration-level coverage for the `/health` probe
+    // belongs in `apps/desktop/src-tauri/tests/`. Unit tests here assert the
+    // pure predicates (manifest empty, dead pid, key mismatch) and leave the
+    // HTTP stub to integration scope.
+    if wait_for_health(&manifest.base_url, OPENCODE_SERVER_USERNAME, &manifest.secret)
+      .await
+      .is_err()
+    {
+      continue;
+    }
+    return Ok(Some(manifest));
+  }
+  Ok(None)
+}
+
 #[tauri::command]
 pub async fn start_opencode(
   app: AppHandle,
@@ -187,13 +235,30 @@ pub async fn start_opencode(
     return Err("user_id must not be empty".to_string());
   }
 
-  let session_id = random_url_safe(16);
-  let username = OPENCODE_SERVER_USERNAME.to_string();
-  let secret = random_url_safe(24);
+  let folder_path = canonical_folder_path(&folder_path);
   let home = app
     .path()
     .home_dir()
     .map_err(|e| format!("resolve home dir: {e}"))?;
+  let manifests_dir_path = manifests_dir(&home)?;
+
+  // Idempotency: a live sidecar already bound to this key is reused verbatim —
+  // no kill, no respawn, no manifest rewrite. Matches anomalyco's
+  // "don't kill what you don't have to" ethos (see TIN-192 design §4.1).
+  if let Some(existing) =
+    find_live_matching(&manifests_dir_path, &folder_path, &user_id, &memory_subdir).await?
+  {
+    return Ok(OpencodeHandle {
+      base_url: existing.base_url,
+      pid: existing.pid,
+      username: OPENCODE_SERVER_USERNAME.to_string(),
+      password: existing.secret,
+    });
+  }
+
+  let session_id = random_url_safe(16);
+  let username = OPENCODE_SERVER_USERNAME.to_string();
+  let secret = random_url_safe(24);
 
   let (mut rx, child) = app
     .shell()
@@ -243,7 +308,7 @@ pub async fn start_opencode(
     base_url: base_url.clone(),
     session_id: session_id.clone(),
   };
-  let manifest_path = manifests_dir(&home)?.join(format!("{session_id}.json"));
+  let manifest_path = manifests_dir_path.join(format!("{session_id}.json"));
   let manifest_json = serde_json::to_string_pretty(&manifest)
     .map_err(|e| format!("serialize manifest: {e}"))?;
   fs::write(&manifest_path, manifest_json)
@@ -283,7 +348,12 @@ pub async fn start_opencode(
     }
   });
 
-  Ok(OpencodeHandle { base_url, pid })
+  Ok(OpencodeHandle {
+    base_url,
+    pid,
+    username,
+    password: secret,
+  })
 }
 
 #[cfg(unix)]
@@ -553,10 +623,14 @@ mod tests {
     let handle = OpencodeHandle {
       base_url: "http://127.0.0.1:1".into(),
       pid: 42,
+      username: "tinker".into(),
+      password: "secret".into(),
     };
     let json = serde_json::to_string(&handle).unwrap();
     assert!(json.contains("\"baseUrl\":\"http://127.0.0.1:1\""));
     assert!(json.contains("\"pid\":42"));
+    assert!(json.contains("\"username\":\"tinker\""));
+    assert!(json.contains("\"password\":\"secret\""));
   }
 
   #[cfg(unix)]
@@ -579,6 +653,29 @@ mod tests {
       folder_path: "/tmp".into(),
       user_id: "u".into(),
       memory_subdir: "/tmp/u".into(),
+      base_url: "http://127.0.0.1:1".into(),
+      session_id: session_id.into(),
+    };
+    let path = dir.join(format!("{session_id}.json"));
+    fs::write(&path, serde_json::to_string(&manifest).unwrap()).unwrap();
+    path
+  }
+
+  fn write_manifest_full(
+    dir: &Path,
+    session_id: &str,
+    pid: u32,
+    folder_path: &str,
+    user_id: &str,
+    memory_subdir: &str,
+  ) -> PathBuf {
+    let manifest = OpencodeManifest {
+      pid,
+      port: 1,
+      secret: "s".into(),
+      folder_path: folder_path.into(),
+      user_id: user_id.into(),
+      memory_subdir: memory_subdir.into(),
       base_url: "http://127.0.0.1:1".into(),
       session_id: session_id.into(),
     };
@@ -641,6 +738,58 @@ mod tests {
     assert_eq!(manifests.len(), 1, "only opencode manifests returned");
     assert!(auth_manifest.exists(), "foreign sidecar file is preserved");
     assert!(opencode_manifest.exists());
+  }
+
+  #[tokio::test]
+  async fn find_live_matching_returns_none_when_no_manifest() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let result = find_live_matching(tmp.path(), "/tmp/vault", "user-1", "/tmp/memory/user-1")
+      .await
+      .expect("find_live_matching succeeds on empty manifest dir");
+    assert!(result.is_none(), "empty manifest dir yields no match");
+  }
+
+  #[cfg(unix)]
+  #[tokio::test]
+  async fn find_live_matching_returns_none_on_dead_pid() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    // `u32::MAX` is well past the pid space any running unix kernel will ever
+    // assign, so `process_alive` reliably returns false without a real reap.
+    let _manifest = write_manifest_full(
+      tmp.path(),
+      "dead",
+      u32::MAX,
+      "/tmp/vault",
+      "user-1",
+      "/tmp/memory/user-1",
+    );
+
+    let result = find_live_matching(tmp.path(), "/tmp/vault", "user-1", "/tmp/memory/user-1")
+      .await
+      .expect("find_live_matching succeeds when only dead pids match");
+
+    assert!(result.is_none(), "dead pid does not count as a live match");
+  }
+
+  #[tokio::test]
+  async fn find_live_matching_returns_none_on_key_mismatch() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    // The only manifest is anchored on `/tmp/vault-a`; we query `/tmp/vault-b`
+    // and expect `None` without any health probing because no key matched.
+    let _manifest = write_manifest_full(
+      tmp.path(),
+      "other",
+      1,
+      "/tmp/vault-a",
+      "user-1",
+      "/tmp/memory/user-1",
+    );
+
+    let result = find_live_matching(tmp.path(), "/tmp/vault-b", "user-1", "/tmp/memory/user-1")
+      .await
+      .expect("find_live_matching succeeds when no key matches");
+
+    assert!(result.is_none(), "different folder yields no match");
   }
 
   #[cfg(unix)]

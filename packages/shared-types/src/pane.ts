@@ -30,7 +30,12 @@ export type TinkerPaneKind = 'chat' | 'file' | 'settings' | 'memory';
  * preferences survive layout restore and app restart.
  */
 export type TinkerPaneData =
-  | { readonly kind: 'chat'; readonly sessionId?: string }
+  | {
+      readonly kind: 'chat';
+      readonly sessionId?: string;
+      readonly folderPath?: string;
+      readonly memorySubdir?: string;
+    }
   | { readonly kind: 'file'; readonly path: string; readonly mime: string }
   | { readonly kind: 'settings' }
   | { readonly kind: 'memory' };

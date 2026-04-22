@@ -97,6 +97,7 @@ type ChatProps = {
   onClosePane?: () => void;
   paneIsActive?: boolean;
   onAttentionSignal?: (reason: 'notification-arrival') => void;
+  onReleaseOpencode?: () => void;
 };
 
 const MODE_ITEMS: ReadonlyArray<MenuItem<SessionMode>> = [
@@ -246,6 +247,7 @@ export const Chat = ({
   onClosePane,
   paneIsActive = true,
   onAttentionSignal,
+  onReleaseOpencode,
 }: ChatProps): JSX.Element => {
   const folderPickerAvailable = typeof onSelectSessionFolder === 'function';
   const awaitingFolder = !sessionFolderPath && folderPickerAvailable;
@@ -298,6 +300,9 @@ export const Chat = ({
   });
   const composerBlocked = busy || hydratingHistory || awaitingFolder || !modelConnected || mcpConnectionGate.blocked;
 
+  const releaseRef = useRef(onReleaseOpencode);
+  releaseRef.current = onReleaseOpencode;
+
   useEffect(() => {
     mountedRef.current = true;
 
@@ -315,6 +320,7 @@ export const Chat = ({
       if (activeSessionID) {
         void client.session.abort({ sessionID: activeSessionID });
       }
+      releaseRef.current?.();
     };
   }, [client]);
 
