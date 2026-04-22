@@ -1,7 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import DOMPurify from 'dompurify';
 import { Renderer, marked, type Tokens } from 'marked';
-import type { IDockviewPanelProps } from 'dockview-react';
 import { parseFrontmatter } from '@tinker/memory';
 import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 import { readTextFile } from '@tauri-apps/plugin-fs';
@@ -64,12 +63,12 @@ export const renderMarkdown = async (text: string): Promise<string> => {
   });
 };
 
-type MarkdownRendererProps = IDockviewPanelProps<FilePaneParams> & {
+type MarkdownRendererProps = {
+  params?: FilePaneParams;
   vaultRevision: number;
 };
 
-export const MarkdownRenderer = ({ api, params, vaultRevision }: MarkdownRendererProps): JSX.Element => {
-  void api;
+export const MarkdownRenderer = ({ params, vaultRevision }: MarkdownRendererProps): JSX.Element => {
   const path = params?.path;
   const [html, setHtml] = useState('');
   const [error, setError] = useState<string | null>(null);

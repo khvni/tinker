@@ -9,7 +9,7 @@ import { getDatabase } from './database.js';
 
 export type LayoutRow = {
   version: number;
-  dockview_model_json: string;
+  workspace_state_json: string | null;
   updated_at: string;
 };
 
@@ -76,7 +76,7 @@ export const hydrateLayoutRow = (row: LayoutRow | undefined, userId: string): La
     return null;
   }
 
-  const payload = parseStoredLayout(row.dockview_model_json);
+  const payload = row.workspace_state_json ? parseStoredLayout(row.workspace_state_json) : null;
   if (!payload || typeof payload !== 'object') {
     console.warn(`Ignoring stored layout for user ${userId}: payload was not valid JSON.`);
     return null;
@@ -105,7 +105,7 @@ export const createLayoutStore = (): LayoutStore => {
     async load(userId: string): Promise<LayoutState | null> {
       const database = await getDatabase();
       const rows = await database.select<LayoutRow[]>(
-        `SELECT version, dockview_model_json, updated_at
+        `SELECT version, workspace_state_json, updated_at
          FROM layouts
          WHERE user_id = $1
          LIMIT 1`,
@@ -119,11 +119,11 @@ export const createLayoutStore = (): LayoutStore => {
       const database = await getDatabase();
 
       await database.execute(
-        `INSERT INTO layouts (user_id, version, dockview_model_json, updated_at)
+        `INSERT INTO layouts (user_id, version, workspace_state_json, updated_at)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT(user_id) DO UPDATE SET
            version = excluded.version,
-           dockview_model_json = excluded.dockview_model_json,
+           workspace_state_json = excluded.workspace_state_json,
            updated_at = excluded.updated_at`,
         [userId, state.version, serializeLayoutState(state), state.updatedAt],
       );

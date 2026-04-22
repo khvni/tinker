@@ -162,6 +162,89 @@ describe('streamSessionEvents', () => {
     ]);
   });
 
+  it('emits context_usage from assistant message updates', async () => {
+    const client = makeClient([
+      makeEvent('message.updated', {
+        sessionID: 'session-1',
+        info: {
+          id: 'msg-1',
+          role: 'assistant',
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          tokens: {
+            total: 12_345,
+            input: 12_000,
+            output: 300,
+            reasoning: 45,
+          },
+        },
+      }),
+      makeEvent('session.idle', {
+        sessionID: 'session-1',
+      }),
+    ]);
+
+    const events = await collectEvents(streamSessionEvents(client, 'session-1'));
+
+    expect(events).toEqual([
+      {
+        type: 'context_usage',
+        providerID: 'anthropic',
+        modelID: 'claude-sonnet-4',
+        tokens: {
+          total: 12_345,
+          input: 12_000,
+          output: 300,
+          reasoning: 45,
+        },
+      },
+      { type: 'done' },
+    ]);
+  });
+
+  it('emits context_usage from step-finish parts during streaming', async () => {
+    const client = makeClient([
+      makeEvent('message.part.updated', {
+        sessionID: 'session-1',
+        part: {
+          type: 'step-finish',
+          messageID: 'msg-1',
+          sessionID: 'session-1',
+          reason: 'stop',
+          cost: 0.1,
+          tokens: {
+            input: 20_000,
+            output: 2_000,
+            reasoning: 500,
+            cache: {
+              read: 0,
+              write: 0,
+            },
+          },
+        } as Part,
+      }),
+      makeEvent('session.idle', {
+        sessionID: 'session-1',
+      }),
+    ]);
+
+    const events = await collectEvents(streamSessionEvents(client, 'session-1'));
+
+    expect(events).toEqual([
+      {
+        type: 'context_usage',
+        providerID: null,
+        modelID: null,
+        tokens: {
+          input: 20_000,
+          output: 2_000,
+          reasoning: 500,
+        },
+      },
+      { type: 'done' },
+    ]);
+  });
+
   it('emits a tool_error event when a ToolPart finishes with status=error', async () => {
     const client = makeClient([
       makeEvent('message.part.updated', {

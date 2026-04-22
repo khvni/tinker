@@ -1,11 +1,24 @@
 import type { Event, OpencodeClient, Part, ToolPart } from '@opencode-ai/sdk/v2/client';
 
+type ContextUsageTokens = {
+  total?: number;
+  input: number;
+  output: number;
+  reasoning: number;
+};
+
 export type TinkerStreamEvent =
   | { type: 'token'; partID: string; text: string }
   | { type: 'reasoning'; partID: string; text: string }
   | { type: 'tool_call'; partID: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; partID: string; name: string; output: string }
   | { type: 'tool_error'; partID: string; name: string; message: string }
+  | {
+      type: 'context_usage';
+      providerID: string | null;
+      modelID: string | null;
+      tokens: ContextUsageTokens;
+    }
   | { type: 'file_written'; path: string }
   | { type: 'done' }
   | { type: 'error'; message: string };
@@ -66,6 +79,79 @@ const asFileWrites = (part: Part): TinkerStreamEvent[] => {
   return [];
 };
 
+const readContextUsageTokens = (value: unknown): ContextUsageTokens | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const usage = value as {
+    total?: unknown;
+    input?: unknown;
+    output?: unknown;
+    reasoning?: unknown;
+  };
+
+  if (
+    typeof usage.input !== 'number'
+    || typeof usage.output !== 'number'
+    || typeof usage.reasoning !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    ...(typeof usage.total === 'number' ? { total: usage.total } : {}),
+    input: usage.input,
+    output: usage.output,
+    reasoning: usage.reasoning,
+  };
+};
+
+const asContextUsageFromMessage = (
+  event: Extract<Event, { type: 'message.updated' }>,
+): TinkerStreamEvent | null => {
+  const info = event.properties.info as {
+    role?: unknown;
+    providerID?: unknown;
+    modelID?: unknown;
+    tokens?: unknown;
+  };
+
+  if (info.role !== 'assistant') {
+    return null;
+  }
+
+  const tokens = readContextUsageTokens(info.tokens);
+  if (!tokens) {
+    return null;
+  }
+
+  return {
+    type: 'context_usage',
+    providerID: typeof info.providerID === 'string' ? info.providerID : null,
+    modelID: typeof info.modelID === 'string' ? info.modelID : null,
+    tokens,
+  };
+};
+
+const asContextUsageFromPart = (part: Part): TinkerStreamEvent | null => {
+  if (part.type !== 'step-finish') {
+    return null;
+  }
+
+  const tokens = readContextUsageTokens(part.tokens);
+  if (!tokens) {
+    return null;
+  }
+
+  return {
+    type: 'context_usage',
+    providerID: null,
+    modelID: null,
+    tokens,
+  };
+};
+
 const readErrorMessage = (event: Extract<Event, { type: 'session.error' }>): string => {
   const error = event.properties.error;
   if (!error) {
@@ -93,6 +179,14 @@ export const streamSessionEvents = async function* (
       continue;
     }
 
+    if (event.type === 'message.updated') {
+      const usageEvent = asContextUsageFromMessage(event);
+      if (usageEvent) {
+        yield usageEvent;
+      }
+      continue;
+    }
+
     if (event.type === 'message.part.delta' && event.properties.field === 'text') {
       const { partID, delta } = event.properties;
       if (reasoningPartIDs.has(partID)) {
@@ -105,6 +199,10 @@ export const streamSessionEvents = async function* (
 
     if (event.type === 'message.part.updated') {
       const { part } = event.properties;
+      const usageEvent = asContextUsageFromPart(part);
+      if (usageEvent) {
+        yield usageEvent;
+      }
 
       if (part.type === 'reasoning') {
         // Mark this partID so the streaming text deltas (which carry no type

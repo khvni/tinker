@@ -4,14 +4,9 @@
 // workspace layout uses to render pane content by kind. Renderers are narrowed
 // per kind via `TinkerPaneData`'s discriminator, so passing the wrong data
 // shape for a given kind is a compile error.
-//
-// The legacy `WorkspacePaneMap` / `createPaneRegistry` exports below are the
-// Dockview-coupled surface used by `Workspace.tsx`. They stay in place only
-// until M1.7 swaps the renderer tree onto `@tinker/panes`; M1.8 deletes them.
 
-import type { FunctionComponent, ReactNode } from 'react';
-import type { IDockviewPanelProps } from 'dockview-react';
-import type { TabKind, TinkerPaneData, TinkerPaneKind } from '@tinker/shared-types';
+import type { ReactNode } from 'react';
+import type { TinkerPaneData, TinkerPaneKind } from '@tinker/shared-types';
 
 // ──────────────────────────────────────────────────────────────────────────
 // New API (M1.2) — typed renderer registry keyed by `TinkerPaneKind`.
@@ -80,11 +75,3 @@ export const resetPaneRegistry = (): void => {
     delete renderers[key];
   }
 };
-
-// ──────────────────────────────────────────────────────────────────────────
-// Legacy Dockview surface — removed by M1.7/M1.8 alongside `dockview-react`.
-// ──────────────────────────────────────────────────────────────────────────
-
-export type WorkspacePaneMap = Record<TabKind, FunctionComponent<IDockviewPanelProps>>;
-
-export const createPaneRegistry = <T extends WorkspacePaneMap>(panes: T): T => panes;

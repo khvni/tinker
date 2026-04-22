@@ -1,11 +1,18 @@
-import type { TabKind } from '@tinker/shared-types';
-
 export type FilePaneParams = {
   path: string;
   mime?: string;
 };
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
+const MIME_BY_EXTENSION: Record<string, string> = {
+  '.csv': 'text/csv',
+  '.htm': 'text/html',
+  '.html': 'text/html',
+  '.json': 'application/json',
+  '.md': 'text/markdown',
+  '.txt': 'text/plain',
+  '.xml': 'text/xml',
+};
 const CODE_LANGUAGE_BY_EXTENSION: Record<string, string> = {
   '.c': 'c',
   '.cpp': 'cpp',
@@ -68,30 +75,25 @@ export const getPanelTitleForPath = (path: string): string => {
   return segments.at(-1) ?? path;
 };
 
-export const getPanelIdForPath = (component: TabKind, path: string): string => {
-  return `${component}:${path}`;
-};
-
-export const getTabKindForPath = (path: string): TabKind => {
+export const getFileMimeForPath = (path: string): string => {
   const extension = getFileExtension(path);
-
-  if (extension === '.md') {
-    return 'markdown';
-  }
-
-  if (extension === '.csv') {
-    return 'csv';
-  }
-
-  if (extension === '.html' || extension === '.htm') {
-    return 'html';
+  if (extension === '.svg') {
+    return 'image/svg+xml';
   }
 
   if (IMAGE_EXTENSIONS.has(extension)) {
-    return 'image';
+    return getImageMimeType(path);
   }
 
-  return 'code';
+  return MIME_BY_EXTENSION[extension] ?? 'text/plain';
+};
+
+export const getPanelIdForPath = (path: string, mime = getFileMimeForPath(path)): string => {
+  return `file:${encodeURIComponent(mime)}:${path}`;
+};
+
+export const getFileTitleForPath = (path: string, mime = getFileMimeForPath(path)): string => {
+  return mime === 'text/markdown; mode=edit' ? `${getPanelTitleForPath(path)} (Edit)` : getPanelTitleForPath(path);
 };
 
 export const getCodeLanguage = (path: string, mime?: string): string => {

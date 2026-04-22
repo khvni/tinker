@@ -28,7 +28,6 @@
     "@tinker/panes": "workspace:*",
     "@tinker/scheduler": "workspace:*",
     "@tinker/shared-types": "workspace:*",
-    "dockview-react": "^5.2.0",
     "dompurify": "^3.4.0",
     "highlight.js": "^11.11.1",
     "marked": "^18.0.0",
