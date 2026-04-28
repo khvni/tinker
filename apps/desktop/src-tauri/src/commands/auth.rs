@@ -786,7 +786,7 @@ async fn spawn_better_auth<R: Runtime>(
         sidecar = sidecar.current_dir(parent.to_path_buf());
     }
 
-    let (receiver, child) = sidecar.spawn().map_err(|error| error.to_string())?;
+    let (child, receiver) = sidecar.spawn().map_err(|error| error.to_string())?;
     let pid = child.pid();
     let runtime = BetterAuthRuntime {
         handle: AuthHandle {

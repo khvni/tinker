@@ -480,11 +480,12 @@ async fn reconcile_manifest_entry(manifests_dir: &Path, path: PathBuf, manifest:
           "[opencode:{}] orphan manifest health check failed: {error}",
           manifest.pid
         );
+        stop_opencode_inner(manifests_dir.to_path_buf(), manifest.pid)
+          .await
+          .map_err(|error| format!("stop unhealthy orphan {:?}: {error}", path))
+      } else {
+        Ok(())
       }
-
-      stop_opencode_inner(manifests_dir.to_path_buf(), manifest.pid)
-        .await
-        .map_err(|error| format!("stop unhealthy orphan {:?}: {error}", path))
     }
     Ok(_) => remove_manifest(&path),
     Err(error) => {

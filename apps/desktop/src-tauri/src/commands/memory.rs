@@ -202,7 +202,7 @@ mod memory_test {
     }
 
     #[test]
-    fn rejects_uppercase_or_leading_digit() {
+    fn rejects_leading_digit_or_hyphen() {
         assert!(validate_destination_dir("1people").is_err());
         assert!(validate_destination_dir("-people").is_err());
         assert!(validate_destination_dir("active-work").is_err());
