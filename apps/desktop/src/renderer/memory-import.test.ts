@@ -1,8 +1,9 @@
-import { describe, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as memory from '@tinker/memory';
 
 describe('memory import', () => {
-  it('imports', () => {
-    console.log('memory keys:', Object.keys(memory).slice(0, 5));
+  it('imports memory as a non-null object', () => {
+    expect(typeof memory).toBe('object');
+    expect(memory).not.toBeNull();
   });
 });
