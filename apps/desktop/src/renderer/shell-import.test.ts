@@ -1,8 +1,8 @@
-import { describe, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Command } from '@tauri-apps/plugin-shell';
 
 describe('shell import', () => {
-  it('imports', () => {
-    console.log('Command imported:', typeof Command);
+  it('imports Command as a function', () => {
+    expect(typeof Command).toBe('function');
   });
 });
