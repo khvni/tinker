@@ -347,40 +347,17 @@ export const Workspace = ({
       }
 
       const memorySubdir = await getActiveMemoryPath(currentUserId);
-      const state = workspaceStore.getState();
-      const activeTab = findActiveTab(state) ?? state.tabs[0] ?? null;
       const title = getPanelTitleForPath(folderPath.replace(/[\\/]+$/u, ''));
 
-      if (!activeTab) {
-        state.actions.openTab({
-          id: createWorkspaceTabId(),
-          pane: {
-            id: `chat-${crypto.randomUUID()}`,
-            kind: 'chat',
-            title,
-            data: { kind: 'chat', folderPath, memorySubdir },
-          },
-        });
-      } else {
-        const activePaneId = activeTab.activePaneId;
-        const activePane = activePaneId ? activeTab.panes[activePaneId] : null;
-
-        if (activePane?.data.kind === 'chat' && !activePane.data.sessionId && !activePane.data.folderPath) {
-          state.actions.updatePaneData(activeTab.id, activePane.id, (prev) => ({
-            ...prev,
-            folderPath,
-            memorySubdir,
-          }));
-          state.actions.renamePane(activeTab.id, activePane.id, title);
-        } else {
-          state.actions.addPane(activeTab.id, {
-            id: `chat-${crypto.randomUUID()}`,
-            kind: 'chat',
-            title,
-            data: { kind: 'chat', folderPath, memorySubdir },
-          });
-        }
-      }
+      workspaceStore.getState().actions.openTab({
+        id: createWorkspaceTabId(),
+        pane: {
+          id: `chat-${crypto.randomUUID()}`,
+          kind: 'chat',
+          title,
+          data: { kind: 'chat', folderPath, memorySubdir },
+        },
+      });
 
       setSessionSwitcherResolved(true);
       await refreshStoredSessions();
