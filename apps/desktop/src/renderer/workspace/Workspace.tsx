@@ -456,9 +456,10 @@ export const Workspace = ({
             const folderPath = await onSelectSessionFolder();
             if (folderPath) {
               const memorySubdir = await getActiveMemoryPath(currentUserId);
+              const currentConfig = (node.getConfig() ?? { kind: 'chat' }) as TinkerPaneData;
               model.doAction(
                 Actions.updateNodeAttributes(paneId, {
-                  config: { ...config, folderPath, memorySubdir },
+                  config: { ...currentConfig, folderPath, memorySubdir },
                 }),
               );
             }
@@ -474,13 +475,14 @@ export const Workspace = ({
               onDuplicatePane={() => {
                 const activeTabset = model.getActiveTabset();
                 if (activeTabset) {
+                  const liveConfig = (node.getConfig() ?? { kind: 'chat' }) as TinkerPaneData;
                   model.doAction(
                     Actions.addTab(
                       {
                         type: 'tab',
                         name: node.getName(),
                         component: 'chat',
-                        config: { ...config },
+                        config: { ...liveConfig },
                       },
                       activeTabset.getId(),
                       DockLocation.CENTER,
