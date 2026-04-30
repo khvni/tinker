@@ -38,7 +38,14 @@ export const collectTabIds = (model: Model): string[] => {
 export const openNewChatPanel = (model: Model): void => {
   const panelId = getNextChatPanelId(collectTabIds(model));
   const activeTabset = model.getActiveTabset();
-  const targetId = activeTabset?.getId() ?? model.getFirstTabSet().getId();
+  const firstTabset = model.getFirstTabSet();
+
+  if (!activeTabset && !firstTabset) {
+    console.warn('Cannot open a new chat panel because the workspace has no tabsets.');
+    return;
+  }
+
+  const targetId = activeTabset?.getId() ?? firstTabset.getId();
 
   model.doAction(
     Actions.addTab(
