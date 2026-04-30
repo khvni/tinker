@@ -240,7 +240,9 @@ export const Workspace = ({
   );
 
   const saveLayoutNow = useCallback((): void => {
-    const layoutJson = model.toJson();
+    const currentModel = modelRef.current;
+    if (!currentModel) return;
+    const layoutJson = currentModel.toJson();
 
     void layoutStore
       .save(currentUserId, {
@@ -252,7 +254,7 @@ export const Workspace = ({
       .catch((error) => {
         console.warn('Failed to persist workspace layout.', error);
       });
-  }, [currentUserId, layoutStore, model]);
+  }, [currentUserId, layoutStore]);
 
   const scheduleLayoutSave = useCallback((): void => {
     if (saveTimerRef.current !== null) {
@@ -433,8 +435,11 @@ export const Workspace = ({
 
   const handleModelChange = useCallback((_model: Model, _action: Action): void => {
     scheduleLayoutSave();
-    setActiveRailItem(getActivePaneKind(model));
-  }, [scheduleLayoutSave, model]);
+    const currentModel = modelRef.current;
+    if (currentModel) {
+      setActiveRailItem(getActivePaneKind(currentModel));
+    }
+  }, [scheduleLayoutSave]);
 
   const factory = useCallback(
     (node: TabNode): JSX.Element | null => {
