@@ -15,10 +15,11 @@ import {
   subscribeMemoryPathChanged,
   syncActiveMemoryPath,
   upsertUser,
+  updateLastActive,
   type MemoryRunState,
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
-import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
+import type { LayoutStore, MemoryStore, ScheduledJobStore, Session, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
@@ -948,6 +949,11 @@ export const App = (): JSX.Element => {
     }
   };
 
+  const handleActivateSession = async (session: Session): Promise<void> => {
+    await updateLastActive(session.id, new Date().toISOString());
+    await bindSessionFolder(session.folderPath, false);
+  };
+
   const handleActiveSkillsChanged = (): void => {
     setState((current) =>
       current.status !== 'ready'
@@ -1223,6 +1229,7 @@ export const App = (): JSX.Element => {
         onContinueAsGuest={handleContinueAsGuest}
         sessionFolderBusy={sessionFolderBusy}
         onSelectSessionFolder={handleSelectSessionFolder}
+        onActivateSession={handleActivateSession}
         onCreateVault={handleCreateDefaultVault}
         onSelectVault={handleSelectSessionFolder}
         onConnectGoogle={() => handleProviderConnect('google')}
@@ -1241,19 +1248,15 @@ export const App = (): JSX.Element => {
         onRequestMcpRespawn={() => refreshAllConnectorState(currentSessions)}
         getConnectionForPane={(paneData) => {
           if (state.status !== 'ready') return WEB_PREVIEW_CONNECTION;
-          const folderPath = (paneData as unknown as { folderPath?: string }).folderPath;
-          const memorySubdir = (paneData as unknown as { memorySubdir?: string }).memorySubdir;
-          if (folderPath && memorySubdir) {
-            return connectionFor(state, bindingKey(folderPath, memorySubdir, currentUserId));
+          if (paneData.folderPath && paneData.memorySubdir) {
+            return connectionFor(state, bindingKey(paneData.folderPath, paneData.memorySubdir, currentUserId));
           }
           return defaultConnection(state);
         }}
         releaseConnectionForPane={(paneData) => {
           if (state.status !== 'ready') return;
-          const folderPath = (paneData as unknown as { folderPath?: string }).folderPath;
-          const memorySubdir = (paneData as unknown as { memorySubdir?: string }).memorySubdir;
-          if (folderPath && memorySubdir) {
-            void releaseOpencode(folderPath, memorySubdir, currentUserId);
+          if (paneData.folderPath && paneData.memorySubdir) {
+            void releaseOpencode(paneData.folderPath, paneData.memorySubdir, currentUserId);
           }
         }}
       />

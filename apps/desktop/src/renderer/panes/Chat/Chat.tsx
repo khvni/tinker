@@ -38,6 +38,7 @@ import {
   appendMemoryCapture,
   createSession,
   findLatestSessionForFolder,
+  getSession,
   getActiveMemoryPath,
   listSessionsForUser,
   subscribeMemoryPathChanged,
@@ -113,6 +114,8 @@ type ChatProps = {
   onDuplicatePane?: () => void;
   onClosePane?: () => void;
   paneIsActive?: boolean;
+  paneSessionId?: string;
+  onPersistSessionId?: (sessionId: string) => void;
   onAttentionSignal?: (reason: 'notification-arrival') => void;
   onReleaseOpencode?: () => void;
 };
@@ -266,6 +269,8 @@ export const Chat = ({
   onDuplicatePane,
   onClosePane,
   paneIsActive = true,
+  paneSessionId,
+  onPersistSessionId,
   onAttentionSignal,
   onReleaseOpencode,
 }: ChatProps): JSX.Element => {
@@ -498,8 +503,10 @@ export const Chat = ({
     void (async () => {
       try {
         const existingSession = await findLatestSessionForFolder(currentUserId, sessionFolderPath);
+        const pinnedSession = paneSessionId ? await getSession(paneSessionId) : null;
         const restoredSessionID =
-          existingSession?.id
+          pinnedSession?.id
+          ?? existingSession?.id
           ?? (await findLatestChatHistorySessionId({
             folderPath: sessionFolderPath,
             userId: currentUserId,
@@ -512,11 +519,12 @@ export const Chat = ({
           return;
         }
 
-        const restoredCreatedAt = existingSession?.createdAt ?? new Date().toISOString();
+        const restoredCreatedAt = pinnedSession?.createdAt ?? existingSession?.createdAt ?? new Date().toISOString();
         setRequiresMcpConnectionGate(false);
         activateSession(restoredSessionID, restoredCreatedAt);
+        onPersistSessionId?.(restoredSessionID);
 
-        if (!existingSession) {
+        if (!pinnedSession && !existingSession) {
           try {
             await createSession({
               id: restoredSessionID,
@@ -565,7 +573,7 @@ export const Chat = ({
     // installing a skill used to force this effect — which aborts the live
     // OpenCode session, wipes messages, and rehydrates from disk. Re-injection
     // now happens lazily in `injectActiveSkillsIfStale` before each prompt.
-  }, [activateSession, client, currentUserId, readyStatus, sessionFolderPath]);
+  }, [activateSession, client, currentUserId, onPersistSessionId, paneSessionId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     if (!activeSessionId || !selectedModel) {
@@ -830,6 +838,7 @@ export const Chat = ({
 
     const timestamp = new Date().toISOString();
     activateSession(session.id, timestamp);
+    onPersistSessionId?.(session.id);
     setRequiresMcpConnectionGate(false);
 
     if (selectedModel) {

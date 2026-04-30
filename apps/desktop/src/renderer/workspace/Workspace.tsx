@@ -10,12 +10,13 @@ import {
   Workspace as PanesWorkspace,
 } from '@tinker/panes';
 import '@tinker/panes/styles.css';
-import { getActiveMemoryPath, type MemoryRunState } from '@tinker/memory';
+import { getActiveMemoryPath, listSessionsForUser, type MemoryRunState } from '@tinker/memory';
 import {
   createDefaultWorkspacePreferences,
   type LayoutStore,
   type MemoryStore,
   type ScheduledJobStore,
+  type Session,
   type SkillStore,
   type SSOSession,
   type SSOStatus,
@@ -30,6 +31,7 @@ import { BUILTIN_MCP_NAMES, type BuiltinMcpName, type MCPStatus } from '../integ
 import { isAbsolutePath, getPanelTitleForPath } from '../renderers/file-utils.js';
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
 import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
+import { SessionSwitcher } from './components/SessionSwitcher/index.js';
 import { Titlebar } from './components/Titlebar/index.js';
 import { WorkspaceShell } from './components/WorkspaceShell/index.js';
 import { WorkspaceSidebar } from './components/WorkspaceSidebar/index.js';
@@ -86,6 +88,7 @@ type WorkspaceProps = {
   onContinueAsGuest(): Promise<void>;
   sessionFolderBusy: boolean;
   onSelectSessionFolder(): Promise<string | null>;
+  onActivateSession(session: Session): Promise<void>;
   onConnectModel(): Promise<void>;
   onDisconnectModel(): Promise<void>;
   onConnectGoogle(): Promise<void>;
@@ -159,6 +162,7 @@ export const Workspace = ({
   guestMessage,
   sessionFolderBusy,
   onSelectSessionFolder,
+  onActivateSession,
   googleAuthBusy,
   googleAuthMessage,
   githubAuthBusy,
@@ -202,6 +206,9 @@ export const Workspace = ({
     createDefaultWorkspacePreferences(),
   );
   const [pendingSettingsSectionId, setPendingSettingsSectionId] = useState<string | null>(null);
+  const [storedSessions, setStoredSessions] = useState<Session[]>([]);
+  const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
+  const [sessionSwitcherResolved, setSessionSwitcherResolved] = useState(false);
 
   const activeRailItem = useWorkspaceSelector<TinkerPaneData, TinkerPaneKind | null>(
     workspaceStore,
@@ -256,6 +263,141 @@ export const Workspace = ({
   const openNewChatPane = useCallback((): void => {
     openNewChatPanel(workspaceStore);
   }, [workspaceStore]);
+
+  const refreshStoredSessions = useCallback(async (): Promise<void> => {
+    try {
+      setSessionLoadError(null);
+      setStoredSessions(await listSessionsForUser(currentUserId));
+    } catch (error) {
+      setSessionLoadError(error instanceof Error ? error.message : String(error));
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    setSessionSwitcherResolved(false);
+    void refreshStoredSessions();
+  }, [refreshStoredSessions]);
+
+  const openSessionChatPane = useCallback(
+    async (session: Session): Promise<void> => {
+      const memorySubdir = await getActiveMemoryPath(currentUserId);
+      const state = workspaceStore.getState();
+      const activeTab = findActiveTab(state) ?? state.tabs[0] ?? null;
+      const title = getPanelTitleForPath(session.folderPath.replace(/[\\/]+$/u, ''));
+
+      if (!activeTab) {
+        state.actions.openTab({
+          id: createWorkspaceTabId(),
+          pane: {
+            id: `chat-${session.id}`,
+            kind: 'chat',
+            title,
+            data: {
+              kind: 'chat',
+              sessionId: session.id,
+              folderPath: session.folderPath,
+              memorySubdir,
+            },
+          },
+        });
+        return;
+      }
+
+      const existingPane = Object.values(activeTab.panes).find(
+        (pane) => pane.data.kind === 'chat' && pane.data.sessionId === session.id,
+      );
+      if (existingPane) {
+        state.actions.focusPane(activeTab.id, existingPane.id);
+        return;
+      }
+
+      const activePaneId = activeTab.activePaneId;
+      const activePane = activePaneId ? activeTab.panes[activePaneId] : null;
+      if (activePane?.data.kind === 'chat' && !activePane.data.sessionId && !activePane.data.folderPath) {
+        state.actions.updatePaneData(activeTab.id, activePane.id, () => ({
+          kind: 'chat',
+          sessionId: session.id,
+          folderPath: session.folderPath,
+          memorySubdir,
+        }));
+        state.actions.renamePane(activeTab.id, activePane.id, title);
+        return;
+      }
+
+      state.actions.addPane(activeTab.id, {
+        id: `chat-${session.id}`,
+        kind: 'chat',
+        title,
+        data: {
+          kind: 'chat',
+          sessionId: session.id,
+          folderPath: session.folderPath,
+          memorySubdir,
+        },
+      });
+    },
+    [currentUserId, workspaceStore],
+  );
+
+  const handleCreateSessionFromSwitcher = useCallback((): void => {
+    void (async () => {
+      const folderPath = await onSelectSessionFolder();
+      if (!folderPath) {
+        return;
+      }
+
+      const memorySubdir = await getActiveMemoryPath(currentUserId);
+      const state = workspaceStore.getState();
+      const activeTab = findActiveTab(state) ?? state.tabs[0] ?? null;
+      const title = getPanelTitleForPath(folderPath.replace(/[\\/]+$/u, ''));
+
+      if (!activeTab) {
+        state.actions.openTab({
+          id: createWorkspaceTabId(),
+          pane: {
+            id: `chat-${crypto.randomUUID()}`,
+            kind: 'chat',
+            title,
+            data: { kind: 'chat', folderPath, memorySubdir },
+          },
+        });
+      } else {
+        const activePaneId = activeTab.activePaneId;
+        const activePane = activePaneId ? activeTab.panes[activePaneId] : null;
+
+        if (activePane?.data.kind === 'chat' && !activePane.data.sessionId && !activePane.data.folderPath) {
+          state.actions.updatePaneData(activeTab.id, activePane.id, (prev) => ({
+            ...prev,
+            folderPath,
+            memorySubdir,
+          }));
+          state.actions.renamePane(activeTab.id, activePane.id, title);
+        } else {
+          state.actions.addPane(activeTab.id, {
+            id: `chat-${crypto.randomUUID()}`,
+            kind: 'chat',
+            title,
+            data: { kind: 'chat', folderPath, memorySubdir },
+          });
+        }
+      }
+
+      setSessionSwitcherResolved(true);
+      await refreshStoredSessions();
+    })();
+  }, [currentUserId, onSelectSessionFolder, refreshStoredSessions, workspaceStore]);
+
+  const handleSelectStoredSession = useCallback(
+    (session: Session): void => {
+      void (async () => {
+        await onActivateSession(session);
+        await openSessionChatPane(session);
+        setSessionSwitcherResolved(true);
+        await refreshStoredSessions();
+      })();
+    },
+    [onActivateSession, openSessionChatPane, refreshStoredSessions],
+  );
 
   const signalPaneAttention = useCallback(
     (paneId: string, reason: FlashReason): void => {
@@ -475,11 +617,12 @@ export const Workspace = ({
             const folderPath = await onSelectSessionFolder();
             if (folderPath) {
               const memorySubdir = await getActiveMemoryPath(currentUserId);
+              setSessionSwitcherResolved(true);
               workspaceStore.getState().actions.updatePaneData(tabId, pane.id, (prev) => ({
                 ...prev,
                 folderPath,
                 memorySubdir,
-              } as unknown as TinkerPaneData));
+              }));
             }
           };
           return (
@@ -540,6 +683,13 @@ export const Workspace = ({
       onOpenNewChat: openNewChatPane,
       onActiveSkillsChanged,
       onMemoryCommitted,
+      persistPaneSessionId: (tabId: string, paneId: string, sessionId: string) => {
+        workspaceStore.getState().actions.updatePaneData(tabId, paneId, (prev) => ({
+          ...prev,
+          sessionId,
+        }));
+        void refreshStoredSessions();
+      },
     }),
     [
       activeSkillsRevision,
@@ -554,6 +704,7 @@ export const Workspace = ({
       openNewChatPane,
       opencode,
       releaseConnectionForPane,
+      refreshStoredSessions,
       sessionFolderBusy,
       vaultPath,
       skillStore,
@@ -681,6 +832,8 @@ export const Workspace = ({
   const accountLabel = isGuest
     ? 'Account · Guest'
     : `Account · ${currentUserEmail ?? currentUserName}`;
+  const shouldShowSessionSwitcher =
+    !sessionSwitcherResolved && (storedSessions.length > 0 || sessionLoadError !== null);
 
   return (
     <WorkspaceShell
@@ -714,15 +867,26 @@ export const Workspace = ({
         <SettingsPaneRuntimeContext.Provider value={settingsPaneRuntime}>
           <MemoryPaneRuntimeContext.Provider value={{ currentUserId }}>
             <PlaybookPaneRuntimeContext.Provider value={playbookPaneRuntime}>
-              <PanesWorkspace
-                store={workspaceStore}
-                registry={registry}
-                attention={{
-                  store: attentionStore,
-                  workspaceId: DESKTOP_WORKSPACE_ATTENTION_ID,
-                }}
-                ariaLabel="Tinker workspace"
-              />
+              {shouldShowSessionSwitcher ? (
+                <SessionSwitcher
+                  sessions={storedSessions}
+                  busy={sessionFolderBusy}
+                  errorMessage={sessionLoadError}
+                  onSelectSession={handleSelectStoredSession}
+                  onCreateSession={handleCreateSessionFromSwitcher}
+                  onRetry={() => void refreshStoredSessions()}
+                />
+              ) : (
+                <PanesWorkspace
+                  store={workspaceStore}
+                  registry={registry}
+                  attention={{
+                    store: attentionStore,
+                    workspaceId: DESKTOP_WORKSPACE_ATTENTION_ID,
+                  }}
+                  ariaLabel="Tinker workspace"
+                />
+              )}
             </PlaybookPaneRuntimeContext.Provider>
           </MemoryPaneRuntimeContext.Provider>
         </SettingsPaneRuntimeContext.Provider>
