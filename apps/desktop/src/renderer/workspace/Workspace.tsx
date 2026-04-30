@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Layout, Model, Actions, DockLocation, type TabNode, type Action, type IJsonModel } from 'flexlayout-react';
-import 'flexlayout-react/style/dark.css';
+import 'flexlayout-react/style/light.css';
+import './flexlayout-overrides.css';
 import { getActiveMemoryPath, type MemoryRunState } from '@tinker/memory';
 import {
   createDefaultWorkspacePreferences,

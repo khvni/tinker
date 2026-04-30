@@ -1,0 +1,79 @@
+/*
+ * FlexLayout CSS overrides — map FlexLayout variables to Tinker design tokens.
+ *
+ * Loaded after flexlayout-react/style/light.css so these take precedence.
+ * Uses only values from @tinker/design tokens.css.
+ */
+
+.flexlayout__layout {
+  --color-text: var(--color-text-primary);
+  --color-background: var(--color-bg-primary);
+  --color-base: var(--color-bg-primary);
+  --color-1: var(--color-bg-panel);
+  --color-2: var(--color-bg-hover);
+  --color-3: var(--color-border-subtle);
+  --color-4: var(--color-border-default);
+  --color-5: var(--color-border-strong);
+  --color-6: var(--color-border-strong);
+  --font-size: var(--font-size-sm);
+  --font-family: var(--font-sans);
+
+  --color-tabset-background: var(--color-bg-panel);
+  --color-tabset-background-selected: var(--color-bg-panel);
+  --color-tabset-divider-line: var(--color-border-subtle);
+
+  --color-tab-selected: var(--color-text-primary);
+  --color-tab-selected-background: var(--color-bg-elevated);
+  --color-tab-unselected: var(--color-text-secondary);
+  --color-tab-unselected-background: transparent;
+
+  --color-splitter: var(--color-border-subtle);
+  --color-splitter-hover: var(--color-border-default);
+  --color-splitter-drag: var(--color-accent);
+
+  --color-drag-rect-border: var(--color-accent);
+  --color-drag-rect-background: var(--color-accent-soft);
+  --color-drag-rect: var(--color-text-primary);
+
+  --color-popup-border: var(--color-border-default);
+  --color-popup-unselected: var(--color-text-primary);
+  --color-popup-unselected-background: var(--color-bg-elevated);
+
+  --splitter-size: 4px;
+  --splitter-active-size: 8px;
+}
+
+/* Tabset header strip */
+.flexlayout__tabset_header {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* Selected tab indicator — amber underline */
+.flexlayout__tab_button--selected {
+  border-bottom: 2px solid var(--color-accent);
+}
+
+/* Tab close button styling */
+.flexlayout__tab_button_trailing {
+  opacity: 0.5;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.flexlayout__tab_button:hover .flexlayout__tab_button_trailing {
+  opacity: 1;
+}
+
+/* Remove hard borders between tabset and content */
+.flexlayout__tabset-selected {
+  box-shadow: none;
+}
+
+/* Splitter handle */
+.flexlayout__splitter {
+  background: var(--color-border-subtle);
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.flexlayout__splitter:hover {
+  background: var(--color-border-default);
+}

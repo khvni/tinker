@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type JSX } from 'react';
 import { Layout, Model, Actions, DockLocation, type TabNode, type IJsonModel } from 'flexlayout-react';
-import 'flexlayout-react/style/dark.css';
+import 'flexlayout-react/style/light.css';
 import '@tinker/design/styles/tokens.css';
 import { Badge, Button } from '@tinker/design';
 import './panes-demo.css';
