@@ -1,5 +1,6 @@
 import type { HTMLAttributes } from 'react';
 import { cx } from '../cx.js';
+import { isMac } from '../../utils/index.js';
 import './KeyboardHint.css';
 
 export type KeyboardHintOs = 'mac' | 'other';
@@ -72,9 +73,7 @@ const OTHER_FORMAT: Record<string, string> = {
 
 const detectOs = (): KeyboardHintOs => {
   if (typeof navigator === 'undefined') return 'other';
-  const platform = navigator.platform ?? '';
-  const ua = navigator.userAgent ?? '';
-  return /Mac|iPhone|iPod|iPad/i.test(`${platform} ${ua}`) ? 'mac' : 'other';
+  return isMac() ? 'mac' : 'other';
 };
 
 const formatKey = (key: string, os: KeyboardHintOs): string => {

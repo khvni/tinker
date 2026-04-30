@@ -8,6 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { cx } from '../cx.js';
+import { isMac } from '../../utils/index.js';
 import { ModelPickerTrigger } from './ModelPickerTrigger.js';
 import { ModelPickerPanel } from './ModelPickerPanel.js';
 import './ModelPicker.css';
@@ -83,9 +84,6 @@ const reducer = (state: State, action: Action): State => {
       return { ...state, mouseActive: false };
   }
 };
-
-const isMac = (): boolean =>
-  typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
