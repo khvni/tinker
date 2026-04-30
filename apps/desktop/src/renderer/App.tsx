@@ -43,15 +43,6 @@ type BindingKey = string;
 const bindingKey = (folderPath: string, memorySubdir: string, userId: string): BindingKey =>
   `${folderPath}\0${memorySubdir}\0${userId}`;
 
-const parseBindingKey = (key: BindingKey): { folderPath: string; memorySubdir: string; userId: string } | null => {
-  const [folderPath, memorySubdir, userId, ...rest] = key.split('\0');
-  if (folderPath === undefined || memorySubdir === undefined || userId === undefined || rest.length > 0) {
-    return null;
-  }
-
-  return { folderPath, memorySubdir, userId };
-};
-
 const defaultConnection = (state: ReadyAppState): OpencodeConnection => {
   return state.opencodes[state.defaultBindingKey] ?? Object.values(state.opencodes)[0] ?? WEB_PREVIEW_CONNECTION;
 };
@@ -402,6 +393,23 @@ export const App = (): JSX.Element => {
       const conn = state.opencodes[key];
       if (!conn) return;
 
+      await invoke('stop_opencode', { pid: conn.pid });
+      setState((current) => {
+        if (current.status !== 'ready') return current;
+        const { [key]: _, ...rest } = current.opencodes;
+        return { ...current, opencodes: rest };
+      });
+    },
+    [nativeRuntime, state],
+  );
+
+  const stopBinding = useCallback(
+    async (key: BindingKey): Promise<void> => {
+      if (!nativeRuntime || state.status !== 'ready') return;
+      const conn = state.opencodes[key];
+      if (!conn) return;
+
+      refcountsRef.current[key] = 0;
       await invoke('stop_opencode', { pid: conn.pid });
       setState((current) => {
         if (current.status !== 'ready') return current;
@@ -957,10 +965,7 @@ export const App = (): JSX.Element => {
             },
       );
       if (previousDefaultBindingKey && previousDefaultBindingKey !== nextBindingKey) {
-        const previous = parseBindingKey(previousDefaultBindingKey);
-        if (previous) {
-          void releaseOpencode(previous.folderPath, previous.memorySubdir, previous.userId);
-        }
+        void stopBinding(previousDefaultBindingKey);
       }
     } finally {
       setSessionFolderBusy(false);
