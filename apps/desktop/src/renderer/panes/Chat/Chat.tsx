@@ -362,10 +362,10 @@ export const Chat = ({
   }, [client]);
 
   useEffect(() => {
-    if (!hydratingHistory) {
+    if (!hydratingHistory && !busy && !memoryRefreshPaused) {
       setStatus(readyStatus);
     }
-  }, [hydratingHistory, readyStatus]);
+  }, [busy, hydratingHistory, memoryRefreshPaused, readyStatus]);
 
   useEffect(() => {
     let cancelled = false;
