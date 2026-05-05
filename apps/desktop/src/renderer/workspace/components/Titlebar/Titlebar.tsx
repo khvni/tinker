@@ -1,15 +1,17 @@
 import type { JSX } from 'react';
-import { IconButton } from '@tinker/design';
-import { getPanelTitleForPath } from '../../../renderers/file-utils.js';
+import { Avatar, IconButton } from '@tinker/design';
+import { getPanelTitleForPath, tildify } from '../../../renderers/file-utils.js';
 import './Titlebar.css';
 
 export type TitlebarProps = {
   sessionFolderPath: string | null;
+  homeDirPath?: string | null;
+  currentUserName?: string;
+  currentUserAvatarUrl?: string | null;
   isLeftRailVisible: boolean;
   isRightInspectorVisible: boolean;
   onToggleLeftRail: () => void;
   onToggleRightInspector: () => void;
-  onOpenPlaybook?: () => void;
 };
 
 const basename = (path: string): string => getPanelTitleForPath(path.replace(/[\\/]+$/u, ''));
@@ -48,23 +50,18 @@ const RightPaneToggleIcon = (): JSX.Element => (
   </svg>
 );
 
-const PlaybookIcon = (): JSX.Element => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5Z" />
-    <path d="M7 5v14" />
-    <path d="M9 9h5M9 12h5" />
-  </svg>
-);
-
 export const Titlebar = ({
   sessionFolderPath,
+  homeDirPath = null,
+  currentUserName = 'Guest',
+  currentUserAvatarUrl = null,
   isLeftRailVisible,
   isRightInspectorVisible,
   onToggleLeftRail,
   onToggleRightInspector,
-  onOpenPlaybook,
 }: TitlebarProps): JSX.Element => {
   const crumb = sessionFolderPath !== null ? basename(sessionFolderPath) : null;
+  const pathLabel = sessionFolderPath !== null ? tildify(sessionFolderPath, homeDirPath) : null;
 
   return (
     <header className="tinker-titlebar" data-tauri-drag-region>
@@ -80,8 +77,20 @@ export const Titlebar = ({
             <span className="tinker-titlebar__crumb" title={sessionFolderPath ?? undefined}>
               {crumb}
             </span>
+            {pathLabel !== null ? (
+              <span className="tinker-titlebar__path" title={sessionFolderPath ?? undefined}>
+                {pathLabel}
+              </span>
+            ) : null}
           </>
         ) : null}
+        <Avatar
+          className="tinker-titlebar__avatar"
+          name={currentUserName}
+          {...(currentUserAvatarUrl !== null ? { src: currentUserAvatarUrl } : {})}
+          size="xs"
+          title={currentUserName}
+        />
       </div>
 
       <div className="tinker-titlebar__actions" data-tauri-drag-region="false">
@@ -101,15 +110,6 @@ export const Titlebar = ({
           aria-pressed={!isRightInspectorVisible}
           onClick={onToggleRightInspector}
         />
-        {onOpenPlaybook ? (
-          <IconButton
-            variant="ghost"
-            size="s"
-            icon={<PlaybookIcon />}
-            label="Playbook"
-            onClick={onOpenPlaybook}
-          />
-        ) : null}
       </div>
     </header>
   );

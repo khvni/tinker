@@ -19,6 +19,14 @@ const SAMPLE_LAYOUT_JSON = {
   },
 };
 
+const DEFAULT_PREFERENCES = {
+  autoOpenAgentWrittenFiles: true,
+  isLeftRailVisible: true,
+  isRightInspectorVisible: false,
+  activeRoute: 'workspace' as const,
+  customMcps: [],
+};
+
 describe('hydrateLayoutRow', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -67,13 +75,20 @@ describe('hydrateLayoutRow', () => {
   });
 
   it('round-trips a persisted layout including workspace preferences', () => {
+    const preferences = {
+      autoOpenAgentWrittenFiles: false,
+      isLeftRailVisible: true,
+      isRightInspectorVisible: false,
+      activeRoute: 'workspace' as const,
+      customMcps: [],
+    };
     const row = {
       version: CURRENT_LAYOUT_VERSION,
       workspace_state_json: serializeLayoutState({
         version: CURRENT_LAYOUT_VERSION,
         layoutJson: SAMPLE_LAYOUT_JSON,
         updatedAt: '2026-04-15T00:00:00.000Z',
-        preferences: { autoOpenAgentWrittenFiles: false, isLeftRailVisible: true, isRightInspectorVisible: false, customMcps: [] },
+        preferences,
       }),
       updated_at: '2026-04-15T00:00:00.000Z',
     };
@@ -82,7 +97,7 @@ describe('hydrateLayoutRow', () => {
       version: CURRENT_LAYOUT_VERSION,
       layoutJson: SAMPLE_LAYOUT_JSON,
       updatedAt: '2026-04-15T00:00:00.000Z',
-      preferences: { autoOpenAgentWrittenFiles: false, isLeftRailVisible: true, isRightInspectorVisible: false, customMcps: [] },
+      preferences,
     });
   });
 
@@ -97,7 +112,7 @@ describe('hydrateLayoutRow', () => {
       version: CURRENT_LAYOUT_VERSION,
       layoutJson: SAMPLE_LAYOUT_JSON,
       updatedAt: '2026-04-15T00:00:00.000Z',
-      preferences: { autoOpenAgentWrittenFiles: true, isLeftRailVisible: true, isRightInspectorVisible: false, customMcps: [] },
+      preferences: DEFAULT_PREFERENCES,
     });
   });
 });

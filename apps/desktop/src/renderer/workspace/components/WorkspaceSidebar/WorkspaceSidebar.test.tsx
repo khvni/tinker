@@ -7,8 +7,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { TinkerPaneKind } from '@tinker/shared-types';
-import { WorkspaceSidebar } from './WorkspaceSidebar.js';
+import { WorkspaceSidebar, type WorkspaceRailItem } from './WorkspaceSidebar.js';
 
 const noop = (): void => {};
 
@@ -112,10 +111,11 @@ describe('WorkspaceSidebar', () => {
     container.remove();
   });
 
-  it('aria-current follows activeRailItem across chat/memory/settings', () => {
-    const cases: ReadonlyArray<{ readonly kind: TinkerPaneKind; readonly activeLabel: string }> = [
+  it('aria-current follows activeRailItem across chat/memory/connections/settings', () => {
+    const cases: ReadonlyArray<{ readonly kind: WorkspaceRailItem; readonly activeLabel: string }> = [
       { kind: 'chat', activeLabel: 'Chats' },
       { kind: 'memory', activeLabel: 'Memory' },
+      { kind: 'connections', activeLabel: 'Connections' },
       { kind: 'settings', activeLabel: 'Settings' },
     ];
 
@@ -137,7 +137,7 @@ describe('WorkspaceSidebar', () => {
       const activePattern = new RegExp(`<button[^>]*aria-label="${activeLabel}"[^>]*aria-current="page"`);
       expect(markup).toMatch(activePattern);
 
-      for (const otherLabel of ['Chats', 'Memory', 'Settings'].filter((label) => label !== activeLabel)) {
+      for (const otherLabel of ['Chats', 'Memory', 'Connections', 'Settings'].filter((label) => label !== activeLabel)) {
         const otherPattern = new RegExp(`<button[^>]*aria-label="${otherLabel}"[^>]*aria-current="page"`);
         expect(markup).not.toMatch(otherPattern);
       }

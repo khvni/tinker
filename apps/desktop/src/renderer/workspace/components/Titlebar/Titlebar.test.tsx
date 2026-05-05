@@ -234,35 +234,114 @@ describe('<Titlebar>', () => {
     });
   });
 
-  describe('Playbook affordance', () => {
-    it('omits the Playbook button when onOpenPlaybook is not provided', () => {
+  it('omits Playbook pane affordances from the route-only titlebar', () => {
+    const markup = renderToStaticMarkup(
+      <Titlebar
+        sessionFolderPath={null}
+        isLeftRailVisible
+        isRightInspectorVisible
+        onToggleLeftRail={() => undefined}
+        onToggleRightInspector={() => undefined}
+      />,
+    );
+    expect(markup).not.toContain('aria-label="Playbook"');
+  });
+
+  describe('session path display', () => {
+    it('collapses the home directory prefix to ~ in the monospace path', () => {
       const markup = renderToStaticMarkup(
         <Titlebar
-          sessionFolderPath={null}
+          sessionFolderPath="/Users/ali/projects/tinker"
+          homeDirPath="/Users/ali"
           isLeftRailVisible
           isRightInspectorVisible
           onToggleLeftRail={() => undefined}
           onToggleRightInspector={() => undefined}
         />,
       );
-      expect(markup).not.toContain('aria-label="Playbook"');
+      expect(markup).toMatch(
+        /<span[^>]*class="tinker-titlebar__path"[^>]*>~\/projects\/tinker<\/span>/,
+      );
     });
 
-    it('renders the Playbook button with a stacked-book glyph when the callback is provided', () => {
+    it('renders the absolute path when no home directory is known', () => {
       const markup = renderToStaticMarkup(
         <Titlebar
-          sessionFolderPath={null}
+          sessionFolderPath="/Users/ali/projects/tinker"
+          homeDirPath={null}
           isLeftRailVisible
           isRightInspectorVisible
           onToggleLeftRail={() => undefined}
           onToggleRightInspector={() => undefined}
-          onOpenPlaybook={() => undefined}
         />,
       );
-      expect(markup).toContain('aria-label="Playbook"');
-      // Stacked-book glyph: vertical spine + two shelf lines.
-      expect(markup).toContain('M7 5v14');
-      expect(markup).toContain('M9 9h5M9 12h5');
+      expect(markup).toMatch(
+        /<span[^>]*class="tinker-titlebar__path"[^>]*>\/Users\/ali\/projects\/tinker<\/span>/,
+      );
+    });
+
+    it('keeps the full path as the monospace span tooltip', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath="/home/ali/work/tinker"
+          homeDirPath="/home/ali"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toMatch(
+        /<span[^>]*class="tinker-titlebar__path"[^>]*title="\/home\/ali\/work\/tinker"/,
+      );
+    });
+  });
+
+  describe('user identity', () => {
+    it('renders the avatar with the current user name as the tooltip', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          currentUserName="Ali Khani"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toMatch(
+        /<span[^>]*class="[^"]*tinker-titlebar__avatar[^"]*"[^>]*aria-label="Ali Khani"[^>]*title="Ali Khani"/,
+      );
+    });
+
+    it('renders an avatar image when the current user has an avatar URL', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          currentUserName="Ali Khani"
+          currentUserAvatarUrl="https://example.test/avatar.png"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toContain('https://example.test/avatar.png');
+    });
+
+    it('renders the avatar even when no session folder is selected', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          currentUserName="Ali Khani"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toContain('tinker-titlebar__avatar');
+      expect(markup).not.toContain('tinker-titlebar__crumb');
     });
   });
 });

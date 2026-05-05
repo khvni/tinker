@@ -26,6 +26,7 @@ export type SettingsPaneRuntime = {
   readonly workspacePreferences: WorkspacePreferences;
   readonly opencode: OpencodeConnection | null;
   readonly vaultPath: string | null;
+  readonly memoryPath: string | null;
   readonly mcpSeedStatuses: Partial<Record<BuiltinMcpName, MCPStatus>>;
   // One-shot navigation hint. When set, SettingsPane seeds SettingsShell with this
   // section id on its next render, then calls `onPendingSectionConsumed` so the hint

@@ -1,7 +1,6 @@
 import { getRenderer, registerPane } from './pane-registry.js';
 import { registerFilePane } from '../panes/FilePane/index.js';
 import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
-import { registerWorkspacePaneRenderers } from './register-pane-renderers.js';
 
 const isMissingPaneError = (kind: 'chat' | 'file', error: unknown): boolean => {
   return (
@@ -34,6 +33,4 @@ export const registerWorkspacePanes = (): void => {
   ensurePaneRegistered('file', () => {
     registerFilePane();
   });
-
-  registerWorkspacePaneRenderers();
 };

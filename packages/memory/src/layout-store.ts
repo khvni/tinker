@@ -13,7 +13,7 @@ export type LayoutRow = {
   updated_at: string;
 };
 
-export const CURRENT_LAYOUT_VERSION = 3 as const;
+export const CURRENT_LAYOUT_VERSION = 4 as const;
 
 type StoredLayoutPayload = {
   layoutJson: unknown;
@@ -60,6 +60,13 @@ const normalizePreferences = (value: unknown): WorkspacePreferences => {
       typeof candidate.isRightInspectorVisible === 'boolean'
         ? candidate.isRightInspectorVisible
         : defaults.isRightInspectorVisible,
+    activeRoute:
+      candidate.activeRoute === 'workspace' ||
+      candidate.activeRoute === 'memory' ||
+      candidate.activeRoute === 'settings' ||
+      candidate.activeRoute === 'connections'
+        ? candidate.activeRoute
+        : defaults.activeRoute,
     customMcps: Array.isArray(candidate.customMcps)
       ? (candidate.customMcps as unknown[]).filter(isValidMcpEntry)
       : defaults.customMcps,

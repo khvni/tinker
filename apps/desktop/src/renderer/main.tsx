@@ -5,12 +5,10 @@ import { ToastProvider } from '@tinker/design';
 import 'flexlayout-react/style/light.css';
 import './workspace/flexlayout-overrides.css';
 import { App } from './App.js';
-import { registerWorkspacePaneRenderers } from './workspace/register-pane-renderers.js';
 import { registerWorkspacePanes } from './workspace/register-panes.js';
 import { applyTheme, readTheme } from './theme.js';
 import './styles.css';
 
-registerWorkspacePaneRenderers();
 registerWorkspacePanes();
 
 applyTheme(readTheme() ?? 'light');

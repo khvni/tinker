@@ -77,6 +77,21 @@ export const getPanelTitleForPath = (path: string): string => {
   return segments.at(-1) ?? path;
 };
 
+const stripTrailingSeparators = (path: string): string => path.replace(/[\\/]+$/u, '');
+
+// Collapses an absolute path under the user's home directory to `~/...` form.
+// Falls back to the absolute path when no home dir is known or the path is
+// outside it. Pure function (no Tauri APIs) so it stays trivially testable.
+export const tildify = (path: string, homeDirPath: string | null | undefined): string => {
+  if (typeof homeDirPath !== 'string' || homeDirPath.length === 0) return path;
+  const home = stripTrailingSeparators(homeDirPath);
+  if (home.length === 0) return path;
+  if (path === home) return '~';
+  if (path.startsWith(`${home}/`)) return `~/${path.slice(home.length + 1)}`;
+  if (path.startsWith(`${home}\\`)) return `~\\${path.slice(home.length + 1)}`;
+  return path;
+};
+
 export const getFileMimeForPath = (path: string): string => {
   const extension = getFileExtension(path);
   if (extension === '.svg') {

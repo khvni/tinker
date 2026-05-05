@@ -15,10 +15,11 @@ import {
   subscribeMemoryPathChanged,
   syncActiveMemoryPath,
   upsertUser,
+  updateLastActive,
   type MemoryRunState,
 } from '@tinker/memory';
 import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
-import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
+import type { LayoutStore, MemoryStore, ScheduledJobStore, Session, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
 import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
 import {
@@ -41,6 +42,17 @@ type BindingKey = string;
 
 const bindingKey = (folderPath: string, memorySubdir: string, userId: string): BindingKey =>
   `${folderPath}\0${memorySubdir}\0${userId}`;
+
+const parseBindingKey = (
+  key: BindingKey,
+): { folderPath: string; memorySubdir: string; userId: string } | null => {
+  const [folderPath, memorySubdir, userId, ...rest] = key.split('\0');
+  if (rest.length > 0 || folderPath === undefined || memorySubdir === undefined || userId === undefined) {
+    return null;
+  }
+
+  return { folderPath, memorySubdir, userId };
+};
 
 const defaultConnection = (state: ReadyAppState): OpencodeConnection => {
   return state.opencodes[state.defaultBindingKey] ?? Object.values(state.opencodes)[0] ?? WEB_PREVIEW_CONNECTION;
@@ -107,10 +119,6 @@ const providerNeedsRefreshToken = (provider: AuthProvider): boolean => {
   return provider === 'google' || provider === 'microsoft';
 };
 
-const providerNeedsWorkspaceRefresh = (provider: AuthProvider): boolean => {
-  return provider === 'github';
-};
-
 const createGuestUser = (): User => {
   const timestamp = new Date().toISOString();
 
@@ -172,15 +180,19 @@ const syncStoredUsers = async (sessions: SSOStatus): Promise<void> => {
   ]);
 };
 
-const syncCurrentUserMemoryPath = async (
-  sessions: SSOStatus,
-  options?: { emit?: boolean },
-): Promise<void> => {
+const resolveUserMemoryPath = async (sessions: SSOStatus, options?: { emit?: boolean }): Promise<string> => {
   const connectedSessions = Object.values(sessions).filter((session): session is SSOSession => session !== null);
   await Promise.all(
     connectedSessions.map((session) => getActiveMemoryPath(buildStoredUserId(session.provider, session.userId))),
   );
-  await syncActiveMemoryPath(pickCurrentUserId(sessions), options);
+  return syncActiveMemoryPath(pickCurrentUserId(sessions), options);
+};
+
+const syncCurrentUserMemoryPath = async (
+  sessions: SSOStatus,
+  options?: { emit?: boolean },
+): Promise<void> => {
+  await resolveUserMemoryPath(sessions, options);
 };
 
 const selectSessionFolder = async (): Promise<string | null> => {
@@ -325,9 +337,26 @@ export const App = (): JSX.Element => {
   const [memorySweepState, setMemorySweepState] = useState<MemoryRunState | null>(null);
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
   const [sessionFolderBusy, setSessionFolderBusy] = useState(false);
+  const [homeDirPath, setHomeDirPath] = useState<string | null>(null);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
   const refcountsRef = useRef<Record<BindingKey, number>>({});
   const { state: currentUserState, refresh: refreshCurrentUser } = useCurrentUser(nativeRuntime);
+
+  useEffect(() => {
+    if (!nativeRuntime) return;
+    let cancelled = false;
+    void homeDir()
+      .then((value) => {
+        if (!cancelled) setHomeDirPath(value);
+      })
+      .catch(() => {
+        // Resolving the home directory is best-effort. Without it, the
+        // titlebar simply renders the absolute session folder path.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [nativeRuntime]);
 
   useEffect(() => {
     const ready = state.status === 'ready' && currentUserState.status === 'ready';
@@ -402,21 +431,135 @@ export const App = (): JSX.Element => {
     [nativeRuntime, state],
   );
 
-  const refreshAllConnectorState = useCallback(
+  const stopBinding = useCallback(
+    async (key: BindingKey): Promise<void> => {
+      if (!nativeRuntime || state.status !== 'ready') return;
+      const conn = state.opencodes[key];
+      if (!conn) return;
+
+      refcountsRef.current[key] = 0;
+      await invoke('stop_opencode', { pid: conn.pid });
+      setState((current) => {
+        if (current.status !== 'ready') return current;
+        const { [key]: _, ...rest } = current.opencodes;
+        return { ...current, opencodes: rest };
+      });
+    },
+    [nativeRuntime, state],
+  );
+
+  const respawnAllOpencodes = useCallback(
     async (sessions: SSOStatus): Promise<void> => {
       if (!nativeRuntime || state.status !== 'ready') {
         return;
       }
-      await syncCurrentUserMemoryPath(sessions, { emit: false });
-      for (const conn of Object.values(state.opencodes)) {
-        await syncConnectorState(conn, state.vaultPath, sessions);
-      }
-      const modelConnected = await probeModelConnection(defaultConnection(state), state.vaultPath);
+
       setState((current) =>
         current.status !== 'ready'
           ? current
           : {
               ...current,
+              mcpStatus: {
+                ...current.mcpStatus,
+                ...Object.fromEntries(BUILTIN_MCP_NAMES.map((name) => [name, { status: 'reconnecting' }])),
+                [EXA_MCP_NAME]: { status: 'reconnecting' },
+              },
+            },
+      );
+
+      const nextUserId = pickCurrentUserId(sessions);
+      const nextMemorySubdir = await resolveUserMemoryPath(sessions, { emit: false });
+      const previousState = state;
+      const requestedBindings = new Map<BindingKey, { key: BindingKey; nextKey: BindingKey; nextBinding: { folderPath: string; memorySubdir: string; userId: string } }>();
+      for (const [key] of Object.entries(previousState.opencodes)) {
+        const binding = parseBindingKey(key);
+        if (!binding) {
+          continue;
+        }
+
+        const nextKey =
+          key === previousState.defaultBindingKey || binding.userId === nextUserId
+            ? bindingKey(binding.folderPath, nextMemorySubdir, nextUserId)
+            : key;
+        const nextBinding = parseBindingKey(nextKey);
+        if (!nextBinding) {
+          continue;
+        }
+
+        requestedBindings.set(nextKey, { key, nextKey, nextBinding });
+      }
+      if (previousState.vaultPath) {
+        const nextKey = bindingKey(previousState.vaultPath, nextMemorySubdir, nextUserId);
+        const nextBinding = parseBindingKey(nextKey);
+        if (nextBinding && !requestedBindings.has(nextKey)) {
+          requestedBindings.set(nextKey, { key: previousState.defaultBindingKey, nextKey, nextBinding });
+        }
+      }
+      const nextBindings = [...requestedBindings.values()];
+      const nextOpencodes: Record<BindingKey, OpencodeConnection> = {};
+      let nextDefaultBindingKey: BindingKey | null = null;
+
+      try {
+        for (const { key, nextKey, nextBinding } of nextBindings) {
+          const nextConn = await invoke<OpencodeConnection>('start_opencode', {
+            folderPath: nextBinding.folderPath,
+            userId: nextBinding.userId,
+            memorySubdir: nextBinding.memorySubdir,
+          });
+          await syncConnectorState(nextConn, previousState.vaultPath, sessions);
+          nextOpencodes[nextKey] = nextConn;
+
+          if (key === previousState.defaultBindingKey) {
+            nextDefaultBindingKey = nextKey;
+          }
+        }
+      } catch (error) {
+        for (const conn of Object.values(nextOpencodes)) {
+          try {
+            await invoke('stop_opencode', { pid: conn.pid });
+          } catch (stopError) {
+            console.warn('Failed to stop a partially refreshed OpenCode sidecar.', stopError);
+          }
+        }
+        throw error;
+      }
+
+      await Promise.all(
+        Object.values(previousState.opencodes).map(async (conn) => {
+          try {
+            await invoke('stop_opencode', { pid: conn.pid });
+          } catch (error) {
+            console.warn('Failed to stop a replaced OpenCode sidecar.', error);
+          }
+        }),
+      );
+
+      const desiredDefaultBindingKey = previousState.vaultPath
+        ? bindingKey(previousState.vaultPath, nextMemorySubdir, nextUserId)
+        : nextDefaultBindingKey;
+      const nextDefaultConnection =
+        desiredDefaultBindingKey && nextOpencodes[desiredDefaultBindingKey]
+          ? nextOpencodes[desiredDefaultBindingKey]
+          : nextDefaultBindingKey && nextOpencodes[nextDefaultBindingKey]
+            ? nextOpencodes[nextDefaultBindingKey]
+            : Object.values(nextOpencodes)[0];
+      const modelConnected = nextDefaultConnection
+        ? await probeModelConnection(nextDefaultConnection, previousState.vaultPath)
+        : false;
+      refcountsRef.current = Object.fromEntries(
+        nextBindings
+          .map(({ key, nextKey }) => [nextKey, refcountsRef.current[key] ?? (key === previousState.defaultBindingKey ? 1 : 0)] as const)
+          .filter((entry) => entry[0] in nextOpencodes),
+      );
+      setState((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              opencodes: nextOpencodes,
+              defaultBindingKey:
+                desiredDefaultBindingKey ?? nextDefaultBindingKey ?? Object.keys(nextOpencodes)[0] ?? previousState.defaultBindingKey,
+              skillsRootPath: nextMemorySubdir,
               modelConnected,
               mcpStatus: {
                 ...current.mcpStatus,
@@ -441,13 +584,13 @@ export const App = (): JSX.Element => {
         return;
       }
 
-      void refreshAllConnectorState(sessions).catch((error) => {
+      void respawnAllOpencodes(sessions).catch((error) => {
         console.warn('Failed to refresh OpenCode after a memory path change.', error);
       });
     });
   }, [
     nativeRuntime,
-    refreshAllConnectorState,
+    respawnAllOpencodes,
     state.status,
     currentUserState.status,
     currentUserState.status === 'ready' ? currentUserState.sessions : null,
@@ -507,13 +650,14 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
-        const home = await homeDir();
-        const guestMemoryPath = await getActiveMemoryPath(GUEST_USER_ID);
-        const defaultKey = bindingKey(home, guestMemoryPath, GUEST_USER_ID);
+        const defaultFolderPath = storedVaultPath ?? await homeDir();
+        const defaultUserId = pickCurrentUserId(sessions);
+        const defaultMemoryPath = await getActiveMemoryPath(defaultUserId);
+        const defaultKey = bindingKey(defaultFolderPath, defaultMemoryPath, defaultUserId);
         const opencode = await invoke<OpencodeConnection>('start_opencode', {
-          folderPath: home,
-          userId: GUEST_USER_ID,
-          memorySubdir: guestMemoryPath,
+          folderPath: defaultFolderPath,
+          userId: defaultUserId,
+          memorySubdir: defaultMemoryPath,
         });
         await syncConnectorState(opencode, storedVaultPath, sessions);
         const modelConnected = await probeModelConnection(opencode, storedVaultPath);
@@ -866,6 +1010,75 @@ export const App = (): JSX.Element => {
     currentUserState.status === 'ready' ? currentUserState.sessions.github?.scopes.join(',') : null,
   ]);
 
+  const currentSessions = currentUserState.status === 'ready' ? currentUserState.sessions : withDefaultSessions(null);
+  const currentUser = resolveCurrentUser(currentSessions);
+  const currentUserId =
+    currentUserState.status === 'ready' && currentUserState.authState === 'authenticated'
+      ? currentUserState.user.id
+      : pickCurrentUserId(currentSessions);
+
+  const bindSessionFolder = useCallback(async (folderPath: string, isNew: boolean): Promise<void> => {
+    requireNativeRuntime('Selecting a folder');
+    setSessionFolderBusy(true);
+
+    try {
+      const memorySubdir = await getActiveMemoryPath(currentUserId);
+      const previousDefaultBindingKey = state.status === 'ready' ? state.defaultBindingKey : null;
+      const nextBindingKey = bindingKey(folderPath, memorySubdir, currentUserId);
+      const existingConnection =
+        state.status === 'ready' && state.opencodes[nextBindingKey]
+          ? state.opencodes[nextBindingKey]
+          : null;
+      const connection = existingConnection ?? await acquireOpencode(folderPath, memorySubdir, currentUserId);
+      if (existingConnection) {
+        refcountsRef.current[nextBindingKey] = (refcountsRef.current[nextBindingKey] ?? 0) + 1;
+      }
+      await syncConnectorState(connection, folderPath, currentSessions);
+      await vaultService.init({ path: folderPath, isNew });
+      await indexVault({ path: folderPath, isNew });
+      window.localStorage.setItem(VAULT_PATH_KEY, folderPath);
+
+      setState((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              defaultBindingKey: nextBindingKey,
+              vaultPath: folderPath,
+              vaultRevision: current.vaultRevision + 1,
+              activeSkillsRevision: current.activeSkillsRevision + 1,
+            },
+      );
+      if (previousDefaultBindingKey && previousDefaultBindingKey !== nextBindingKey) {
+        void stopBinding(previousDefaultBindingKey);
+      }
+    } finally {
+      setSessionFolderBusy(false);
+    }
+  }, [acquireOpencode, currentSessions, currentUserId, nativeRuntime, state, stopBinding, vaultService]);
+
+  const handleSelectSessionFolder = useCallback(async (): Promise<string | null> => {
+    if (sessionFolderBusy) {
+      return null;
+    }
+
+    requireNativeRuntime('Selecting a folder');
+    const folderPath = await selectSessionFolder();
+    if (!folderPath) {
+      return null;
+    }
+
+    await bindSessionFolder(folderPath, false);
+    return folderPath;
+  }, [bindSessionFolder, nativeRuntime, sessionFolderBusy]);
+
+  const handleCreateDefaultVault = useCallback(async (): Promise<void> => {
+    requireNativeRuntime('Creating the default vault');
+    const home = await homeDir();
+    const defaultPath = await join(home, 'Tinker', 'knowledge');
+    await bindSessionFolder(defaultPath, true);
+  }, [bindSessionFolder, nativeRuntime]);
+
   if (state.status === 'loading' || currentUserState.status === 'loading') {
     return (
       <div className="tinker-app">
@@ -908,44 +1121,9 @@ export const App = (): JSX.Element => {
     );
   }
 
-  const currentSessions = currentUserState.sessions;
-
-  const reloadConnectionState = async (
-    connection: OpencodeConnection,
-    vaultPath: string | null,
-  ): Promise<{ sessions: SSOStatus; modelConnected: boolean }> => {
-    const sessions = await readAuthStatus();
-    await syncConnectorState(connection, vaultPath, sessions);
-    const modelConnected = await probeModelConnection(connection, vaultPath);
-
-    return { sessions, modelConnected };
-  };
-
-  const bindSessionFolder = async (folderPath: string, isNew: boolean): Promise<void> => {
-    requireNativeRuntime('Selecting a folder');
-    setSessionFolderBusy(true);
-
-    try {
-      const memorySubdir = await getActiveMemoryPath(currentUserId);
-      const connection = await acquireOpencode(folderPath, memorySubdir, currentUserId);
-      await syncConnectorState(connection, folderPath, currentSessions);
-      await vaultService.init({ path: folderPath, isNew });
-      await indexVault({ path: folderPath, isNew });
-      window.localStorage.setItem(VAULT_PATH_KEY, folderPath);
-
-      setState((current) =>
-        current.status !== 'ready'
-          ? current
-          : {
-              ...current,
-              vaultPath: folderPath,
-              vaultRevision: current.vaultRevision + 1,
-              activeSkillsRevision: current.activeSkillsRevision + 1,
-            },
-      );
-    } finally {
-      setSessionFolderBusy(false);
-    }
+  const handleActivateSession = async (session: Session): Promise<void> => {
+    await updateLastActive(session.id, new Date().toISOString());
+    await bindSessionFolder(session.folderPath, false);
   };
 
   const handleActiveSkillsChanged = (): void => {
@@ -1050,20 +1228,7 @@ export const App = (): JSX.Element => {
       await getActiveMemoryPath(buildStoredUserId(session.provider, session.userId));
 
       const nextState = await refreshCurrentUser();
-      if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshAllConnectorState(nextState.sessions);
-      } else {
-        const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
-        await syncCurrentUserMemoryPath(reloaded.sessions);
-        setState((current) =>
-          current.status !== 'ready'
-            ? current
-            : {
-                ...current,
-                modelConnected: reloaded.modelConnected,
-              },
-        );
-      }
+      await respawnAllOpencodes(nextState.sessions);
 
       setProviderMessage(provider, `${providerDisplayName(provider)} connected as ${session.email}.`);
       setGuestMessage(null);
@@ -1083,20 +1248,7 @@ export const App = (): JSX.Element => {
       await invoke('auth_sign_out', { provider });
 
       const nextState = await refreshCurrentUser();
-      if (providerNeedsWorkspaceRefresh(provider)) {
-        await refreshAllConnectorState(nextState.sessions);
-      } else {
-        const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
-        await syncCurrentUserMemoryPath(reloaded.sessions);
-        setState((current) =>
-          current.status !== 'ready'
-            ? current
-            : {
-                ...current,
-                modelConnected: reloaded.modelConnected,
-              },
-        );
-      }
+      await respawnAllOpencodes(nextState.sessions);
 
       setProviderMessage(provider, `${providerDisplayName(provider)} disconnected.`);
       setGuestMessage(null);
@@ -1124,21 +1276,7 @@ export const App = (): JSX.Element => {
 
       await upsertUser(createGuestUser());
       const nextUserState = await refreshCurrentUser();
-
-      if (providersToClear.includes('github')) {
-        await refreshAllConnectorState(nextUserState.sessions);
-      } else {
-        const reloaded = await reloadConnectionState(defaultConnection(state), state.vaultPath);
-        await syncCurrentUserMemoryPath(reloaded.sessions);
-        setState((current) =>
-          current.status !== 'ready'
-            ? current
-            : {
-                ...current,
-                modelConnected: reloaded.modelConnected,
-              },
-        );
-      }
+      await respawnAllOpencodes(nextUserState.sessions);
 
       setProviderMessages(EMPTY_PROVIDER_MESSAGES);
       setGuestMessage('Guest mode active.');
@@ -1147,28 +1285,6 @@ export const App = (): JSX.Element => {
     } finally {
       setGuestBusy(false);
     }
-  };
-
-  const handleSelectSessionFolder = async (): Promise<string | null> => {
-    if (sessionFolderBusy) {
-      return null;
-    }
-
-    requireNativeRuntime('Selecting a folder');
-    const folderPath = await selectSessionFolder();
-    if (!folderPath) {
-      return null;
-    }
-
-    await bindSessionFolder(folderPath, false);
-    return folderPath;
-  };
-
-  const handleCreateDefaultVault = async (): Promise<void> => {
-    requireNativeRuntime('Creating the default vault');
-    const home = await homeDir();
-    const defaultPath = await join(home, 'Tinker', 'knowledge');
-    await bindSessionFolder(defaultPath, true);
   };
 
   const handleRunScheduledJobNow = async (jobId: string): Promise<void> => {
@@ -1180,12 +1296,6 @@ export const App = (): JSX.Element => {
     await engine.runNow(jobId);
   };
 
-  const currentUser = resolveCurrentUser(currentSessions);
-  const currentUserId =
-    currentUserState.authState === 'authenticated'
-      ? currentUserState.user.id
-      : pickCurrentUserId(currentSessions);
-
   return (
     <div className="tinker-app">
       <Workspace
@@ -1195,6 +1305,7 @@ export const App = (): JSX.Element => {
         currentUserProvider={currentUser.provider}
         currentUserEmail={currentUser.email}
         currentUserAvatarUrl={currentUser.avatarUrl}
+        homeDirPath={homeDirPath}
         nativeRuntimeAvailable={nativeRuntime}
         layoutStore={state.layoutStore}
         memoryStore={state.memoryStore}
@@ -1223,6 +1334,7 @@ export const App = (): JSX.Element => {
         onContinueAsGuest={handleContinueAsGuest}
         sessionFolderBusy={sessionFolderBusy}
         onSelectSessionFolder={handleSelectSessionFolder}
+        onActivateSession={handleActivateSession}
         onCreateVault={handleCreateDefaultVault}
         onSelectVault={handleSelectSessionFolder}
         onConnectGoogle={() => handleProviderConnect('google')}
@@ -1238,22 +1350,18 @@ export const App = (): JSX.Element => {
         onActiveSkillsChanged={handleActiveSkillsChanged}
         onRunMemorySweep={handleRunMemorySweep}
         onMemoryCommitted={handleMemoryCommitted}
-        onRequestMcpRespawn={() => refreshAllConnectorState(currentSessions)}
+        onRequestMcpRespawn={() => respawnAllOpencodes(currentSessions)}
         getConnectionForPane={(paneData) => {
           if (state.status !== 'ready') return WEB_PREVIEW_CONNECTION;
-          const folderPath = (paneData as unknown as { folderPath?: string }).folderPath;
-          const memorySubdir = (paneData as unknown as { memorySubdir?: string }).memorySubdir;
-          if (folderPath && memorySubdir) {
-            return connectionFor(state, bindingKey(folderPath, memorySubdir, currentUserId));
+          if (paneData.folderPath && paneData.memorySubdir) {
+            return connectionFor(state, bindingKey(paneData.folderPath, paneData.memorySubdir, currentUserId));
           }
           return defaultConnection(state);
         }}
         releaseConnectionForPane={(paneData) => {
           if (state.status !== 'ready') return;
-          const folderPath = (paneData as unknown as { folderPath?: string }).folderPath;
-          const memorySubdir = (paneData as unknown as { memorySubdir?: string }).memorySubdir;
-          if (folderPath && memorySubdir) {
-            void releaseOpencode(folderPath, memorySubdir, currentUserId);
+          if (paneData.folderPath && paneData.memorySubdir) {
+            void releaseOpencode(paneData.folderPath, paneData.memorySubdir, currentUserId);
           }
         }}
       />

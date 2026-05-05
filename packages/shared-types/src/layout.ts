@@ -25,6 +25,7 @@ export type WorkspacePreferences = {
   autoOpenAgentWrittenFiles: boolean;
   isLeftRailVisible: boolean;
   isRightInspectorVisible: boolean;
+  activeRoute: 'workspace' | 'memory' | 'settings' | 'connections';
   customMcps: ReadonlyArray<CustomMcpEntry>;
 };
 
@@ -33,12 +34,13 @@ export const createDefaultWorkspacePreferences = (): WorkspacePreferences => {
     autoOpenAgentWrittenFiles: true,
     isLeftRailVisible: true,
     isRightInspectorVisible: false,
+    activeRoute: 'workspace',
     customMcps: [],
   };
 };
 
 export type LayoutState = {
-  version: 3;
+  version: 4;
   layoutJson: unknown;
   updatedAt: string;
   preferences: WorkspacePreferences;

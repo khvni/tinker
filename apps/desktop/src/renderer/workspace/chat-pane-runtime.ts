@@ -5,7 +5,12 @@ import type { Chat } from '../panes/Chat/index.js';
 
 export type ChatPaneRuntime = Omit<
   ComponentProps<typeof Chat>,
-  'paneSessionId' | 'onPersistSessionId' | 'opencode' | 'onReleaseOpencode' | 'onSelectSessionFolder'
+  | 'paneSessionId'
+  | 'createFreshSession'
+  | 'onPersistSessionId'
+  | 'opencode'
+  | 'onReleaseOpencode'
+  | 'onSelectSessionFolder'
 > & {
   persistPaneSessionId?: (
     tabId: string,

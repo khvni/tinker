@@ -176,6 +176,7 @@ const normalizeTrackedMcpStatus = (name: string, status: MCPStatusLike | undefin
     case 'failed':
     case 'needs_auth':
     case 'needs_client_registration':
+    case 'reconnecting':
       return error ? { status: status.status, error } : { status: status.status };
     default:
       return {

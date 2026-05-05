@@ -38,6 +38,7 @@ import {
   appendMemoryCapture,
   createSession,
   findLatestSessionForFolder,
+  getSession,
   getActiveMemoryPath,
   listSessionsForUser,
   subscribeMemoryPathChanged,
@@ -113,6 +114,9 @@ type ChatProps = {
   onDuplicatePane?: () => void;
   onClosePane?: () => void;
   paneIsActive?: boolean;
+  paneSessionId?: string;
+  createFreshSession?: boolean;
+  onPersistSessionId?: (sessionId: string) => void;
   onAttentionSignal?: (reason: 'notification-arrival') => void;
   onReleaseOpencode?: () => void;
 };
@@ -266,6 +270,9 @@ export const Chat = ({
   onDuplicatePane,
   onClosePane,
   paneIsActive = true,
+  paneSessionId,
+  createFreshSession = false,
+  onPersistSessionId,
   onAttentionSignal,
   onReleaseOpencode,
 }: ChatProps): JSX.Element => {
@@ -294,6 +301,7 @@ export const Chat = ({
   const [contextUsage, setContextUsage] = useState<ResolvedContextUsage | null>(null);
   const [showNewMessagesPill, setShowNewMessagesPill] = useState(false);
   const [requiresMcpConnectionGate, setRequiresMcpConnectionGate] = useState(false);
+  const [memoryRefreshPaused, setMemoryRefreshPaused] = useState(false);
   // Global default applied where no per-disclosure override exists. ⌥T flips this and clears overrides.
   const [defaultDisclosureOpen, setDefaultDisclosureOpen] = useState(false);
   const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
@@ -302,6 +310,7 @@ export const Chat = ({
   const [composerMode, setComposerMode] = useState<SessionMode>(DEFAULT_SESSION_MODE);
   const [thinkingLevel, setThinkingLevel] = useState<ReasoningLevel>(DEFAULT_REASONING_LEVEL);
   const mountedRef = useRef(true);
+  const busyRef = useRef(busy);
   const sessionIDRef = useRef<string | null>(null);
   const sessionCreatedAtRef = useRef<string | null>(null);
   const historyWriterRef = useRef<ChatHistoryWriter | null>(null);
@@ -324,13 +333,17 @@ export const Chat = ({
     enabled: !hydratingHistory && !awaitingFolder && requiresMcpConnectionGate,
     loadStatus: loadMcpStatus,
   });
-  const composerBlocked = busy || hydratingHistory || awaitingFolder || !modelConnected || mcpConnectionGate.blocked;
+  const composerBlocked = busy || hydratingHistory || awaitingFolder || !modelConnected || mcpConnectionGate.blocked || memoryRefreshPaused;
 
   const saveAsSkillDefaultBody = useMemo(() => {
     return saveAsSkillOpen ? buildSkillTranscript(messages) : '';
   }, [saveAsSkillOpen, messages]);
   const releaseRef = useRef(onReleaseOpencode);
   releaseRef.current = onReleaseOpencode;
+  const persistSessionIdRef = useRef(onPersistSessionId);
+  persistSessionIdRef.current = onPersistSessionId;
+  const paneSessionIdRef = useRef(paneSessionId);
+  paneSessionIdRef.current = paneSessionId;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -354,10 +367,10 @@ export const Chat = ({
   }, [client]);
 
   useEffect(() => {
-    if (!hydratingHistory) {
+    if (!hydratingHistory && !busy && !memoryRefreshPaused) {
       setStatus(readyStatus);
     }
-  }, [hydratingHistory, readyStatus]);
+  }, [busy, hydratingHistory, memoryRefreshPaused, readyStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -438,8 +451,16 @@ export const Chat = ({
   }, [currentUserId]);
 
   useEffect(() => {
-    return subscribeMemoryPathChanged(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
+  useEffect(() => {
+    return subscribeMemoryPathChanged((detail) => {
       memoryPathRef.current = null;
+      if (busyRef.current) {
+        setMemoryRefreshPaused(true);
+        setStatus(`Paused for memory refresh (${detail.reason === 'root-changed' ? 'path changed' : 'user switched'}).`);
+      }
     });
   }, []);
 
@@ -497,13 +518,22 @@ export const Chat = ({
 
     void (async () => {
       try {
-        const existingSession = await findLatestSessionForFolder(currentUserId, sessionFolderPath);
+        const existingSession = createFreshSession ? null : await findLatestSessionForFolder(currentUserId, sessionFolderPath);
+        const pinnedSessionId = paneSessionIdRef.current;
+        const loadedPinnedSession = pinnedSessionId ? await getSession(pinnedSessionId) : null;
+        const pinnedSession =
+          loadedPinnedSession?.userId === currentUserId && loadedPinnedSession.folderPath === sessionFolderPath
+            ? loadedPinnedSession
+            : null;
         const restoredSessionID =
-          existingSession?.id
-          ?? (await findLatestChatHistorySessionId({
-            folderPath: sessionFolderPath,
-            userId: currentUserId,
-          }));
+          pinnedSession?.id
+          ?? existingSession?.id
+          ?? (createFreshSession
+            ? null
+            : await findLatestChatHistorySessionId({
+              folderPath: sessionFolderPath,
+              userId: currentUserId,
+            }));
 
         if (!restoredSessionID || cancelled || !mountedRef.current) {
           if (!cancelled && mountedRef.current) {
@@ -512,11 +542,12 @@ export const Chat = ({
           return;
         }
 
-        const restoredCreatedAt = existingSession?.createdAt ?? new Date().toISOString();
+        const restoredCreatedAt = pinnedSession?.createdAt ?? existingSession?.createdAt ?? new Date().toISOString();
         setRequiresMcpConnectionGate(false);
         activateSession(restoredSessionID, restoredCreatedAt);
+        persistSessionIdRef.current?.(restoredSessionID);
 
-        if (!existingSession) {
+        if (!pinnedSession && !existingSession) {
           try {
             await createSession({
               id: restoredSessionID,
@@ -565,7 +596,7 @@ export const Chat = ({
     // installing a skill used to force this effect — which aborts the live
     // OpenCode session, wipes messages, and rehydrates from disk. Re-injection
     // now happens lazily in `injectActiveSkillsIfStale` before each prompt.
-  }, [activateSession, client, currentUserId, readyStatus, sessionFolderPath]);
+  }, [activateSession, client, createFreshSession, currentUserId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     if (!activeSessionId || !selectedModel) {
@@ -830,6 +861,7 @@ export const Chat = ({
 
     const timestamp = new Date().toISOString();
     activateSession(session.id, timestamp);
+    persistSessionIdRef.current?.(session.id);
     setRequiresMcpConnectionGate(false);
 
     if (selectedModel) {
@@ -953,7 +985,7 @@ export const Chat = ({
   }, [busy, client]);
   const sendMessage = async (): Promise<void> => {
     const text = input.trim();
-    if (!text || busy || hydratingHistory || !modelConnected || mcpConnectionGate.blocked) {
+    if (!text || busy || hydratingHistory || memoryRefreshPaused || !modelConnected || mcpConnectionGate.blocked) {
       return;
     }
 
@@ -972,6 +1004,7 @@ export const Chat = ({
     dispatchDraft({ type: 'reset' });
 
     try {
+      setMemoryRefreshPaused(false);
       const activeSessionID = await ensureSession();
       if (abortRequestedRef.current) {
         setStatus(readyStatus);
@@ -1049,6 +1082,9 @@ export const Chat = ({
           : {}),
       });
       await consumeStream;
+      if (mountedRef.current) {
+        setMemoryRefreshPaused(false);
+      }
 
       const aborted = abortRequestedRef.current;
       const partialBlocks = draftBlocksRef.current;
@@ -1124,6 +1160,7 @@ export const Chat = ({
     } finally {
       abortRequestedRef.current = false;
       if (mountedRef.current) {
+        setMemoryRefreshPaused(false);
         setBusy(false);
       }
     }

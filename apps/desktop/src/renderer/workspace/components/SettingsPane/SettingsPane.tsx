@@ -105,7 +105,7 @@ export const SettingsPane = (): JSX.Element => {
           <ConnectionsSection
             opencode={runtime.opencode}
             vaultPath={runtime.vaultPath}
-            memoryPath={runtime.vaultPath}
+            memoryPath={runtime.memoryPath}
             seedStatuses={runtime.mcpSeedStatuses}
             customMcps={runtime.workspacePreferences.customMcps}
             onAddCustomMcp={handleAddCustomMcp}

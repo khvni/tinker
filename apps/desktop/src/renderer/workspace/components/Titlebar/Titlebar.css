@@ -44,13 +44,27 @@
 }
 
 .tinker-titlebar__crumb {
+  max-width: 18vw;
+  color: var(--color-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  max-width: 40vw;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tinker-titlebar__path {
+  max-width: 28vw;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tinker-titlebar__avatar {
+  margin-left: var(--space-1);
 }
 
 /* Paper 9Q-0: WindowActions is a 68×15 flex cluster, 10 px gap, two 15 px glyphs, end-aligned. */

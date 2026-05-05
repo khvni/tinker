@@ -1,5 +1,4 @@
 import { useEffect, useState, type JSX } from 'react';
-import type { TinkerPaneKind } from '@tinker/shared-types';
 import {
   ChatsIcon,
   ConnectionsIcon,
@@ -9,11 +8,13 @@ import {
 } from './icons.js';
 import './WorkspaceSidebar.css';
 
+export type WorkspaceRailItem = 'chat' | 'file' | 'memory' | 'settings' | 'connections';
+
 export type WorkspaceSidebarProps = {
   readonly userInitial: string;
   readonly avatarUrl: string | null;
   readonly accountLabel: string;
-  readonly activeRailItem: TinkerPaneKind | null;
+  readonly activeRailItem: WorkspaceRailItem | null;
   readonly onOpenChat: () => void;
   readonly onOpenMemory: () => void;
   readonly onOpenSettings: () => void;
@@ -88,6 +89,7 @@ export const WorkspaceSidebar = ({
           label="Connections"
           title="Connections"
           icon={<ConnectionsIcon />}
+          isActive={activeRailItem === 'connections'}
           onClick={onOpenConnections}
         />
         <RailItem label="New tab" title="New tab" icon={<NewTabIcon />} onClick={onOpenChat} />

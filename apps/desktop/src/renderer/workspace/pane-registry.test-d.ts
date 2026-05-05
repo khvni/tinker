@@ -24,7 +24,13 @@ type _FileRendererData = Parameters<PaneRenderer<'file'>>[0];
 type _ChatDataEq = Expect<
   AssertEqual<
     _ChatRendererData,
-    { readonly kind: 'chat'; readonly sessionId?: string; readonly folderPath?: string; readonly memorySubdir?: string }
+    {
+      readonly kind: 'chat';
+      readonly sessionId?: string;
+      readonly createFreshSession?: boolean;
+      readonly folderPath?: string;
+      readonly memorySubdir?: string;
+    }
   >
 >;
 type _FileDataEq = Expect<

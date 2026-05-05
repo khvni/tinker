@@ -39,6 +39,7 @@ type MockClient = {
 const mocks = vi.hoisted(() => ({
   client: null as MockClient | null,
   findLatestChatHistorySessionId: null as ReturnType<typeof vi.fn> | null,
+  getSession: null as ReturnType<typeof vi.fn> | null,
 }));
 
 vi.mock('../../opencode.js', () => ({
@@ -73,6 +74,12 @@ vi.mock('@tinker/memory', () => ({
   appendMemoryCapture: () => Promise.resolve(false),
   createSession: () => Promise.resolve(),
   findLatestSessionForFolder: () => Promise.resolve(null),
+  getSession: (...args: unknown[]) => {
+    if (mocks.getSession) {
+      return mocks.getSession(...args) as Promise<unknown>;
+    }
+    return Promise.resolve(null);
+  },
   getActiveMemoryPath: () => Promise.resolve('/memory/test-user'),
   listSessionsForUser: () => Promise.resolve([]),
   subscribeMemoryPathChanged: () => () => undefined,
@@ -159,6 +166,7 @@ describe('<Chat> — skill re-inject decoupled from session reset', () => {
       },
     };
     mocks.findLatestChatHistorySessionId = vi.fn(() => Promise.resolve(null));
+    mocks.getSession = vi.fn(() => Promise.resolve(null));
   });
 
   afterEach(async () => {
@@ -221,6 +229,77 @@ describe('<Chat> — skill re-inject decoupled from session reset', () => {
 
     expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
     expect(mocks.client.session.abort.mock.calls.length).toBe(0);
+  });
+
+  it('does NOT re-run the session-reset effect when onPersistSessionId changes', async () => {
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
+        </ToastProvider>,
+      );
+    });
+    await flushEffects();
+
+    if (!mocks.findLatestChatHistorySessionId) {
+      throw new Error('mock not installed');
+    }
+
+    const hydrateCallsAfterMount = mocks.findLatestChatHistorySessionId.mock.calls.length;
+    expect(hydrateCallsAfterMount).toBeGreaterThanOrEqual(1);
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
+        </ToastProvider>,
+      );
+    });
+    await flushEffects();
+
+    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
+    expect(mocks.client?.session.abort.mock.calls.length).toBe(0);
+  });
+
+  it('does NOT re-run the session-reset effect when paneSessionId is persisted back into props', async () => {
+    mocks.findLatestChatHistorySessionId = vi.fn(() => Promise.resolve('restored-session'));
+    mocks.getSession = vi.fn(() => Promise.resolve(null));
+    const persistSessionId = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={persistSessionId} />
+        </ToastProvider>,
+      );
+    });
+    await flushEffects();
+
+    expect(persistSessionId).toHaveBeenCalledWith('restored-session');
+
+    if (!mocks.findLatestChatHistorySessionId) {
+      throw new Error('mock not installed');
+    }
+
+    const hydrateCallsAfterMount = mocks.findLatestChatHistorySessionId.mock.calls.length;
+    expect(hydrateCallsAfterMount).toBeGreaterThanOrEqual(1);
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Chat
+            {...baseProps}
+            sessionFolderPath="/vault/a"
+            paneSessionId="restored-session"
+            onPersistSessionId={persistSessionId}
+          />
+        </ToastProvider>,
+      );
+    });
+    await flushEffects();
+
+    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
+    expect(mocks.client?.session.abort.mock.calls.length).toBe(0);
   });
 
   it('DOES re-run the session-reset effect when sessionFolderPath changes (guard: the effect still fires for real triggers)', async () => {
