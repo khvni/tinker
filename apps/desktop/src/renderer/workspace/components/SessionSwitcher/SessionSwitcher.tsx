@@ -1,22 +1,20 @@
 import { useMemo, type JSX } from 'react';
 import { Button, EmptyState } from '@tinker/design';
 import type { Session } from '@tinker/shared-types';
-import { getPanelTitleForPath } from '../../../renderers/file-utils.js';
+import { getPanelTitleForPath, tildify } from '../../../renderers/file-utils.js';
 import './SessionSwitcher.css';
 
 type SessionSwitcherProps = {
   readonly sessions: readonly Session[];
   readonly busy: boolean;
   readonly errorMessage: string | null;
+  readonly homeDirPath?: string | null;
   readonly onSelectSession: (session: Session) => void;
   readonly onCreateSession: () => void;
   readonly onRetry: () => void;
 };
 
 const basename = (path: string): string => getPanelTitleForPath(path.replace(/[\\/]+$/u, ''));
-
-const formatPath = (path: string): string =>
-  path.replace(/^\/Users\/([^/]+)\//u, '~$1/').replace(/^\/home\/([^/]+)\//u, '~$1/');
 
 const formatRelativeTime = (iso: string): string => {
   const timestamp = Date.parse(iso);
@@ -49,6 +47,7 @@ export const SessionSwitcher = ({
   sessions,
   busy,
   errorMessage,
+  homeDirPath = null,
   onSelectSession,
   onCreateSession,
   onRetry,
@@ -113,7 +112,9 @@ export const SessionSwitcher = ({
               onClick={() => onSelectSession(session)}
             >
               <span className="tinker-session-switcher__folder">{basename(session.folderPath)}</span>
-              <span className="tinker-session-switcher__path">{formatPath(session.folderPath)}</span>
+              <span className="tinker-session-switcher__path">
+                {tildify(session.folderPath, homeDirPath)}
+              </span>
               <span className="tinker-session-switcher__time">{formatRelativeTime(session.lastActiveAt)}</span>
             </button>
           ))}

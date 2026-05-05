@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Titlebar, tildify } from './Titlebar.js';
+import { Titlebar } from './Titlebar.js';
 
 describe('<Titlebar>', () => {
   it('renders the brand label', () => {
@@ -343,34 +343,5 @@ describe('<Titlebar>', () => {
       expect(markup).toContain('tinker-titlebar__avatar');
       expect(markup).not.toContain('tinker-titlebar__crumb');
     });
-  });
-});
-
-describe('tildify', () => {
-  it('replaces an exact home directory match with ~', () => {
-    expect(tildify('/Users/ali', '/Users/ali')).toBe('~');
-  });
-
-  it('replaces a posix home prefix with ~/...', () => {
-    expect(tildify('/Users/ali/projects/tinker', '/Users/ali')).toBe('~/projects/tinker');
-    expect(tildify('/home/ali/projects/tinker', '/home/ali')).toBe('~/projects/tinker');
-  });
-
-  it('tolerates trailing separators on the home dir', () => {
-    expect(tildify('/Users/ali/projects', '/Users/ali/')).toBe('~/projects');
-  });
-
-  it('replaces a windows-style home prefix with ~\\...', () => {
-    expect(tildify('C:\\Users\\ali\\projects', 'C:\\Users\\ali')).toBe('~\\projects');
-  });
-
-  it('returns the original path when home dir is missing or empty', () => {
-    expect(tildify('/Users/ali/projects', null)).toBe('/Users/ali/projects');
-    expect(tildify('/Users/ali/projects', '')).toBe('/Users/ali/projects');
-  });
-
-  it('returns the original path when it sits outside the home directory', () => {
-    expect(tildify('/tmp/foo', '/Users/ali')).toBe('/tmp/foo');
-    expect(tildify('/Users/alicia/projects', '/Users/ali')).toBe('/Users/alicia/projects');
   });
 });

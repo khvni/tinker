@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 import { Avatar, IconButton } from '@tinker/design';
-import { getPanelTitleForPath } from '../../../renderers/file-utils.js';
+import { getPanelTitleForPath, tildify } from '../../../renderers/file-utils.js';
 import './Titlebar.css';
 
 export type TitlebarProps = {
@@ -14,22 +14,7 @@ export type TitlebarProps = {
   onToggleRightInspector: () => void;
 };
 
-const stripTrailingSeparators = (path: string): string => path.replace(/[\\/]+$/u, '');
-
-const basename = (path: string): string => getPanelTitleForPath(stripTrailingSeparators(path));
-
-// Collapses an absolute path under the user's home directory to `~/...` form.
-// Falls back to the absolute path when no home dir is known or the path is
-// outside it. Pure function (no Tauri APIs) so it stays trivially testable.
-export const tildify = (path: string, homeDirPath: string | null | undefined): string => {
-  if (typeof homeDirPath !== 'string' || homeDirPath.length === 0) return path;
-  const home = stripTrailingSeparators(homeDirPath);
-  if (home.length === 0) return path;
-  if (path === home) return '~';
-  if (path.startsWith(`${home}/`)) return `~/${path.slice(home.length + 1)}`;
-  if (path.startsWith(`${home}\\`)) return `~\\${path.slice(home.length + 1)}`;
-  return path;
-};
+const basename = (path: string): string => getPanelTitleForPath(path.replace(/[\\/]+$/u, ''));
 
 // Paper 9Q-0: 15×15 glyph with 12×10 rounded-rect panel outline + a divider line.
 // LEFT-rail-toggle places the divider toward the left edge of the panel. Stroke uses

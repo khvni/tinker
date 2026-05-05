@@ -13,7 +13,7 @@ export type LayoutRow = {
   updated_at: string;
 };
 
-export const CURRENT_LAYOUT_VERSION = 3 as const;
+export const CURRENT_LAYOUT_VERSION = 4 as const;
 
 type StoredLayoutPayload = {
   layoutJson: unknown;

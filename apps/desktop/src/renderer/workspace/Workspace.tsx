@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Layout, Model, Actions, DockLocation, type TabNode, type Action, type IJsonModel } from 'flexlayout-react';
-import { getActiveMemoryPath, listSessionsForUser, type MemoryRunState } from '@tinker/memory';
+import { CURRENT_LAYOUT_VERSION, getActiveMemoryPath, listSessionsForUser, type MemoryRunState } from '@tinker/memory';
 import {
   createDefaultWorkspacePreferences,
   type LayoutStore,
@@ -375,7 +375,7 @@ export const Workspace = ({
 
     void layoutStore
       .save(currentUserId, {
-        version: 3,
+        version: CURRENT_LAYOUT_VERSION,
         layoutJson,
         updatedAt: new Date().toISOString(),
         preferences: {
@@ -634,9 +634,14 @@ export const Workspace = ({
           return;
         }
         const config = ((node as TabNode).getConfig() ?? { kind: 'chat' }) as TinkerPaneData;
+        if (config.kind !== 'chat') {
+          return;
+        }
+        const { createFreshSession: _drop, ...rest } = config;
+        void _drop;
         model.doAction(
           Actions.updateNodeAttributes(paneId, {
-            config: { ...config, sessionId },
+            config: { ...rest, sessionId },
           }),
         );
         void refreshStoredSessions();
@@ -790,6 +795,7 @@ export const Workspace = ({
       sessions={storedSessions}
       busy={sessionFolderBusy}
       errorMessage={sessionLoadError}
+      homeDirPath={homeDirPath}
       onSelectSession={handleSelectStoredSession}
       onCreateSession={handleCreateSessionFromSwitcher}
       onRetry={() => void refreshStoredSessions()}

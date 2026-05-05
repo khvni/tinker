@@ -40,7 +40,7 @@ export const createDefaultWorkspacePreferences = (): WorkspacePreferences => {
 };
 
 export type LayoutState = {
-  version: 3;
+  version: 4;
   layoutJson: unknown;
   updatedAt: string;
   preferences: WorkspacePreferences;
