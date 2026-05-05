@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Model } from 'flexlayout-react';
-import { getChatPanelTitle, getNextChatPanelId, openNewChatPanel, collectTabIds } from './chat-panels.js';
-import { createDefaultLayoutJson } from './layout.default.js';
+import { createWorkspaceStore } from '@tinker/panes';
+import { getChatPanelTitle, getNextChatPanelId, openNewChatPanel } from './chat-panels.js';
+import { createDefaultWorkspaceState } from './layout.default.js';
+import type { TinkerPaneData } from '@tinker/shared-types';
 
 describe('chat panel helpers', () => {
   it('allocates stable incrementing chat ids', () => {
@@ -15,38 +16,26 @@ describe('chat panel helpers', () => {
     expect(getChatPanelTitle('chat-2')).toBe('Chat 2');
   });
 
-  it('opens a new chat pane in the active tabset', () => {
-    const model = Model.fromJson(createDefaultLayoutJson());
-
-    openNewChatPanel(model);
-
-    const ids = collectTabIds(model);
-    expect(ids).toContain('chat');
-
-    const chatNode = model.getNodeById('chat');
-    expect(chatNode).toBeDefined();
-  });
-
-  it('adds a chat tab to an empty model', () => {
-    const model = Model.fromJson({
-      global: {},
-      borders: [],
-      layout: {
-        type: 'row',
-        weight: 100,
-        children: [
-          {
-            type: 'tabset',
-            weight: 100,
-            children: [],
-          },
-        ],
-      },
+  it('opens a new chat pane in the active workspace tab', () => {
+    const store = createWorkspaceStore<TinkerPaneData>({
+      initial: createDefaultWorkspaceState(),
     });
 
-    openNewChatPanel(model);
+    openNewChatPanel(store);
 
-    const ids = collectTabIds(model);
-    expect(ids).toContain('chat');
+    const activeTab = store.getState().tabs[0];
+    expect(activeTab).toBeDefined();
+    expect(activeTab?.activePaneId).toBe('chat');
+    expect(Object.keys(activeTab?.panes ?? {})).toContain('chat');
+    expect(activeTab?.panes.chat?.data).toEqual({ kind: 'chat' });
+  });
+
+  it('creates a workspace tab when none exist yet', () => {
+    const store = createWorkspaceStore<TinkerPaneData>();
+
+    openNewChatPanel(store);
+
+    expect(store.getState().tabs).toHaveLength(1);
+    expect(store.getState().tabs[0]?.activePaneId).toBe('chat');
   });
 });

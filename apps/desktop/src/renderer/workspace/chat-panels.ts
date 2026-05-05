@@ -1,4 +1,5 @@
-import { Actions, DockLocation, type Model } from 'flexlayout-react';
+import type { WorkspaceStore } from '@tinker/panes';
+import type { TinkerPaneData } from '@tinker/shared-types';
 
 const CHAT_PANEL_PATTERN = /^chat(?:-(\d+))?$/u;
 
@@ -9,6 +10,19 @@ const getChatPanelIndex = (panelId: string): number | null => {
   }
 
   return match[1] ? Number(match[1]) : 1;
+};
+
+const createWorkspaceTabId = (): string => {
+  return `workspace-${crypto.randomUUID()}`;
+};
+
+const createChatPane = (panelId: string) => {
+  return {
+    id: panelId,
+    kind: 'chat',
+    title: getChatPanelTitle(panelId),
+    data: { kind: 'chat' } as const,
+  };
 };
 
 export const getNextChatPanelId = (panelIds: string[]): string => {
@@ -25,41 +39,19 @@ export const getChatPanelTitle = (panelId: string): string => {
   return index && index > 1 ? `Chat ${index}` : 'Chat';
 };
 
-export const collectTabIds = (model: Model): string[] => {
-  const ids: string[] = [];
-  model.visitNodes((node) => {
-    if (node.getType() === 'tab') {
-      ids.push(node.getId());
-    }
-  });
-  return ids;
-};
+export const openNewChatPanel = (store: WorkspaceStore<TinkerPaneData>): void => {
+  const state = store.getState();
+  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
+  const panelId = getNextChatPanelId(state.tabs.flatMap((tab) => Object.keys(tab.panes)));
+  const pane = createChatPane(panelId);
 
-export const openNewChatPanel = (model: Model): void => {
-  const panelId = getNextChatPanelId(collectTabIds(model));
-  const activeTabset = model.getActiveTabset();
-  const firstTabset = model.getFirstTabSet();
-
-  if (!activeTabset && !firstTabset) {
-    console.warn('Cannot open a new chat panel because the workspace has no tabsets.');
+  if (!activeTab) {
+    state.actions.openTab({
+      id: createWorkspaceTabId(),
+      pane,
+    });
     return;
   }
 
-  const targetId = activeTabset?.getId() ?? firstTabset.getId();
-
-  model.doAction(
-    Actions.addTab(
-      {
-        type: 'tab',
-        id: panelId,
-        name: getChatPanelTitle(panelId),
-        component: 'chat',
-        config: { kind: 'chat' as const },
-      },
-      targetId,
-      DockLocation.CENTER,
-      -1,
-      true,
-    ),
-  );
+  state.actions.addPane(activeTab.id, pane, { activate: true });
 };
