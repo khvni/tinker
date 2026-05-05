@@ -42,7 +42,7 @@ export const CatalogCard = ({ mcp, alreadyAdded, onAdd }: CatalogCardProps): JSX
             placeholder={mcp.headerPlaceholder}
             aria-label={mcp.headerName}
           />
-          <Button variant="primary" size="s" onClick={handleAdd}>
+          <Button variant="primary" size="s" disabled={secret.trim().length === 0} onClick={handleAdd}>
             Connect
           </Button>
         </div>
