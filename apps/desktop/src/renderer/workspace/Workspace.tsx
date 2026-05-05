@@ -69,6 +69,7 @@ type WorkspaceProps = {
   sessions: SSOStatus;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
+  homeDirPath: string | null;
   activeSkillsRevision: number;
   skillsRootPath: string | null;
   memorySweepState: MemoryRunState | null;
@@ -139,6 +140,7 @@ export const Workspace = ({
   opencode,
   sessions,
   vaultPath,
+  homeDirPath,
   activeSkillsRevision,
   skillsRootPath,
   onActiveSkillsChanged,
@@ -823,8 +825,9 @@ export const Workspace = ({
       titlebar={
         <Titlebar
           sessionFolderPath={vaultPath}
+          homeDirPath={homeDirPath}
           isLeftRailVisible={workspacePreferences.isLeftRailVisible}
-          currentUserName={currentUserName}
+          currentUserName={isGuest ? 'Guest' : currentUserName}
           currentUserAvatarUrl={currentUserAvatarUrl}
           isRightInspectorVisible={workspacePreferences.isRightInspectorVisible}
           onToggleLeftRail={toggleLeftRail}

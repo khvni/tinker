@@ -337,9 +337,26 @@ export const App = (): JSX.Element => {
   const [memorySweepState, setMemorySweepState] = useState<MemoryRunState | null>(null);
   const [memorySweepBusy, setMemorySweepBusy] = useState(false);
   const [sessionFolderBusy, setSessionFolderBusy] = useState(false);
+  const [homeDirPath, setHomeDirPath] = useState<string | null>(null);
   const schedulerEngineRef = useRef<SchedulerEngine | null>(null);
   const refcountsRef = useRef<Record<BindingKey, number>>({});
   const { state: currentUserState, refresh: refreshCurrentUser } = useCurrentUser(nativeRuntime);
+
+  useEffect(() => {
+    if (!nativeRuntime) return;
+    let cancelled = false;
+    void homeDir()
+      .then((value) => {
+        if (!cancelled) setHomeDirPath(value);
+      })
+      .catch(() => {
+        // Resolving the home directory is best-effort. Without it, the
+        // titlebar simply renders the absolute session folder path.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [nativeRuntime]);
 
   useEffect(() => {
     const ready = state.status === 'ready' && currentUserState.status === 'ready';
@@ -1288,6 +1305,7 @@ export const App = (): JSX.Element => {
         currentUserProvider={currentUser.provider}
         currentUserEmail={currentUser.email}
         currentUserAvatarUrl={currentUser.avatarUrl}
+        homeDirPath={homeDirPath}
         nativeRuntimeAvailable={nativeRuntime}
         layoutStore={state.layoutStore}
         memoryStore={state.memoryStore}

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Titlebar } from './Titlebar.js';
+import { Titlebar, tildify } from './Titlebar.js';
 
 describe('<Titlebar>', () => {
   it('renders the brand label', () => {
@@ -245,5 +245,132 @@ describe('<Titlebar>', () => {
       />,
     );
     expect(markup).not.toContain('aria-label="Playbook"');
+  });
+
+  describe('session path display', () => {
+    it('collapses the home directory prefix to ~ in the monospace path', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath="/Users/ali/projects/tinker"
+          homeDirPath="/Users/ali"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toMatch(
+        /<span[^>]*class="tinker-titlebar__path"[^>]*>~\/projects\/tinker<\/span>/,
+      );
+    });
+
+    it('renders the absolute path when no home directory is known', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath="/Users/ali/projects/tinker"
+          homeDirPath={null}
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toMatch(
+        /<span[^>]*class="tinker-titlebar__path"[^>]*>\/Users\/ali\/projects\/tinker<\/span>/,
+      );
+    });
+
+    it('keeps the full path as the monospace span tooltip', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath="/home/ali/work/tinker"
+          homeDirPath="/home/ali"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toMatch(
+        /<span[^>]*class="tinker-titlebar__path"[^>]*title="\/home\/ali\/work\/tinker"/,
+      );
+    });
+  });
+
+  describe('user identity', () => {
+    it('renders the avatar with the current user name as the tooltip', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          currentUserName="Ali Khani"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toMatch(
+        /<span[^>]*class="[^"]*tinker-titlebar__avatar[^"]*"[^>]*aria-label="Ali Khani"[^>]*title="Ali Khani"/,
+      );
+    });
+
+    it('renders an avatar image when the current user has an avatar URL', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          currentUserName="Ali Khani"
+          currentUserAvatarUrl="https://example.test/avatar.png"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toContain('https://example.test/avatar.png');
+    });
+
+    it('renders the avatar even when no session folder is selected', () => {
+      const markup = renderToStaticMarkup(
+        <Titlebar
+          sessionFolderPath={null}
+          currentUserName="Ali Khani"
+          isLeftRailVisible
+          isRightInspectorVisible
+          onToggleLeftRail={() => undefined}
+          onToggleRightInspector={() => undefined}
+        />,
+      );
+      expect(markup).toContain('tinker-titlebar__avatar');
+      expect(markup).not.toContain('tinker-titlebar__crumb');
+    });
+  });
+});
+
+describe('tildify', () => {
+  it('replaces an exact home directory match with ~', () => {
+    expect(tildify('/Users/ali', '/Users/ali')).toBe('~');
+  });
+
+  it('replaces a posix home prefix with ~/...', () => {
+    expect(tildify('/Users/ali/projects/tinker', '/Users/ali')).toBe('~/projects/tinker');
+    expect(tildify('/home/ali/projects/tinker', '/home/ali')).toBe('~/projects/tinker');
+  });
+
+  it('tolerates trailing separators on the home dir', () => {
+    expect(tildify('/Users/ali/projects', '/Users/ali/')).toBe('~/projects');
+  });
+
+  it('replaces a windows-style home prefix with ~\\...', () => {
+    expect(tildify('C:\\Users\\ali\\projects', 'C:\\Users\\ali')).toBe('~\\projects');
+  });
+
+  it('returns the original path when home dir is missing or empty', () => {
+    expect(tildify('/Users/ali/projects', null)).toBe('/Users/ali/projects');
+    expect(tildify('/Users/ali/projects', '')).toBe('/Users/ali/projects');
+  });
+
+  it('returns the original path when it sits outside the home directory', () => {
+    expect(tildify('/tmp/foo', '/Users/ali')).toBe('/tmp/foo');
+    expect(tildify('/Users/alicia/projects', '/Users/ali')).toBe('/Users/alicia/projects');
   });
 });
