@@ -50,6 +50,18 @@ export function clearRefreshToken(provider: RefreshTokenProvider, userId: string
   return invoke('clear_refresh_token', { provider, userId });
 }
 
+export function saveMcpSecret(mcpId: string, secret: string): Promise<void> {
+  return invoke('save_mcp_secret', { mcpId, secret });
+}
+
+export function loadMcpSecret(mcpId: string): Promise<string | null> {
+  return invoke<string | null>('load_mcp_secret', { mcpId });
+}
+
+export function clearMcpSecret(mcpId: string): Promise<void> {
+  return invoke('clear_mcp_secret', { mcpId });
+}
+
 export function restoreAuthSession(provider: RefreshTokenProvider, userId: string): Promise<SSOSession | null> {
   return invoke<SSOSession | null>('restore_auth_session', { provider, userId });
 }

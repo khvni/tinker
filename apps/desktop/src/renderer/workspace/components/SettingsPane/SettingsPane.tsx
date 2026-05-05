@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import type { CustomMcpEntry } from '@tinker/shared-types';
+import { saveMcpSecret, clearMcpSecret } from '../../../../bindings.js';
 import { MemorySettingsPanel } from '../MemorySettingsPanel/index.js';
 import { SettingsShell, type SettingsShellSection } from '../SettingsShell/index.js';
 import { useSettingsPaneRuntime } from '../../settings-pane-runtime.js';
@@ -22,7 +23,11 @@ export const SettingsPane = (): JSX.Element => {
   }, [runtime]);
 
   const handleAddCustomMcp = useCallback(
-    (entry: CustomMcpEntry) => {
+    (entry: CustomMcpEntry, secret: string) => {
+      if (secret) {
+        void saveMcpSecret(entry.id, secret);
+      }
+
       const prefs = runtime.workspacePreferences;
       runtime.onWorkspacePreferencesChange({
         ...prefs,
@@ -34,6 +39,8 @@ export const SettingsPane = (): JSX.Element => {
 
   const handleRemoveCustomMcp = useCallback(
     (id: string) => {
+      void clearMcpSecret(id);
+
       const prefs = runtime.workspacePreferences;
       runtime.onWorkspacePreferencesChange({
         ...prefs,

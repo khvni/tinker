@@ -18,7 +18,7 @@ type ConnectionsSectionProps = {
   memoryPath: string | null;
   seedStatuses?: Partial<Record<BuiltinMcpName, MCPStatus>> | undefined;
   customMcps: ReadonlyArray<CustomMcpEntry>;
-  onAddCustomMcp: (entry: CustomMcpEntry) => void;
+  onAddCustomMcp: (entry: CustomMcpEntry, secret: string) => void;
   onRemoveCustomMcp: (id: string) => void;
   onRequestRespawn: () => Promise<void>;
 };

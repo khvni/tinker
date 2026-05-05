@@ -1,5 +1,6 @@
 import {
   createDefaultWorkspacePreferences,
+  type CustomMcpEntry,
   type LayoutState,
   type LayoutStore,
   type WorkspacePreferences,
@@ -27,6 +28,18 @@ const parseStoredLayout = (raw: string): unknown | null => {
   }
 };
 
+const isValidMcpEntry = (entry: unknown): entry is CustomMcpEntry => {
+  if (!entry || typeof entry !== 'object') return false;
+  const record = entry as Record<string, unknown>;
+  return (
+    typeof record.id === 'string' &&
+    typeof record.label === 'string' &&
+    typeof record.url === 'string' &&
+    typeof record.headerName === 'string' &&
+    typeof record.enabled === 'boolean'
+  );
+};
+
 const normalizePreferences = (value: unknown): WorkspacePreferences => {
   if (!value || typeof value !== 'object') {
     return createDefaultWorkspacePreferences();
@@ -47,7 +60,9 @@ const normalizePreferences = (value: unknown): WorkspacePreferences => {
       typeof candidate.isRightInspectorVisible === 'boolean'
         ? candidate.isRightInspectorVisible
         : defaults.isRightInspectorVisible,
-    customMcps: Array.isArray(candidate.customMcps) ? candidate.customMcps : defaults.customMcps,
+    customMcps: Array.isArray(candidate.customMcps)
+      ? (candidate.customMcps as unknown[]).filter(isValidMcpEntry)
+      : defaults.customMcps,
   };
 };
 

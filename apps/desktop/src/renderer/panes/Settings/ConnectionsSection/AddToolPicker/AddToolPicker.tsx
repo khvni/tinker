@@ -1,26 +1,21 @@
-import { useCallback, useState, type ChangeEvent, type JSX } from 'react';
+import { useCallback, useState, type JSX } from 'react';
 import { Button, Modal, TextInput } from '@tinker/design';
 import type { CustomMcpEntry } from '@tinker/shared-types';
-import { CATALOG_MCPS, type CatalogMcp } from './available-mcps.js';
+import type { CatalogMcp } from './available-mcps.js';
+import { useField } from './use-field.js';
+import { CatalogView } from './components/CatalogView/index.js';
 import './AddToolPicker.css';
 
 export type AddToolPickerProps = {
   open: boolean;
   onClose: () => void;
-  onAdd: (entry: CustomMcpEntry) => void;
+  onAdd: (entry: CustomMcpEntry, secret: string) => void;
   existingIds: ReadonlyArray<string>;
 };
 
 type View = 'catalog' | 'custom';
 
 const generateId = (): string => `mcp-${Date.now().toString(36)}`;
-
-const useField = (initial = ''): [string, (e: ChangeEvent<HTMLInputElement>) => void, () => void] => {
-  const [value, setValue] = useState(initial);
-  const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value), []);
-  const reset = useCallback(() => setValue(initial), [initial]);
-  return [value, onChange, reset];
-};
 
 export const AddToolPicker = ({
   open,
@@ -63,10 +58,9 @@ export const AddToolPicker = ({
       label: label.trim() || hostname,
       url: trimmedUrl,
       headerName: headerName.trim(),
-      headerValue: headerValue.trim(),
       enabled: true,
     };
-    onAdd(entry);
+    onAdd(entry, headerValue.trim());
     handleClose();
   }, [url, label, headerName, headerValue, onAdd, handleClose]);
 
@@ -77,10 +71,9 @@ export const AddToolPicker = ({
         label: catalog.label,
         url: catalog.url,
         headerName: catalog.headerName,
-        headerValue: secret.trim(),
         enabled: true,
       };
-      onAdd(entry);
+      onAdd(entry, secret.trim());
       handleClose();
     },
     [onAdd, handleClose],
@@ -142,101 +135,5 @@ export const AddToolPicker = ({
         </div>
       )}
     </Modal>
-  );
-};
-
-type CatalogViewProps = {
-  existingIds: ReadonlyArray<string>;
-  onAddCatalog: (catalog: CatalogMcp, secret: string) => void;
-  onSwitchToCustom: () => void;
-};
-
-const CatalogView = ({
-  existingIds,
-  onAddCatalog,
-  onSwitchToCustom,
-}: CatalogViewProps): JSX.Element => (
-  <>
-    <p className="tinker-add-tool-picker__intro tinker-muted">
-      Pick a pre-configured integration or add any MCP server by URL.
-    </p>
-
-    <ul className="tinker-add-tool-picker__grid" role="list">
-      {CATALOG_MCPS.map((mcp) => {
-        const alreadyAdded = existingIds.includes(mcp.id);
-        return (
-          <CatalogCard
-            key={mcp.id}
-            mcp={mcp}
-            alreadyAdded={alreadyAdded}
-            onAdd={onAddCatalog}
-          />
-        );
-      })}
-
-      <li className="tinker-add-tool-picker__card tinker-add-tool-picker__card--custom">
-        <div className="tinker-add-tool-picker__card-body">
-          <p className="tinker-add-tool-picker__card-title">Custom MCP</p>
-          <p className="tinker-add-tool-picker__card-blurb">
-            Connect any MCP server by URL
-          </p>
-        </div>
-        <Button variant="secondary" size="s" onClick={onSwitchToCustom}>
-          Add
-        </Button>
-      </li>
-    </ul>
-  </>
-);
-
-type CatalogCardProps = {
-  mcp: CatalogMcp;
-  alreadyAdded: boolean;
-  onAdd: (catalog: CatalogMcp, secret: string) => void;
-};
-
-const CatalogCard = ({ mcp, alreadyAdded, onAdd }: CatalogCardProps): JSX.Element => {
-  const [expanded, setExpanded] = useState(false);
-  const [secret, onSecretChange] = useField();
-
-  const handleAdd = useCallback(() => {
-    onAdd(mcp, secret);
-  }, [mcp, secret, onAdd]);
-
-  if (alreadyAdded) {
-    return (
-      <li className="tinker-add-tool-picker__card" aria-disabled="true" data-available="false">
-        <div className="tinker-add-tool-picker__card-body">
-          <p className="tinker-add-tool-picker__card-title">{mcp.label}</p>
-          <p className="tinker-add-tool-picker__card-blurb">Already added</p>
-        </div>
-      </li>
-    );
-  }
-
-  return (
-    <li className="tinker-add-tool-picker__card" data-available="true">
-      <div className="tinker-add-tool-picker__card-body">
-        <p className="tinker-add-tool-picker__card-title">{mcp.label}</p>
-        <p className="tinker-add-tool-picker__card-blurb">{mcp.description}</p>
-      </div>
-      {expanded ? (
-        <div className="tinker-add-tool-picker__card-secret">
-          <TextInput
-            value={secret}
-            onChange={onSecretChange}
-            placeholder={mcp.headerPlaceholder}
-            aria-label={mcp.headerName}
-          />
-          <Button variant="primary" size="s" onClick={handleAdd}>
-            Connect
-          </Button>
-        </div>
-      ) : (
-        <Button variant="secondary" size="s" onClick={() => setExpanded(true)}>
-          Set up
-        </Button>
-      )}
-    </li>
   );
 };

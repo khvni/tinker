@@ -18,7 +18,6 @@ export type CustomMcpEntry = {
   readonly label: string;
   readonly url: string;
   readonly headerName: string;
-  readonly headerValue: string;
   readonly enabled: boolean;
 };
 

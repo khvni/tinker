@@ -133,7 +133,6 @@ describe('ConnectionsSection', () => {
             label: 'Composio',
             url: 'https://connect.composio.dev/mcp',
             headerName: 'x-consumer-api-key',
-            headerValue: 'ck_test',
             enabled: true,
           },
         ]}

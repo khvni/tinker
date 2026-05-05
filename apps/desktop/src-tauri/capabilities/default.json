@@ -25,6 +25,7 @@
     "allow-folder-picker",
     "allow-oauth-flow",
     "allow-refresh-token-keychain",
+    "allow-mcp-secret-keychain",
     "allow-start-opencode",
     "allow-stop-opencode",
     "allow-memory-review",

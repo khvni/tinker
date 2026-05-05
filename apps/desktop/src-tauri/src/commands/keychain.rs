@@ -115,6 +115,69 @@ pub fn clear_refresh_token<R: Runtime>(
   clear_refresh_token_with_store(&AppPasswordStore { app: &app }, &provider, &user_id)
 }
 
+fn mcp_secret_account(mcp_id: &str) -> Result<String, String> {
+  let mcp_id = require_key_segment("MCP ID", mcp_id)?;
+  Ok(format!("{KEYRING_SERVICE}.mcp.{mcp_id}"))
+}
+
+fn save_mcp_secret_with_store(
+  store: &impl PasswordStore,
+  mcp_id: &str,
+  secret: &str,
+) -> Result<(), String> {
+  if secret.trim().is_empty() {
+    return Err("Secret is required.".to_string());
+  }
+
+  let account = mcp_secret_account(mcp_id)?;
+  store.set_password(KEYRING_SERVICE, &account, secret)
+}
+
+fn load_mcp_secret_with_store(
+  store: &impl PasswordStore,
+  mcp_id: &str,
+) -> Result<Option<String>, String> {
+  let account = mcp_secret_account(mcp_id)?;
+  store.get_password(KEYRING_SERVICE, &account)
+}
+
+fn clear_mcp_secret_with_store(
+  store: &impl PasswordStore,
+  mcp_id: &str,
+) -> Result<(), String> {
+  let account = mcp_secret_account(mcp_id)?;
+  if store.get_password(KEYRING_SERVICE, &account)?.is_none() {
+    return Ok(());
+  }
+
+  store.delete_password(KEYRING_SERVICE, &account)
+}
+
+#[tauri::command]
+pub fn save_mcp_secret<R: Runtime>(
+  app: AppHandle<R>,
+  mcp_id: String,
+  secret: String,
+) -> Result<(), String> {
+  save_mcp_secret_with_store(&AppPasswordStore { app: &app }, &mcp_id, &secret)
+}
+
+#[tauri::command]
+pub fn load_mcp_secret<R: Runtime>(
+  app: AppHandle<R>,
+  mcp_id: String,
+) -> Result<Option<String>, String> {
+  load_mcp_secret_with_store(&AppPasswordStore { app: &app }, &mcp_id)
+}
+
+#[tauri::command]
+pub fn clear_mcp_secret<R: Runtime>(
+  app: AppHandle<R>,
+  mcp_id: String,
+) -> Result<(), String> {
+  clear_mcp_secret_with_store(&AppPasswordStore { app: &app }, &mcp_id)
+}
+
 #[cfg(test)]
 mod tests {
   use std::{
@@ -186,6 +249,42 @@ mod tests {
     assert_eq!(
       save_refresh_token_with_store(&store, "google", "user-42", " ").unwrap_err(),
       "Token is required."
+    );
+  }
+
+  #[test]
+  fn mcp_secret_account_uses_tinker_mcp_prefix() {
+    assert_eq!(
+      mcp_secret_account("composio").unwrap(),
+      "tinker.mcp.composio"
+    );
+  }
+
+  #[test]
+  fn mcp_secret_commands_round_trip_with_store() {
+    let store = MemoryPasswordStore::default();
+
+    save_mcp_secret_with_store(&store, "composio", "ck_test123").unwrap();
+    assert_eq!(
+      load_mcp_secret_with_store(&store, "composio").unwrap(),
+      Some("ck_test123".to_string())
+    );
+
+    clear_mcp_secret_with_store(&store, "composio").unwrap();
+    assert_eq!(load_mcp_secret_with_store(&store, "composio").unwrap(), None);
+  }
+
+  #[test]
+  fn mcp_secret_commands_reject_blank_segments() {
+    let store = MemoryPasswordStore::default();
+
+    assert_eq!(
+      save_mcp_secret_with_store(&store, " ", "secret").unwrap_err(),
+      "MCP ID is required."
+    );
+    assert_eq!(
+      save_mcp_secret_with_store(&store, "composio", " ").unwrap_err(),
+      "Secret is required."
     );
   }
 
