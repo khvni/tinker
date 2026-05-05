@@ -5,6 +5,12 @@ export type ScheduledOutputSink =
 
 export type ScheduledJobRunStatus = 'success' | 'error' | 'skipped';
 
+export type ScheduledJobTask =
+  | { kind: 'prompt' }
+  | { kind: 'memory-sweep' };
+
+export type ScheduledJobTaskKind = ScheduledJobTask['kind'];
+
 export type ScheduledJob = {
   id: string;
   name: string;
@@ -16,6 +22,7 @@ export type ScheduledJob = {
   lastRunAt: string | null;
   lastRunStatus: ScheduledJobRunStatus | null;
   nextRunAt: string;
+  task: ScheduledJobTask;
   createdAt: string;
   updatedAt: string;
 };

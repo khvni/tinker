@@ -192,15 +192,16 @@ export const createMemoryStore = (): MemoryStore => {
       const normalizedSources = normalizeEntitySources(entity.sources, entity.lastSeenAt);
 
       await database.execute(
-        `INSERT INTO entities (id, kind, name, aliases_json, sources_json, attributes_json, last_seen_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO entities (id, kind, name, aliases_json, sources_json, attributes_json, last_seen_at, stale_since)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
          ON CONFLICT(id) DO UPDATE SET
            kind = excluded.kind,
            name = excluded.name,
            aliases_json = excluded.aliases_json,
            sources_json = excluded.sources_json,
            attributes_json = excluded.attributes_json,
-           last_seen_at = excluded.last_seen_at`,
+           last_seen_at = excluded.last_seen_at,
+           stale_since = NULL`,
         [
           entity.id,
           entity.kind,
@@ -462,6 +463,32 @@ export const pruneEntitiesWithoutSources = async (): Promise<number> => {
   return staleIds.length;
 };
 
+export const flagEntitiesWithoutSources = async (now = new Date()): Promise<number> => {
+  const database = await getDatabase();
+  const rows = await database.select<EntityRow[]>(
+    `SELECT id, kind, name, aliases_json, sources_json, attributes_json, last_seen_at
+     FROM entities
+     WHERE stale_since IS NULL`,
+  );
+
+  const staleIds = rows
+    .map(hydrateEntity)
+    .filter((entity) => entity.sources.length === 0)
+    .map((entity) => entity.id);
+
+  if (staleIds.length === 0) {
+    return 0;
+  }
+
+  const stamp = now.toISOString();
+  await Promise.all(
+    staleIds.map((id) =>
+      database.execute('UPDATE entities SET stale_since = $1 WHERE id = $2', [stamp, id]),
+    ),
+  );
+  return staleIds.length;
+};
+
 export const wipeMemorySource = async (service: string): Promise<{ entities: number; relationships: number }> => {
   const memoryStore = createMemoryStore();
   const database = await getDatabase();
@@ -538,8 +565,8 @@ export const wipeMemorySource = async (service: string): Promise<{ entities: num
   return { entities: entityChanges, relationships: relationshipChanges };
 };
 
-export const runMemoryMaintenanceSweep = async (vault: VaultConfig): Promise<{ entitiesIndexed: number; entitiesPruned: number }> => {
+export const runMemoryMaintenanceSweep = async (vault: VaultConfig): Promise<{ entitiesIndexed: number; entitiesFlagged: number }> => {
   const { entitiesIndexed } = await indexVault(vault);
-  const entitiesPruned = await pruneEntitiesWithoutSources();
-  return { entitiesIndexed, entitiesPruned };
+  const entitiesFlagged = await flagEntitiesWithoutSources();
+  return { entitiesIndexed, entitiesFlagged };
 };

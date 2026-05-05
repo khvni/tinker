@@ -3,6 +3,8 @@ import type {
   ScheduledJobRun,
   ScheduledJobRunStatus,
   ScheduledJobStore,
+  ScheduledJobTask,
+  ScheduledJobTaskKind,
   ScheduledOutputSink,
   ScheduledTodayEntry,
 } from '@tinker/shared-types';
@@ -21,6 +23,7 @@ type JobRow = {
   next_run_at: string;
   created_at: string;
   updated_at: string;
+  task_kind: string | null;
 };
 
 type JobRunRow = {
@@ -50,6 +53,20 @@ const parseOutputSinks = (raw: string): ScheduledOutputSink[] => {
   }
 };
 
+const TASK_KINDS: readonly ScheduledJobTaskKind[] = ['prompt', 'memory-sweep'];
+
+const isScheduledTaskKind = (value: string | null): value is ScheduledJobTaskKind => {
+  if (value === null) return false;
+  return (TASK_KINDS as readonly string[]).includes(value);
+};
+
+const hydrateTask = (row: JobRow): ScheduledJobTask => {
+  if (isScheduledTaskKind(row.task_kind)) {
+    return { kind: row.task_kind };
+  }
+  return { kind: 'prompt' };
+};
+
 const hydrateJob = (row: JobRow): ScheduledJob => {
   return {
     id: row.id,
@@ -62,6 +79,7 @@ const hydrateJob = (row: JobRow): ScheduledJob => {
     lastRunAt: row.last_run_at,
     lastRunStatus: row.last_run_status,
     nextRunAt: row.next_run_at,
+    task: hydrateTask(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -100,7 +118,8 @@ export const createScheduledJobStore = (): ScheduledJobStore => {
            last_run_status,
            next_run_at,
            created_at,
-           updated_at
+           updated_at,
+           task_kind
          FROM jobs
          ORDER BY enabled DESC, datetime(next_run_at) ASC, name ASC`,
       );
@@ -123,7 +142,8 @@ export const createScheduledJobStore = (): ScheduledJobStore => {
            last_run_status,
            next_run_at,
            created_at,
-           updated_at
+           updated_at,
+           task_kind
          FROM jobs
          WHERE id = $1
          LIMIT 1`,
@@ -150,9 +170,10 @@ export const createScheduledJobStore = (): ScheduledJobStore => {
            last_run_status,
            next_run_at,
            created_at,
-           updated_at
+           updated_at,
+           task_kind
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
            prompt = excluded.prompt,
@@ -164,7 +185,8 @@ export const createScheduledJobStore = (): ScheduledJobStore => {
            last_run_status = excluded.last_run_status,
            next_run_at = excluded.next_run_at,
            created_at = excluded.created_at,
-           updated_at = excluded.updated_at`,
+           updated_at = excluded.updated_at,
+           task_kind = excluded.task_kind`,
         [
           job.id,
           job.name,
@@ -178,6 +200,7 @@ export const createScheduledJobStore = (): ScheduledJobStore => {
           job.nextRunAt,
           job.createdAt,
           job.updatedAt,
+          job.task.kind,
         ],
       );
     },
@@ -203,7 +226,8 @@ export const createScheduledJobStore = (): ScheduledJobStore => {
            last_run_status,
            next_run_at,
            created_at,
-           updated_at
+           updated_at,
+           task_kind
          FROM jobs
          WHERE enabled = 1
            AND datetime(next_run_at) <= datetime($1)
