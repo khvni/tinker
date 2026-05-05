@@ -232,7 +232,7 @@ Scope preserved for historical context + roadmap signaling. **Do not work on the
 | 03 | Self-building memory pipeline (entity extraction) | [[03-memory-pipeline]] | MVP memory = flat markdown files. Entity graph is premature without validated retrieval need. |
 | 04 | Native scheduler | [[04-native-scheduler]] | No scheduled execution in MVP. |
 | 05 | Coach skill discovery | [[05-coach-skill-discovery]] | Depends on Playbook. |
-| 06 | Sub-agent orchestration | [[06-subagent-orchestration]] | MVP = single agent per session. |
+| 06 | Sub-agent orchestration | [[06-subagent-orchestration]] | MVP = single agent per session. **TIN-130 (orchestrator primitive) reopened 2026-05-05.** TIN-131 (worker registry) + TIN-132 (UI disclosures) remain queued. |
 | 07 | Workspace persistence + split-pane UI | [[07-workspace-persistence]] | Merged into M1 (scaled-down: single-pane default). Split support preserved in `@tinker/panes` but default layout is single Chat. |
 | 08 | MCP proxy layer | [[08-mcp-proxy-layer]] | Cold-start-time optimization. MVP uses direct MCP spawn. |
 | 09 | Design system enforcement | [[09-design-system]] | **Done** — continues as hygiene, no active work. |

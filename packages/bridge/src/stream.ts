@@ -1,4 +1,11 @@
-import type { Event, OpencodeClient, Part, ToolPart } from '@opencode-ai/sdk/v2/client';
+import type {
+  AgentPart,
+  Event,
+  OpencodeClient,
+  Part,
+  SubtaskPart,
+  ToolPart,
+} from '@opencode-ai/sdk/v2/client';
 
 type ContextUsageTokens = {
   total?: number;
@@ -13,6 +20,16 @@ export type TinkerStreamEvent =
   | { type: 'tool_call'; partID: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; partID: string; name: string; output: string }
   | { type: 'tool_error'; partID: string; name: string; message: string }
+  | {
+      type: 'subtask';
+      partID: string;
+      agent: string;
+      description: string;
+      prompt: string;
+      providerID: string | null;
+      modelID: string | null;
+    }
+  | { type: 'agent_invoked'; partID: string; name: string }
   | {
       type: 'context_usage';
       providerID: string | null;
@@ -69,6 +86,26 @@ const asToolEvent = (part: ToolPart): TinkerStreamEvent | null => {
   }
 
   return null;
+};
+
+const asSubtaskEvent = (part: SubtaskPart): TinkerStreamEvent => {
+  return {
+    type: 'subtask',
+    partID: part.id,
+    agent: part.agent,
+    description: part.description,
+    prompt: part.prompt,
+    providerID: part.model?.providerID ?? null,
+    modelID: part.model?.modelID ?? null,
+  };
+};
+
+const asAgentInvokedEvent = (part: AgentPart): TinkerStreamEvent => {
+  return {
+    type: 'agent_invoked',
+    partID: part.id,
+    name: part.name,
+  };
 };
 
 const asFileWrites = (part: Part): TinkerStreamEvent[] => {
@@ -178,6 +215,11 @@ export const streamSessionEvents = async function* (
   // be surfaced as `reasoning` rather than `token` (delta events lack the
   // discriminator and only carry partID).
   const reasoningPartIDs = new Set<string>();
+  // SubtaskPart and AgentPart are single-shot (no state machine), but the
+  // SDK can re-fire `message.part.updated` for the same partID. Dedupe so
+  // the renderer sees one event per part.
+  const emittedSubtaskPartIDs = new Set<string>();
+  const emittedAgentPartIDs = new Set<string>();
 
   for await (const event of subscription.stream) {
     if (readSessionID(event) !== sessionID) {
@@ -228,6 +270,16 @@ export const streamSessionEvents = async function* (
         if (toolEvent) {
           yield toolEvent;
         }
+      }
+
+      if (part.type === 'subtask' && !emittedSubtaskPartIDs.has(part.id)) {
+        emittedSubtaskPartIDs.add(part.id);
+        yield asSubtaskEvent(part);
+      }
+
+      if (part.type === 'agent' && !emittedAgentPartIDs.has(part.id)) {
+        emittedAgentPartIDs.add(part.id);
+        yield asAgentInvokedEvent(part);
       }
 
       for (const fileEvent of asFileWrites(part)) {

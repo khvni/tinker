@@ -1,12 +1,13 @@
 ---
 type: concept
 tags: [tinker, feature, subagents, orchestration, opencode]
-status: not-started
+status: in-progress
 priority: p2
 deferred: post-mvp
 ---
 
-> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP runs one agent per session. Do not start work until MVP ships.
+> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** MVP runs one agent per session.
+> **[2026-05-05] Reopened for TIN-130** (orchestrator primitive). Worker registry (TIN-131) and chat UI (TIN-132) remain queued.
 
 # Feature 06 — Sub-Agent Orchestration
 
@@ -36,6 +37,9 @@ Workers run in parallel, return results to orchestrator, orchestrator composes t
 - `[2026-04-14]` Workers are scoped to specific tool subsets (e.g., worker A = Gmail + Calendar only)
 - `[2026-04-14]` Token efficiency via **prompt caching** (OpenCode SDK supports) and **selective context passing** at the text level
 - `[2026-04-14]` No Latent Briefing (see [[decisions]])
+- `[2026-05-05]` **Decomposition is model-driven** — orchestrator agent has the `task` permission and emits `SubtaskPartInput` itself. Bridge surfaces the resulting `SubtaskPart` events through the existing stream.
+- `[2026-05-05]` **Workers do not inherit orchestrator memory/skills.** Each subagent runs with only its declared `AgentConfig.prompt` + the per-call `description` from the orchestrator.
+- `[2026-05-05]` **Hard cap: 5 parallel workers** in the helper (`MAX_PARALLEL_SUBAGENTS`). Enforced by callers that decompose explicitly; model-driven flows are bounded by the orchestrator agent's `task` permission instead.
 
 ### v2 / later
 - Dynamic worker spawning based on tool inventory
@@ -44,13 +48,14 @@ Workers run in parallel, return results to orchestrator, orchestrator composes t
 
 ## Architecture
 
-### OpenCode SDK primitives (per SDK docs at https://opencode.ai/docs/sdk/)
+### OpenCode SDK primitives (verified against `@opencode-ai/sdk@1.4.3`)
 
-- `[2026-04-14]` `session.create()` — creates an isolated session (use one per worker)
-- `[2026-04-14]` `session.prompt()` — sends a prompt
-- `[2026-04-14]` `session.messages()` — retrieves results
-- `[2026-04-14]` `event.subscribe()` — SSE event stream
-- `[2026-04-14]` `auth.set()` — scopes credentials per session (enables tool-restricted workers)
+- `[2026-05-05]` **`SubtaskPartInput`** `{ type: 'subtask', prompt, description, agent }` — passed to `session.prompt({ parts: [...] })`. OpenCode runs subtasks in parallel and composes results back into the orchestrator's response.
+- `[2026-05-05]` **`SubtaskPart`** — emitted on the orchestrator's message via `message.part.updated`. Single-shot (no state machine); bridge dedupes per `partID`.
+- `[2026-05-05]` **`AgentPart` / `AgentPartInput`** `{ type: 'agent', name }` — explicit agent reference (e.g. `@email-drafter` mention).
+- `[2026-05-05]` **`AgentConfig`** declares the agent in `~/.config/opencode/agent/<name>.md` or project-level config. Fields: `mode: 'subagent' | 'primary' | 'all'`, `prompt`, `permission` (incl. `task` rule for tool/agent scoping), `model`. Listed via `client.app.agents()`.
+- `[2026-04-14]` `event.subscribe()` — SSE event stream (already wrapped by `streamSessionEvents`).
+- `[2026-04-14]` `session.create({ parentID })` + `session.children({ sessionID })` — kept in reserve for explicit child-session forking; **not used in v1**.
 
 ### Orchestration pattern
 
@@ -85,25 +90,34 @@ Latent Briefing is explicitly rejected (see [[decisions]]). Achieve token effici
 - `[2026-04-14]` **`packages/bridge`** — orchestration helpers on top of `@opencode-ai/sdk`
 - `[2026-04-14]` **`packages/shared-types`** — orchestration event types for UI
 
-### API sketch
+### API surface (TIN-130)
+
+Tool scoping lives in `AgentConfig.permission`, not at the call site — TIN-131's worker registry is what emits those configs. The bridge primitive itself is intentionally tiny: it surfaces the SDK's existing events through `TinkerStreamEvent`.
 
 ```typescript
-type WorkerSpec = {
-  id: string;
-  tools: string[];          // MCP server names this worker can access
-  prompt: string;           // targeted question
-};
+// packages/bridge/src/stream.ts
+export type TinkerStreamEvent =
+  | /* ...existing events... */
+  | {
+      type: 'subtask';
+      partID: string;
+      agent: string;
+      description: string;
+      prompt: string;
+      providerID: string | null;
+      modelID: string | null;
+    }
+  | { type: 'agent_invoked'; partID: string; name: string };
 
-type OrchestrationResult = {
-  workers: Record<string, { output: string; tokensUsed: number }>;
-  finalOutput: string;
-};
+// packages/bridge/src/orchestrator.ts
+export const MAX_PARALLEL_SUBAGENTS = 5;
 
-export async function orchestrate(
-  orchestratorPrompt: string,
-  workers: WorkerSpec[]
-): Promise<OrchestrationResult>;
+export const listSubagents = async (
+  client: Pick<OpencodeClient, 'app'>,
+): Promise<Agent[]>;
 ```
+
+An explicit `orchestrate(workers)` helper is **not shipped in v1** — the orchestrator agent decomposes work itself once it has the `task` permission. If a future ticket needs explicit caller-driven decomposition, add a thin wrapper that builds `parts: [TextPartInput, ...SubtaskPartInput[]]` and reuses `streamSessionEvents`.
 
 ### UI considerations
 

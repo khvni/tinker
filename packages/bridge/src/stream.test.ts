@@ -277,6 +277,107 @@ describe('streamSessionEvents', () => {
     ]);
   });
 
+  it('emits a subtask event for each unique SubtaskPart partID and dedupes repeats', async () => {
+    const client = makeClient([
+      makeEvent('message.part.updated', {
+        sessionID: 'session-1',
+        part: {
+          id: 'prt-subtask-1',
+          sessionID: 'session-1',
+          messageID: 'msg-1',
+          type: 'subtask',
+          prompt: 'find the Acme Gong call from last week',
+          description: 'Worker A — Gong query',
+          agent: 'gong-researcher',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        } as Part,
+      }),
+      makeEvent('message.part.updated', {
+        sessionID: 'session-1',
+        part: {
+          id: 'prt-subtask-1',
+          sessionID: 'session-1',
+          messageID: 'msg-1',
+          type: 'subtask',
+          prompt: 'find the Acme Gong call from last week',
+          description: 'Worker A — Gong query',
+          agent: 'gong-researcher',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        } as Part,
+      }),
+      makeEvent('message.part.updated', {
+        sessionID: 'session-1',
+        part: {
+          id: 'prt-subtask-2',
+          sessionID: 'session-1',
+          messageID: 'msg-1',
+          type: 'subtask',
+          prompt: 'cross-reference the Linear ticket',
+          description: 'Worker B — Linear query',
+          agent: 'linear-researcher',
+        } as Part,
+      }),
+      makeEvent('session.idle', { sessionID: 'session-1' }),
+    ]);
+
+    const events = await collectEvents(streamSessionEvents(client, 'session-1'));
+
+    expect(events).toEqual([
+      {
+        type: 'subtask',
+        partID: 'prt-subtask-1',
+        agent: 'gong-researcher',
+        description: 'Worker A — Gong query',
+        prompt: 'find the Acme Gong call from last week',
+        providerID: 'anthropic',
+        modelID: 'claude-sonnet-4',
+      },
+      {
+        type: 'subtask',
+        partID: 'prt-subtask-2',
+        agent: 'linear-researcher',
+        description: 'Worker B — Linear query',
+        prompt: 'cross-reference the Linear ticket',
+        providerID: null,
+        modelID: null,
+      },
+      { type: 'done' },
+    ]);
+  });
+
+  it('emits an agent_invoked event for AgentPart updates and dedupes repeats', async () => {
+    const client = makeClient([
+      makeEvent('message.part.updated', {
+        sessionID: 'session-1',
+        part: {
+          id: 'prt-agent-1',
+          sessionID: 'session-1',
+          messageID: 'msg-1',
+          type: 'agent',
+          name: 'gong-researcher',
+        } as Part,
+      }),
+      makeEvent('message.part.updated', {
+        sessionID: 'session-1',
+        part: {
+          id: 'prt-agent-1',
+          sessionID: 'session-1',
+          messageID: 'msg-1',
+          type: 'agent',
+          name: 'gong-researcher',
+        } as Part,
+      }),
+      makeEvent('session.idle', { sessionID: 'session-1' }),
+    ]);
+
+    const events = await collectEvents(streamSessionEvents(client, 'session-1'));
+
+    expect(events).toEqual([
+      { type: 'agent_invoked', partID: 'prt-agent-1', name: 'gong-researcher' },
+      { type: 'done' },
+    ]);
+  });
+
   it('emits error from session.error and stops', async () => {
     const client = makeClient([
       makeEvent('session.error', {
