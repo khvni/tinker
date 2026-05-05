@@ -1,14 +1,14 @@
 ---
 type: concept
 tags: [host-service, device, architecture]
-deferred: post-mvp
+status: in-flight
 ---
 
-> **[2026-04-21] DEFERRED — post-MVP per [[decisions]] D25.** Premature abstraction for single-user MVP. Revisit when headless mode or a mobile companion becomes real scope. Do not start work until MVP ships.
+> **[2026-05-05] In flight.** Glass parity audit raised priority — host-service is required for headless and scheduled work (TIN-218 approval queue, TIN-141 scheduler migration). The previous `[2026-04-21]` deferral has been reopened.
 
 # Feature 11 — Device ↔ Host-service split
 
-**Status**: spec drafted `[2026-04-19]`. No code yet. Blocks headless mode + future mobile companion.
+**Status**: scaffold landing on TIN-99 (`packages/host-service` + `packages/host-client`). Steps 2–7 of the migration plan land in follow-ups (TIN-141, TIN-218, …).
 
 **Rooted in**: [[D17]]. Inspired by `superset-sh/superset` `HOST_SERVICE_ARCHITECTURE.md`, adapted to Tinker's Tauri stack.
 
@@ -132,13 +132,17 @@ Rules:
 
 ## Migration plan
 
-1. **Scaffold `packages/host-service`** — copy nothing, write fresh. `createHostApp()` + health + host.info endpoints only.
-2. **Move `@tinker/scheduler` under host-service** — in-process scheduler owns host-side work.
+1. **Scaffold `packages/host-service`** — copy nothing, write fresh. `createHostApp()` + health + host.info endpoints only. **TIN-99 (in flight).**
+2. **Move `@tinker/scheduler` under host-service** — in-process scheduler owns host-side work. **TIN-141.**
 3. **Move memory + vault indexing** — both already live in `packages/memory`; rewire them to host-service.
 4. **Move OpenCode sidecar lifecycle** — today in Rust. Migrate orchestration logic into host-service; keep Rust as the process launcher only.
 5. **Coordinator in Rust** — implement `HostCoordinator` per §Coordinator.
-6. **Device-side client** (`packages/host-client`) — typed Fetch/WS wrapper over host endpoints. Lets renderer talk to any host (local or future remote).
+6. **Device-side client** (`packages/host-client`) — typed Fetch/WS wrapper over host endpoints. Lets renderer talk to any host (local or future remote). **Scaffolded alongside step 1 on TIN-99 so steps 2–4 can be exercised against a typed client from the start.**
 7. **Retire `@tinker/bridge` as a grab-bag** — split into `packages/host-client` (transport + typed RPC) and `@tinker/chat-client` (stream shaping + memory injection glue).
+
+### Long-running work + approval queue
+
+Glass parity requires headless long-running tasks plus a permission approval queue layered on top of host-service — **TIN-218**. Lands once steps 1–4 are merged.
 
 ## What this unlocks
 
