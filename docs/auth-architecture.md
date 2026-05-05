@@ -126,7 +126,7 @@ interface FederationAdapter {
 
 ### 4. MCP Proxy Singleton
 
-Lives in `packages/bridge/src/mcpProxy.ts` *(to be built — see feature 08 in `agent-knowledge/features/`)*.
+Lives in `packages/host-service/src/mcp-proxy/` *(to be built; depends on the [[11-host-service]] scaffold landing first — see feature 08 in `agent-knowledge/features/`)*.
 
 **Responsibility:** One persistent connection per MCP server, multiplexed per session.
 

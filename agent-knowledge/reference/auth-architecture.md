@@ -28,7 +28,7 @@ tags: [auth, architecture, federation, oauth, pkce]
 │  Silent refresh, TTL cache for access tokens    │
 └─────────────────────────────────────────────────┘
                 ↓
-┌─ MCP Proxy Singleton (packages/bridge) ────────┐
+┌─ MCP Proxy Singleton (packages/host-service) ──┐
 │  One persistent conn per service                │
 │  Session wrappers multiplex                     │
 └─────────────────────────────────────────────────┘
