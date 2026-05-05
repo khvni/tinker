@@ -15,7 +15,8 @@ type SessionSwitcherProps = {
 
 const basename = (path: string): string => getPanelTitleForPath(path.replace(/[\\/]+$/u, ''));
 
-const formatPath = (path: string): string => path.replace(/^\/Users\/([^/]+)\//u, '~$1/');
+const formatPath = (path: string): string =>
+  path.replace(/^\/Users\/([^/]+)\//u, '~$1/').replace(/^\/home\/([^/]+)\//u, '~$1/');
 
 const formatRelativeTime = (iso: string): string => {
   const timestamp = Date.parse(iso);

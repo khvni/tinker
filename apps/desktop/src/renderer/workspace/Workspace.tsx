@@ -227,6 +227,49 @@ export const Workspace = ({
     return null;
   }, []);
 
+  const saveLayoutNow = useCallback((): void => {
+    const snapshot = selectWorkspaceSnapshot(workspaceStore.getState());
+
+    void layoutStore
+      .save(currentUserId, {
+        version: snapshot.version,
+        workspaceState: snapshot,
+        updatedAt: new Date().toISOString(),
+        preferences: workspacePreferencesRef.current,
+      })
+      .catch((error) => {
+        console.warn('Failed to persist workspace layout.', error);
+      });
+  }, [currentUserId, layoutStore, workspaceStore]);
+
+  const scheduleLayoutSave = useCallback((): void => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      saveLayoutNow();
+    }, LAYOUT_SAVE_DEBOUNCE_MS);
+  }, [saveLayoutNow]);
+
+  const handleWorkspacePreferencesChange = useCallback((nextPreferences: WorkspacePreferences): void => {
+    workspacePreferencesRef.current = nextPreferences;
+    setWorkspacePreferences(nextPreferences);
+    scheduleLayoutSave();
+  }, [scheduleLayoutSave]);
+
+  const handleActiveRouteChange = useCallback((nextRoute: WorkspaceRoute): void => {
+    const current = workspacePreferencesRef.current;
+    if (current.activeRoute === nextRoute) {
+      return;
+    }
+    handleWorkspacePreferencesChange({
+      ...current,
+      activeRoute: nextRoute,
+    });
+  }, [handleWorkspacePreferencesChange]);
+
   const openFileInWorkspace = useCallback(
     (reportedPath: string, options?: { mime?: string }): void => {
       handleActiveRouteChange('workspace');
@@ -385,49 +428,6 @@ export const Workspace = ({
     },
     [openFileInWorkspace],
   );
-
-  const saveLayoutNow = useCallback((): void => {
-    const snapshot = selectWorkspaceSnapshot(workspaceStore.getState());
-
-    void layoutStore
-      .save(currentUserId, {
-        version: snapshot.version,
-        workspaceState: snapshot,
-        updatedAt: new Date().toISOString(),
-        preferences: workspacePreferencesRef.current,
-      })
-      .catch((error) => {
-        console.warn('Failed to persist workspace layout.', error);
-      });
-  }, [currentUserId, layoutStore, workspaceStore]);
-
-  const scheduleLayoutSave = useCallback((): void => {
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = window.setTimeout(() => {
-      saveTimerRef.current = null;
-      saveLayoutNow();
-    }, LAYOUT_SAVE_DEBOUNCE_MS);
-  }, [saveLayoutNow]);
-
-  const handleWorkspacePreferencesChange = useCallback((nextPreferences: WorkspacePreferences): void => {
-    workspacePreferencesRef.current = nextPreferences;
-    setWorkspacePreferences(nextPreferences);
-    scheduleLayoutSave();
-  }, [scheduleLayoutSave]);
-
-  function handleActiveRouteChange(nextRoute: WorkspaceRoute): void {
-    const current = workspacePreferencesRef.current;
-    if (current.activeRoute === nextRoute) {
-      return;
-    }
-    handleWorkspacePreferencesChange({
-      ...current,
-      activeRoute: nextRoute,
-    });
-  }
 
   const toggleLeftRail = useCallback((): void => {
     const current = workspacePreferencesRef.current;
