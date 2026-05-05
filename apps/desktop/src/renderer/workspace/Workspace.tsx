@@ -1,15 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { createAttentionStore, type FlashReason } from '@tinker/attention';
-import {
-  createWorkspaceStore,
-  findActiveTab,
-  selectWorkspaceSnapshot,
-  useWorkspaceSelector,
-  type PaneRegistry,
-  type WorkspaceStore,
-  Workspace as PanesWorkspace,
-} from '@tinker/panes';
-import '@tinker/panes/styles.css';
+import { Layout, Model, Actions, DockLocation, type TabNode, type Action, type IJsonModel } from 'flexlayout-react';
 import { getActiveMemoryPath, listSessionsForUser, type MemoryRunState } from '@tinker/memory';
 import {
   createDefaultWorkspacePreferences,
@@ -28,7 +18,7 @@ import {
 import type { OpencodeConnection } from '../../bindings.js';
 import { resolveWorkspaceFilePath } from '../file-links.js';
 import { BUILTIN_MCP_NAMES, type BuiltinMcpName, type MCPStatus } from '../integrations.js';
-import { isAbsolutePath, getPanelTitleForPath } from '../renderers/file-utils.js';
+import { getPanelTitleForPath, isAbsolutePath } from '../renderers/file-utils.js';
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
 import { ConnectionsRoute } from './components/ConnectionsRoute/index.js';
 import { MemoryRoute } from './components/MemoryRoute/index.js';
@@ -40,9 +30,10 @@ import { WorkspaceShell } from './components/WorkspaceShell/index.js';
 import { WorkspaceSidebar } from './components/WorkspaceSidebar/index.js';
 import { openNewChatPanel } from './chat-panels.js';
 import { openWorkspaceFile } from './file-open.js';
-import { createDefaultWorkspaceState } from './layout.default.js';
+import { createDefaultLayoutJson } from './layout.default.js';
 import { MemoryPaneRuntimeContext } from './memory-pane-runtime.js';
 import { getRenderer } from './pane-registry.js';
+import { PlaybookPaneRuntimeContext, type PlaybookPaneRuntime } from './playbook-pane-runtime.js';
 import {
   SettingsPaneRuntimeContext,
   pickActiveSession,
@@ -50,7 +41,6 @@ import {
 } from './settings-pane-runtime.js';
 
 const LAYOUT_SAVE_DEBOUNCE_MS = 300;
-const DESKTOP_WORKSPACE_ATTENTION_ID = 'desktop-workspace';
 
 type WorkspaceProps = {
   currentUserId: string;
@@ -80,10 +70,6 @@ type WorkspaceProps = {
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
   activeSkillsRevision: number;
-  /**
-   * Absolute root directory the skill store was initialized against. Passed
-   * to the Playbook pane so the Git sync flow can target the same directory.
-   */
   skillsRootPath: string | null;
   memorySweepState: MemoryRunState | null;
   memorySweepBusy: boolean;
@@ -111,12 +97,6 @@ type WorkspaceProps = {
   releaseConnectionForPane: (paneData: Extract<TinkerPaneData, { readonly kind: 'chat' }>) => void;
 };
 
-const createWorkspaceTabId = (): string => {
-  return `workspace-${crypto.randomUUID()}`;
-};
-
-type WorkspaceRoute = WorkspacePreferences['activeRoute'];
-
 const requirePaneData = <K extends TinkerPaneKind>(
   kind: K,
   data: TinkerPaneData,
@@ -127,6 +107,11 @@ const requirePaneData = <K extends TinkerPaneKind>(
 
   return data as Extract<TinkerPaneData, { readonly kind: K }>;
 };
+
+type WorkspaceRoute = 'chat' | 'memory' | 'connections' | 'settings';
+
+const toPersistedRoute = (route: WorkspaceRoute): WorkspacePreferences['activeRoute'] =>
+  route === 'chat' ? 'workspace' : route;
 
 export const Workspace = ({
   currentUserId,
@@ -172,15 +157,12 @@ export const Workspace = ({
   getConnectionForPane,
   releaseConnectionForPane,
 }: WorkspaceProps): JSX.Element => {
-  const workspaceStoreRef = useRef<WorkspaceStore<TinkerPaneData> | null>(null);
-  const attentionStoreRef = useRef(createAttentionStore());
-  if (!workspaceStoreRef.current) {
-    workspaceStoreRef.current = createWorkspaceStore<TinkerPaneData>({
-      initial: createDefaultWorkspaceState(),
-    });
+  const modelRef = useRef<Model | null>(null);
+  if (!modelRef.current) {
+    modelRef.current = Model.fromJson(createDefaultLayoutJson());
   }
-  const workspaceStore = workspaceStoreRef.current;
-  const attentionStore = attentionStoreRef.current;
+  const model = modelRef.current;
+
   const saveTimerRef = useRef<number | null>(null);
   const vaultPathRef = useRef<string | null>(vaultPath);
   const workspacePreferencesRef = useRef<WorkspacePreferences>(createDefaultWorkspacePreferences());
@@ -188,21 +170,11 @@ export const Workspace = ({
     createDefaultWorkspacePreferences(),
   );
   const [pendingSettingsSectionId, setPendingSettingsSectionId] = useState<string | null>(null);
-  const activeRoute = workspacePreferences.activeRoute;
+  const [activeRoute, setActiveRoute] = useState<WorkspaceRoute>('chat');
+  const activeRouteRef = useRef<WorkspaceRoute>('chat');
   const [storedSessions, setStoredSessions] = useState<Session[]>([]);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
   const [sessionSwitcherResolved, setSessionSwitcherResolved] = useState(false);
-
-  const activeRailItem = useWorkspaceSelector<TinkerPaneData, TinkerPaneKind | null>(
-    workspaceStore,
-    (state) => {
-      if (!state.activeTabId) return null;
-      const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
-      if (!tab || !tab.activePaneId) return null;
-      return tab.panes[tab.activePaneId]?.data.kind ?? null;
-    },
-  );
-  const resolvedActiveRailItem = activeRoute === 'workspace' ? activeRailItem : activeRoute;
 
   useEffect(() => {
     vaultPathRef.current = vaultPath;
@@ -211,6 +183,10 @@ export const Workspace = ({
   useEffect(() => {
     workspacePreferencesRef.current = workspacePreferences;
   }, [workspacePreferences]);
+
+  useEffect(() => {
+    activeRouteRef.current = activeRoute;
+  }, [activeRoute]);
 
   const resolveAgentPath = useCallback((reportedPath: string): string | null => {
     const resolvedPath = resolveWorkspaceFilePath(reportedPath, vaultPathRef.current);
@@ -227,71 +203,28 @@ export const Workspace = ({
     return null;
   }, []);
 
-  const saveLayoutNow = useCallback((): void => {
-    const snapshot = selectWorkspaceSnapshot(workspaceStore.getState());
-
-    void layoutStore
-      .save(currentUserId, {
-        version: snapshot.version,
-        workspaceState: snapshot,
-        updatedAt: new Date().toISOString(),
-        preferences: workspacePreferencesRef.current,
-      })
-      .catch((error) => {
-        console.warn('Failed to persist workspace layout.', error);
-      });
-  }, [currentUserId, layoutStore, workspaceStore]);
-
-  const scheduleLayoutSave = useCallback((): void => {
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = window.setTimeout(() => {
-      saveTimerRef.current = null;
-      saveLayoutNow();
-    }, LAYOUT_SAVE_DEBOUNCE_MS);
-  }, [saveLayoutNow]);
-
-  const handleWorkspacePreferencesChange = useCallback((nextPreferences: WorkspacePreferences): void => {
-    workspacePreferencesRef.current = nextPreferences;
-    setWorkspacePreferences(nextPreferences);
-    scheduleLayoutSave();
-  }, [scheduleLayoutSave]);
-
-  const handleActiveRouteChange = useCallback((nextRoute: WorkspaceRoute): void => {
-    const current = workspacePreferencesRef.current;
-    if (current.activeRoute === nextRoute) {
-      return;
-    }
-    handleWorkspacePreferencesChange({
-      ...current,
-      activeRoute: nextRoute,
-    });
-  }, [handleWorkspacePreferencesChange]);
-
   const openFileInWorkspace = useCallback(
     (reportedPath: string, options?: { mime?: string }): void => {
-      handleActiveRouteChange('workspace');
+      setSessionSwitcherResolved(true);
       const absolutePath = resolveAgentPath(reportedPath);
       if (!absolutePath) {
         return;
       }
 
       if (options?.mime) {
-        void openWorkspaceFile(workspaceStore, absolutePath, async () => options.mime ?? 'application/octet-stream');
+        void openWorkspaceFile(model, absolutePath, async () => options.mime ?? 'application/octet-stream');
         return;
       }
 
-      void openWorkspaceFile(workspaceStore, absolutePath);
+      void openWorkspaceFile(model, absolutePath);
     },
-    [handleActiveRouteChange, resolveAgentPath, workspaceStore],
+    [resolveAgentPath, model],
   );
 
   const openNewChatPane = useCallback((): void => {
-    handleActiveRouteChange('workspace');
-    openNewChatPanel(workspaceStore);
-  }, [handleActiveRouteChange, workspaceStore]);
+    setSessionSwitcherResolved(true);
+    openNewChatPanel(model);
+  }, [model]);
 
   const refreshStoredSessions = useCallback(async (): Promise<void> => {
     try {
@@ -310,62 +243,73 @@ export const Workspace = ({
   const openSessionChatPane = useCallback(
     async (session: Session): Promise<void> => {
       const memorySubdir = await getActiveMemoryPath(currentUserId);
-      const state = workspaceStore.getState();
-      const activeTab = findActiveTab(state) ?? state.tabs[0] ?? null;
       const title = getPanelTitleForPath(session.folderPath.replace(/[\\/]+$/u, ''));
+      let activeTabset = model.getActiveTabset();
+      const firstTabset = model.getFirstTabSet();
 
-      if (!activeTab) {
-        state.actions.openTab({
-          id: createWorkspaceTabId(),
-          pane: {
+      if (!activeTabset && !firstTabset) {
+        console.warn('Cannot open a session chat panel because the workspace has no tabsets.');
+        return;
+      }
+
+      let existingNodeId: string | null = null;
+      model.visitNodes((node) => {
+        if (existingNodeId || node.getType() !== 'tab') return;
+        const tabNode = node as TabNode;
+        const config = tabNode.getConfig() as TinkerPaneData | undefined;
+        if (config?.kind === 'chat' && config.sessionId === session.id) {
+          existingNodeId = tabNode.getId();
+        }
+      });
+
+      if (existingNodeId) {
+        model.doAction(Actions.selectTab(existingNodeId));
+        return;
+      }
+
+      const selectedNode = activeTabset?.getSelectedNode();
+      if (selectedNode?.getType() === 'tab') {
+        const selectedTab = selectedNode as TabNode;
+        const config = selectedTab.getConfig() as TinkerPaneData | undefined;
+        if (config?.kind === 'chat' && !config.sessionId && !config.folderPath) {
+          model.doAction(
+            Actions.updateNodeAttributes(selectedTab.getId(), {
+              name: title,
+              config: {
+                kind: 'chat',
+                sessionId: session.id,
+                folderPath: session.folderPath,
+                memorySubdir,
+              },
+            }),
+          );
+          return;
+        }
+      }
+
+      activeTabset = activeTabset ?? firstTabset;
+      model.doAction(
+        Actions.addTab(
+          {
+            type: 'tab',
             id: `chat-${session.id}`,
-            kind: 'chat',
-            title,
-            data: {
-              kind: 'chat',
+            name: title,
+            component: 'chat',
+            config: {
+              kind: 'chat' as const,
               sessionId: session.id,
               folderPath: session.folderPath,
               memorySubdir,
             },
           },
-        });
-        return;
-      }
-
-      const existingPane = Object.values(activeTab.panes).find(
-        (pane) => pane.data.kind === 'chat' && pane.data.sessionId === session.id,
+          activeTabset.getId(),
+          DockLocation.CENTER,
+          -1,
+          true,
+        ),
       );
-      if (existingPane) {
-        state.actions.focusPane(activeTab.id, existingPane.id);
-        return;
-      }
-
-      const activePaneId = activeTab.activePaneId;
-      const activePane = activePaneId ? activeTab.panes[activePaneId] : null;
-      if (activePane?.data.kind === 'chat' && !activePane.data.sessionId && !activePane.data.folderPath) {
-        state.actions.updatePaneData(activeTab.id, activePane.id, () => ({
-          kind: 'chat',
-          sessionId: session.id,
-          folderPath: session.folderPath,
-          memorySubdir,
-        }));
-        state.actions.renamePane(activeTab.id, activePane.id, title);
-        return;
-      }
-
-      state.actions.addPane(activeTab.id, {
-        id: `chat-${session.id}`,
-        kind: 'chat',
-        title,
-        data: {
-          kind: 'chat',
-          sessionId: session.id,
-          folderPath: session.folderPath,
-          memorySubdir,
-        },
-      });
     },
-    [currentUserId, workspaceStore],
+    [currentUserId, model],
   );
 
   const handleCreateSessionFromSwitcher = useCallback((): void => {
@@ -377,22 +321,27 @@ export const Workspace = ({
 
       const memorySubdir = await getActiveMemoryPath(currentUserId);
       const title = getPanelTitleForPath(folderPath.replace(/[\\/]+$/u, ''));
-
-      workspaceStore.getState().actions.openTab({
-        id: createWorkspaceTabId(),
-        pane: {
-          id: `chat-${crypto.randomUUID()}`,
-          kind: 'chat',
-          title,
-          data: { kind: 'chat', createFreshSession: true, folderPath, memorySubdir },
-        },
-      });
+      const targetId = model.getActiveTabset()?.getId() ?? model.getFirstTabSet().getId();
+      model.doAction(
+        Actions.addTab(
+          {
+            type: 'tab',
+            id: `chat-${crypto.randomUUID()}`,
+            name: title,
+            component: 'chat',
+            config: { kind: 'chat' as const, createFreshSession: true, folderPath, memorySubdir },
+          },
+          targetId,
+          DockLocation.CENTER,
+          -1,
+          true,
+        ),
+      );
 
       setSessionSwitcherResolved(true);
-      handleActiveRouteChange('workspace');
       await refreshStoredSessions();
     })();
-  }, [currentUserId, handleActiveRouteChange, onSelectSessionFolder, refreshStoredSessions, workspaceStore]);
+  }, [currentUserId, model, onSelectSessionFolder, refreshStoredSessions]);
 
   const handleSelectStoredSession = useCallback(
     (session: Session): void => {
@@ -400,22 +349,10 @@ export const Workspace = ({
         await onActivateSession(session);
         await openSessionChatPane(session);
         setSessionSwitcherResolved(true);
-        handleActiveRouteChange('workspace');
         await refreshStoredSessions();
       })();
     },
-    [handleActiveRouteChange, onActivateSession, openSessionChatPane, refreshStoredSessions],
-  );
-
-  const signalPaneAttention = useCallback(
-    (paneId: string, reason: FlashReason): void => {
-      attentionStore.getState().actions.signal({
-        workspaceId: DESKTOP_WORKSPACE_ATTENTION_ID,
-        paneId,
-        reason,
-      });
-    },
-    [attentionStore],
+    [onActivateSession, openSessionChatPane, refreshStoredSessions],
   );
 
   const handleAgentFileWritten = useCallback(
@@ -428,6 +365,43 @@ export const Workspace = ({
     },
     [openFileInWorkspace],
   );
+
+  const saveLayoutNow = useCallback((): void => {
+    const currentModel = modelRef.current;
+    if (!currentModel) return;
+    const layoutJson = currentModel.toJson();
+
+    void layoutStore
+      .save(currentUserId, {
+        version: 3,
+        layoutJson,
+        updatedAt: new Date().toISOString(),
+        preferences: {
+          ...workspacePreferencesRef.current,
+          activeRoute: toPersistedRoute(activeRouteRef.current),
+        },
+      })
+      .catch((error) => {
+        console.warn('Failed to persist workspace layout.', error);
+      });
+  }, [currentUserId, layoutStore]);
+
+  const scheduleLayoutSave = useCallback((): void => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      saveLayoutNow();
+    }, LAYOUT_SAVE_DEBOUNCE_MS);
+  }, [saveLayoutNow]);
+
+  const handleWorkspacePreferencesChange = useCallback((nextPreferences: WorkspacePreferences): void => {
+    workspacePreferencesRef.current = nextPreferences;
+    setWorkspacePreferences(nextPreferences);
+    scheduleLayoutSave();
+  }, [scheduleLayoutSave]);
 
   const toggleLeftRail = useCallback((): void => {
     const current = workspacePreferencesRef.current;
@@ -445,11 +419,6 @@ export const Workspace = ({
     });
   }, [handleWorkspacePreferencesChange]);
 
-  // Keyboard shortcuts: mod+b toggles the left rail, mod+alt+b toggles the right
-  // inspector. Anomalyco's OpenCode desktop uses the same mod+b convention
-  // (reference/anomalyco-opencode-desktop-layout.md). We treat Meta (mac) and Ctrl
-  // (win/linux) as interchangeable to keep one binding across platforms, and skip
-  // when the user is typing inside a form field so shortcuts don't eat keystrokes.
   useEffect(() => {
     const isEditableTarget = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
@@ -491,9 +460,6 @@ export const Workspace = ({
 
   useEffect(() => {
     let active = true;
-    const unsubscribe = workspaceStore.subscribe(() => {
-      scheduleLayoutSave();
-    });
 
     void (async () => {
       try {
@@ -502,22 +468,23 @@ export const Workspace = ({
           return;
         }
 
-        // Merge saved preferences on top of current defaults so older snapshots that
-        // predate newly-added keys (e.g. isLeftRailVisible) fall back cleanly instead
-        // of collapsing to `undefined`. Simpler than a schema bump.
         const nextPreferences: WorkspacePreferences = {
           ...createDefaultWorkspacePreferences(),
           ...(savedLayout?.preferences ?? {}),
         };
+        const hydratedRoute = nextPreferences.activeRoute === 'workspace' ? 'chat' : nextPreferences.activeRoute;
+        activeRouteRef.current = hydratedRoute;
+        setActiveRoute(hydratedRoute);
         workspacePreferencesRef.current = nextPreferences;
         setWorkspacePreferences(nextPreferences);
 
-        if (savedLayout) {
+        if (savedLayout?.layoutJson) {
           try {
-            workspaceStore.getState().actions.hydrate(savedLayout.workspaceState);
+            const restoredModel = Model.fromJson(savedLayout.layoutJson as IJsonModel);
+            modelRef.current = restoredModel;
           } catch (error) {
             console.warn('Stored workspace layout could not be hydrated. Falling back to default.', error);
-            workspaceStore.getState().actions.hydrate(createDefaultWorkspaceState());
+            modelRef.current = Model.fromJson(createDefaultLayoutJson());
           }
         }
       } catch (error) {
@@ -529,7 +496,6 @@ export const Workspace = ({
 
     return () => {
       active = false;
-      unsubscribe();
 
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
@@ -538,64 +504,106 @@ export const Workspace = ({
 
       saveLayoutNow();
     };
-  }, [currentUserId, layoutStore, saveLayoutNow, scheduleLayoutSave, workspaceStore]);
+  }, [currentUserId, layoutStore, saveLayoutNow, scheduleLayoutSave]);
+
+  const navigateTo = useCallback(
+    (route: WorkspaceRoute): void => {
+      activeRouteRef.current = route;
+      setActiveRoute(route);
+      const current = workspacePreferencesRef.current;
+      handleWorkspacePreferencesChange({ ...current, activeRoute: toPersistedRoute(route) });
+    },
+    [handleWorkspacePreferencesChange],
+  );
+
+  const openChatRoute = useCallback((): void => {
+    navigateTo('chat');
+  }, [navigateTo]);
 
   const openSettingsPane = useCallback((): void => {
-    setPendingSettingsSectionId(null);
-    handleActiveRouteChange('settings');
-  }, [handleActiveRouteChange]);
+    navigateTo('settings');
+  }, [navigateTo]);
 
   const openMemoryPane = useCallback((): void => {
-    handleActiveRouteChange('memory');
-  }, [handleActiveRouteChange]);
+    navigateTo('memory');
+  }, [navigateTo]);
 
   const openConnectionsSection = useCallback((): void => {
-    setPendingSettingsSectionId('connections');
-    handleActiveRouteChange('connections');
-  }, [handleActiveRouteChange]);
+    setPendingSettingsSectionId(null);
+    navigateTo('connections');
+  }, [navigateTo]);
 
   const handlePendingSettingsSectionConsumed = useCallback((): void => {
     setPendingSettingsSectionId(null);
   }, []);
-  const registry = useMemo<PaneRegistry<TinkerPaneData>>(() => {
-    return {
-      chat: {
-        kind: 'chat',
-        defaultTitle: 'Chat',
-        render: ({ pane, tabId, isActive }) => {
+
+  const handleModelChange = useCallback((_model: Model, _action: Action): void => {
+    scheduleLayoutSave();
+  }, [scheduleLayoutSave]);
+
+  const factory = useCallback(
+    (node: TabNode): JSX.Element | null => {
+      const component = node.getComponent();
+      const config = (node.getConfig() ?? { kind: component }) as TinkerPaneData;
+      const tabId = node.getParent()?.getId() ?? '';
+      const paneId = node.getId();
+      const isActive = node.isSelected();
+
+      switch (component) {
+        case 'chat': {
           const handleSelectSessionFolder = async (): Promise<void> => {
             const folderPath = await onSelectSessionFolder();
             if (folderPath) {
               const memorySubdir = await getActiveMemoryPath(currentUserId);
+              const currentConfig = (node.getConfig() ?? { kind: 'chat' }) as TinkerPaneData;
               setSessionSwitcherResolved(true);
-              workspaceStore.getState().actions.updatePaneData(tabId, pane.id, (prev) => ({
-                ...prev,
-                folderPath,
-                memorySubdir,
-              }));
+              model.doAction(
+                Actions.updateNodeAttributes(paneId, {
+                  config: { ...currentConfig, folderPath, memorySubdir },
+                }),
+              );
             }
           };
           return (
             <RegisteredChatPane
               tabId={tabId}
-              paneId={pane.id}
+              paneId={paneId}
               isActive={isActive}
-              paneData={requirePaneData('chat', pane.data)}
-              onAttentionSignal={(reason) => signalPaneAttention(pane.id, reason)}
+              paneData={requirePaneData('chat', config)}
+              onAttentionSignal={() => { /* FlexLayout manages focus */ }}
               onSelectSessionFolder={handleSelectSessionFolder}
-              onDuplicatePane={() => workspaceStore.getState().actions.duplicatePane(tabId, pane.id)}
-              onClosePane={() => workspaceStore.getState().actions.closePane(tabId, pane.id)}
+              onDuplicatePane={() => {
+                const activeTabset = model.getActiveTabset();
+                if (activeTabset) {
+                  const liveConfig = (node.getConfig() ?? { kind: 'chat' }) as TinkerPaneData;
+                  model.doAction(
+                    Actions.addTab(
+                      {
+                        type: 'tab',
+                        name: node.getName(),
+                        component: 'chat',
+                        config: { ...liveConfig },
+                      },
+                      activeTabset.getId(),
+                      DockLocation.CENTER,
+                      -1,
+                      true,
+                    ),
+                  );
+                }
+              }}
+              onClosePane={() => model.doAction(Actions.deleteTab(paneId))}
             />
           );
-        },
-      },
-      file: {
-        kind: 'file',
-        defaultTitle: (pane) => getPanelTitleForPath(requirePaneData('file', pane.data).path),
-        render: ({ pane }) => <>{getRenderer('file')(requirePaneData('file', pane.data))}</>,
-      },
-    };
-  }, [signalPaneAttention, onSelectSessionFolder, currentUserId, workspaceStore]);
+        }
+        case 'file':
+          return <>{getRenderer('file')(requirePaneData('file', config))}</>;
+        default:
+          return <div>Unknown pane: {component}</div>;
+      }
+    },
+    [currentUserId, model, onSelectSessionFolder],
+  );
 
   const chatPaneRuntime = useMemo(
     () => ({
@@ -618,11 +626,17 @@ export const Workspace = ({
       onOpenNewChat: openNewChatPane,
       onActiveSkillsChanged,
       onMemoryCommitted,
-      persistPaneSessionId: (tabId: string, paneId: string, sessionId: string) => {
-        workspaceStore.getState().actions.updatePaneData(tabId, paneId, (prev) => ({
-          ...prev,
-          sessionId,
-        }));
+      persistPaneSessionId: (_tabId: string, paneId: string, sessionId: string) => {
+        const node = model.getNodeById(paneId);
+        if (node?.getType() !== 'tab') {
+          return;
+        }
+        const config = ((node as TabNode).getConfig() ?? { kind: 'chat' }) as TinkerPaneData;
+        model.doAction(
+          Actions.updateNodeAttributes(paneId, {
+            config: { ...config, sessionId },
+          }),
+        );
         void refreshStoredSessions();
       },
     }),
@@ -638,13 +652,23 @@ export const Workspace = ({
       openFileInWorkspace,
       openNewChatPane,
       opencode,
-      releaseConnectionForPane,
       refreshStoredSessions,
+      model,
+      releaseConnectionForPane,
       sessionFolderBusy,
       vaultPath,
       skillStore,
       skillsRootPath,
     ],
+  );
+
+  const playbookPaneRuntime = useMemo<PlaybookPaneRuntime>(
+    () => ({
+      skillStore,
+      skillsRootPath,
+      onActiveSkillsChanged,
+    }),
+    [onActiveSkillsChanged, skillStore, skillsRootPath],
   );
 
   const settingsPaneRuntime = useMemo<SettingsPaneRuntime>(() => {
@@ -757,43 +781,40 @@ export const Workspace = ({
   ]);
 
   const userInitial = (currentUserId.trim()[0] ?? 'T').toUpperCase();
+  const shouldShowSessionSwitcher =
+    !sessionSwitcherResolved && (storedSessions.length > 0 || sessionLoadError !== null);
+  const chatRouteContent = shouldShowSessionSwitcher ? (
+    <SessionSwitcher
+      sessions={storedSessions}
+      busy={sessionFolderBusy}
+      errorMessage={sessionLoadError}
+      onSelectSession={handleSelectStoredSession}
+      onCreateSession={handleCreateSessionFromSwitcher}
+      onRetry={() => void refreshStoredSessions()}
+    />
+  ) : (
+    <Layout
+      model={model}
+      factory={factory}
+      onModelChange={handleModelChange}
+    />
+  );
+  const workspaceContent = (() => {
+    switch (activeRoute) {
+      case 'memory':
+        return <MemoryRoute />;
+      case 'connections':
+        return <ConnectionsRoute />;
+      case 'settings':
+        return <SettingsRoute />;
+      case 'chat':
+        return chatRouteContent;
+    }
+  })();
   const isGuest = currentUserProvider === 'local';
   const accountLabel = isGuest
     ? 'Account · Guest'
     : `Account · ${currentUserEmail ?? currentUserName}`;
-  const shouldShowSessionSwitcher =
-    !sessionSwitcherResolved && (storedSessions.length > 0 || sessionLoadError !== null);
-  const routeContent = (() => {
-    switch (activeRoute) {
-      case 'memory':
-        return <MemoryRoute />;
-      case 'settings':
-        return <SettingsRoute />;
-      case 'connections':
-        return <ConnectionsRoute />;
-      case 'workspace':
-        return shouldShowSessionSwitcher ? (
-          <SessionSwitcher
-            sessions={storedSessions}
-            busy={sessionFolderBusy}
-            errorMessage={sessionLoadError}
-            onSelectSession={handleSelectStoredSession}
-            onCreateSession={handleCreateSessionFromSwitcher}
-            onRetry={() => void refreshStoredSessions()}
-          />
-        ) : (
-          <PanesWorkspace
-            store={workspaceStore}
-            registry={registry}
-            attention={{
-              store: attentionStore,
-              workspaceId: DESKTOP_WORKSPACE_ATTENTION_ID,
-            }}
-            ariaLabel="Tinker workspace"
-          />
-        );
-    }
-  })();
 
   return (
     <WorkspaceShell
@@ -802,9 +823,9 @@ export const Workspace = ({
       titlebar={
         <Titlebar
           sessionFolderPath={vaultPath}
+          isLeftRailVisible={workspacePreferences.isLeftRailVisible}
           currentUserName={currentUserName}
           currentUserAvatarUrl={currentUserAvatarUrl}
-          isLeftRailVisible={workspacePreferences.isLeftRailVisible}
           isRightInspectorVisible={workspacePreferences.isRightInspectorVisible}
           onToggleLeftRail={toggleLeftRail}
           onToggleRightInspector={toggleRightInspector}
@@ -815,8 +836,8 @@ export const Workspace = ({
           userInitial={userInitial}
           avatarUrl={currentUserAvatarUrl}
           accountLabel={accountLabel}
-          activeRailItem={resolvedActiveRailItem}
-          onOpenChat={openNewChatPane}
+          activeRailItem={activeRoute === 'chat' ? 'chat' : activeRoute}
+          onOpenChat={openChatRoute}
           onOpenMemory={openMemoryPane}
           onOpenSettings={openSettingsPane}
           onOpenAccount={openSettingsPane}
@@ -827,7 +848,9 @@ export const Workspace = ({
       <ChatPaneRuntimeContext.Provider value={chatPaneRuntime}>
         <SettingsPaneRuntimeContext.Provider value={settingsPaneRuntime}>
           <MemoryPaneRuntimeContext.Provider value={{ currentUserId }}>
-            {routeContent}
+            <PlaybookPaneRuntimeContext.Provider value={playbookPaneRuntime}>
+              {workspaceContent}
+            </PlaybookPaneRuntimeContext.Provider>
           </MemoryPaneRuntimeContext.Provider>
         </SettingsPaneRuntimeContext.Provider>
       </ChatPaneRuntimeContext.Provider>

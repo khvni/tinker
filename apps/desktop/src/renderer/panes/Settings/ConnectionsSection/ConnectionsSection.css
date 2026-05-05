@@ -69,6 +69,13 @@
   line-height: var(--line-height-normal);
 }
 
+.tinker-connections-section__subheading {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
 .tinker-connections-section__add {
   display: flex;
   justify-content: flex-start;

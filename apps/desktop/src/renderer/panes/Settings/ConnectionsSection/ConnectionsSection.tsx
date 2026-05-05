@@ -1,5 +1,6 @@
 import { useCallback, useState, type JSX } from 'react';
 import { Button, StatusDot, type StatusDotState } from '@tinker/design';
+import type { CustomMcpEntry } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../../../bindings.js';
 import {
   BUILTIN_MCP_NAMES,
@@ -16,11 +17,9 @@ type ConnectionsSectionProps = {
   vaultPath: string | null;
   memoryPath: string | null;
   seedStatuses?: Partial<Record<BuiltinMcpName, MCPStatus>> | undefined;
-  /**
-   * Fallback if the SDK `client.mcp.connect` call is unavailable or throws.
-   * App.tsx owns the Tauri `restart_opencode` invocation — we do not redo it
-   * here (see D22 — pass config per call, never stash on a manager).
-   */
+  customMcps: ReadonlyArray<CustomMcpEntry>;
+  onAddCustomMcp: (entry: CustomMcpEntry, secret: string) => void;
+  onRemoveCustomMcp: (id: string) => void;
   onRequestRespawn: () => Promise<void>;
 };
 
@@ -79,6 +78,9 @@ export const ConnectionsSection = ({
   vaultPath,
   memoryPath,
   seedStatuses,
+  customMcps,
+  onAddCustomMcp,
+  onRemoveCustomMcp,
   onRequestRespawn,
 }: ConnectionsSectionProps): JSX.Element => {
   const { statuses, refresh, setRowStatus } = useMcpStatusPolling({
@@ -91,10 +93,6 @@ export const ConnectionsSection = ({
 
   const handleRetry = useCallback(
     async (name: BuiltinMcpName): Promise<void> => {
-      // Retry requires a live OpenCode connection — without one we cannot
-      // call `mcp.connect` nor meaningfully respawn the sidecar. Surface the
-      // blocker on the row instead of silently flipping through reconnecting
-      // and back. Caller can sign-in / wait for the boot effect to resolve.
       if (opencode === null) {
         setRowStatus(name, {
           status: 'failed',
@@ -109,15 +107,12 @@ export const ConnectionsSection = ({
       try {
         const directory = getOpencodeDirectory(vaultPath);
         const client = createWorkspaceClient(opencode, directory);
-        // `client.mcp.connect` may be undefined against an older sidecar
-        // build — fall through to respawn when that happens.
         const connect = client.mcp?.connect?.bind(client.mcp);
         if (typeof connect === 'function') {
           await connect({ name });
           sdkHandled = true;
         }
       } catch (error) {
-        // Fall back to full respawn — see onRequestRespawn prop comment.
         console.warn(`mcp.connect(${name}) failed, falling back to respawn.`, error);
         sdkHandled = false;
       }
@@ -137,6 +132,8 @@ export const ConnectionsSection = ({
     [onRequestRespawn, opencode, refresh, setRowStatus, vaultPath],
   );
 
+  const existingCustomIds = customMcps.map((m) => m.id);
+
   return (
     <section className="tinker-connections-section" aria-labelledby="tinker-connections-heading">
       <header className="tinker-connections-section__header">
@@ -145,7 +142,7 @@ export const ConnectionsSection = ({
           <h3 id="tinker-connections-heading">Built-in tools</h3>
         </div>
         <p className="tinker-muted tinker-connections-section__blurb">
-          These three MCP servers ship pre-wired. Sign-in-gated connectors show up after you add them.
+          These MCP servers ship pre-wired. Add more tools below.
         </p>
       </header>
 
@@ -187,6 +184,32 @@ export const ConnectionsSection = ({
         })}
       </ul>
 
+      {customMcps.length > 0 ? (
+        <>
+          <h4 className="tinker-connections-section__subheading">Custom tools</h4>
+          <ul className="tinker-connections-section__rows" role="list">
+            {customMcps.map((mcp) => (
+              <li key={mcp.id} className="tinker-connections-section__row">
+                <div className="tinker-connections-section__row-identity">
+                  <StatusDot state="constructive" label={`${mcp.label} — custom MCP`} />
+                  <div className="tinker-connections-section__row-text">
+                    <p className="tinker-connections-section__row-title">{mcp.label}</p>
+                    <p className="tinker-muted tinker-connections-section__row-subtitle">{mcp.url}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="s"
+                  onClick={() => onRemoveCustomMcp(mcp.id)}
+                >
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
       <div className="tinker-connections-section__add">
         <Button
           variant="secondary"
@@ -197,7 +220,12 @@ export const ConnectionsSection = ({
         </Button>
       </div>
 
-      <AddToolPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
+      <AddToolPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onAdd={onAddCustomMcp}
+        existingIds={existingCustomIds}
+      />
     </section>
   );
 };

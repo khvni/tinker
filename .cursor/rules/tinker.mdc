@@ -25,7 +25,7 @@ Tinker is a local-first desktop AI workspace. Tauri v2 shell + React 19 renderer
 - TypeScript strict. No `any`, no `@ts-ignore`, no `--no-verify`.
 - Function components only. Folder-per-component layout per D21.
 - UI values come from `@tinker/design` tokens only (D14 / D23). No inline hex, no raw `rgba()`.
-- `@tinker/panes` is the layout engine. Never add `dockview-react` or `flexlayout-react` imports.
+- `flexlayout-react` is the layout engine. Never add `dockview-react` or `@tinker/panes` imports.
 - OpenCode owns provider + model auth. Do not call provider APIs directly (D25 non-goals).
 - Conventional commits: `feat(<scope>): <summary>`. Scope matches the pillar or package.
 - Out-of-scope work belongs in a new Linear issue, not in the current PR.

@@ -1,43 +1,43 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AddToolPicker } from './AddToolPicker.js';
-import { AVAILABLE_MCPS, DEFAULT_UNAVAILABLE_BLURB } from './available-mcps.js';
-
-const countOccurrences = (haystack: string, needle: string): number => {
-  if (needle.length === 0) return 0;
-  let count = 0;
-  let index = haystack.indexOf(needle);
-  while (index !== -1) {
-    count += 1;
-    index = haystack.indexOf(needle, index + needle.length);
-  }
-  return count;
-};
+import { CATALOG_MCPS } from './available-mcps.js';
 
 describe('AddToolPicker', () => {
   it('renders nothing when closed', () => {
-    const markup = renderToStaticMarkup(<AddToolPicker open={false} onClose={vi.fn()} />);
+    const markup = renderToStaticMarkup(
+      <AddToolPicker open={false} onClose={vi.fn()} onAdd={vi.fn()} existingIds={[]} />,
+    );
     expect(markup).toBe('');
   });
 
-  it('lists every available-mcp entry as a disabled card when open', () => {
-    const markup = renderToStaticMarkup(<AddToolPicker open onClose={vi.fn()} />);
+  it('shows the catalog and custom MCP card when open', () => {
+    const markup = renderToStaticMarkup(
+      <AddToolPicker open onClose={vi.fn()} onAdd={vi.fn()} existingIds={[]} />,
+    );
 
     expect(markup).toContain('Add a tool');
-    for (const mcp of AVAILABLE_MCPS) {
+    expect(markup).toContain('Custom MCP');
+    for (const mcp of CATALOG_MCPS) {
       expect(markup).toContain(mcp.label);
-      expect(markup).toContain(mcp.ticket);
-      expect(markup).toContain(mcp.ticketUrl);
     }
-    const disabledCount = markup.match(/aria-disabled="true"/g)?.length ?? 0;
-    expect(disabledCount).toBeGreaterThanOrEqual(AVAILABLE_MCPS.length);
   });
 
-  it('renders the shared "coming soon" blurb once per unavailable row', () => {
-    const markup = renderToStaticMarkup(<AddToolPicker open onClose={vi.fn()} />);
+  it('renders Composio as a catalog entry with Set up button', () => {
+    const markup = renderToStaticMarkup(
+      <AddToolPicker open onClose={vi.fn()} onAdd={vi.fn()} existingIds={[]} />,
+    );
 
-    const unavailableCount = AVAILABLE_MCPS.filter((mcp) => !mcp.available).length;
-    expect(unavailableCount).toBeGreaterThanOrEqual(6);
-    expect(countOccurrences(markup, DEFAULT_UNAVAILABLE_BLURB)).toBe(unavailableCount);
+    expect(markup).toContain('Composio');
+    expect(markup).toContain('Set up');
+  });
+
+  it('marks catalog items as disabled when already added', () => {
+    const markup = renderToStaticMarkup(
+      <AddToolPicker open onClose={vi.fn()} onAdd={vi.fn()} existingIds={['composio']} />,
+    );
+
+    expect(markup).toContain('Already added');
+    expect(markup).toContain('aria-disabled="true"');
   });
 });

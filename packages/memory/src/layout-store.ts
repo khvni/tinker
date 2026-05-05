@@ -1,8 +1,8 @@
 import {
   createDefaultWorkspacePreferences,
+  type CustomMcpEntry,
   type LayoutState,
   type LayoutStore,
-  type PersistedWorkspaceState,
   type WorkspacePreferences,
 } from '@tinker/shared-types';
 import { getDatabase } from './database.js';
@@ -13,20 +13,12 @@ export type LayoutRow = {
   updated_at: string;
 };
 
-export const CURRENT_LAYOUT_VERSION = 2 as const;
+export const CURRENT_LAYOUT_VERSION = 3 as const;
 
 type StoredLayoutPayload = {
-  workspaceState: unknown;
+  layoutJson: unknown;
   preferences?: unknown;
 };
-
-type PaneDataRecord = {
-  readonly kind?: unknown;
-};
-
-type PersistedTab = PersistedWorkspaceState['tabs'][number];
-type PersistedPane = PersistedTab['panes'][string];
-type PersistedLayoutNode = PersistedTab['layout'];
 
 const parseStoredLayout = (raw: string): unknown | null => {
   try {
@@ -34,6 +26,18 @@ const parseStoredLayout = (raw: string): unknown | null => {
   } catch {
     return null;
   }
+};
+
+const isValidMcpEntry = (entry: unknown): entry is CustomMcpEntry => {
+  if (!entry || typeof entry !== 'object') return false;
+  const record = entry as Record<string, unknown>;
+  return (
+    typeof record.id === 'string' &&
+    typeof record.label === 'string' &&
+    typeof record.url === 'string' &&
+    typeof record.headerName === 'string' &&
+    typeof record.enabled === 'boolean'
+  );
 };
 
 const normalizePreferences = (value: unknown): WorkspacePreferences => {
@@ -63,114 +67,24 @@ const normalizePreferences = (value: unknown): WorkspacePreferences => {
       candidate.activeRoute === 'connections'
         ? candidate.activeRoute
         : defaults.activeRoute,
+    customMcps: Array.isArray(candidate.customMcps)
+      ? (candidate.customMcps as unknown[]).filter(isValidMcpEntry)
+      : defaults.customMcps,
   };
 };
 
-const isWorkspaceState = (value: unknown): value is PersistedWorkspaceState => {
+const isLayoutJson = (value: unknown): boolean => {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
   const candidate = value as Record<string, unknown>;
-  return (
-    candidate.version === CURRENT_LAYOUT_VERSION &&
-    Array.isArray(candidate.tabs) &&
-    ('activeTabId' in candidate)
-  );
-};
-
-const isPaneDataRecord = (value: unknown): value is PaneDataRecord => {
-  return Boolean(value && typeof value === 'object');
-};
-
-const isPersistablePane = (pane: PersistedPane): boolean => {
-  return isPaneDataRecord(pane.data) && (pane.data.kind === 'chat' || pane.data.kind === 'file');
-};
-
-const pruneLayoutNode = (
-  node: PersistedLayoutNode,
-  paneIds: ReadonlySet<string>,
-): PersistedLayoutNode | null => {
-  if (node.kind === 'stack') {
-    const retainedPaneIds = node.paneIds.filter((paneId) => paneIds.has(paneId));
-    if (retainedPaneIds.length === 0) {
-      return null;
-    }
-
-    return {
-      ...node,
-      paneIds: retainedPaneIds,
-      activePaneId:
-        node.activePaneId && retainedPaneIds.includes(node.activePaneId)
-          ? node.activePaneId
-          : (retainedPaneIds[0] ?? null),
-    };
-  }
-
-  const a = pruneLayoutNode(node.a, paneIds);
-  const b = pruneLayoutNode(node.b, paneIds);
-
-  if (a && b) {
-    return { ...node, a, b };
-  }
-
-  return a ?? b;
-};
-
-const collectStackIds = (node: PersistedLayoutNode): ReadonlyArray<string> => {
-  if (node.kind === 'stack') {
-    return [node.id];
-  }
-
-  return [...collectStackIds(node.a), ...collectStackIds(node.b)];
-};
-
-const sanitizeTab = (tab: PersistedTab): PersistedTab | null => {
-  const panes = Object.fromEntries(
-    Object.entries(tab.panes).filter((entry): entry is [string, PersistedPane] => {
-      const [, pane] = entry;
-      return isPersistablePane(pane);
-    }),
-  ) as Record<string, PersistedPane>;
-  const retainedPaneIds = new Set(Object.keys(panes));
-  const layout = pruneLayoutNode(tab.layout, retainedPaneIds);
-
-  if (!layout || Object.keys(panes).length === 0) {
-    return null;
-  }
-
-  const stackIds = collectStackIds(layout);
-  const firstStackId = stackIds[0] ?? null;
-
-  return {
-    ...tab,
-    layout,
-    panes,
-    activePaneId:
-      tab.activePaneId && retainedPaneIds.has(tab.activePaneId)
-        ? tab.activePaneId
-        : (Object.keys(panes)[0] ?? null),
-    activeStackId:
-      tab.activeStackId && stackIds.includes(tab.activeStackId)
-        ? tab.activeStackId
-        : firstStackId,
-  };
-};
-
-const sanitizeWorkspaceState = (state: PersistedWorkspaceState): PersistedWorkspaceState => {
-  const tabs = state.tabs.map(sanitizeTab).filter((tab): tab is NonNullable<ReturnType<typeof sanitizeTab>> => tab !== null);
-  const tabIds = new Set(tabs.map((tab) => tab.id));
-
-  return {
-    ...state,
-    tabs,
-    activeTabId: state.activeTabId && tabIds.has(state.activeTabId) ? state.activeTabId : (tabs[0]?.id ?? null),
-  };
+  return 'layout' in candidate;
 };
 
 export const serializeLayoutState = (state: LayoutState): string => {
   const payload: StoredLayoutPayload = {
-    workspaceState: sanitizeWorkspaceState(state.workspaceState),
+    layoutJson: state.layoutJson,
     preferences: state.preferences,
   };
 
@@ -196,18 +110,18 @@ export const hydrateLayoutRow = (row: LayoutRow | undefined, userId: string): La
   }
 
   const candidate = payload as Record<string, unknown>;
-  const hasWrapper = 'workspaceState' in candidate;
-  const workspaceState = hasWrapper ? candidate.workspaceState : payload;
+  const hasWrapper = 'layoutJson' in candidate;
+  const layoutJson = hasWrapper ? candidate.layoutJson : payload;
   const preferences = hasWrapper ? normalizePreferences(candidate.preferences) : createDefaultWorkspacePreferences();
 
-  if (!isWorkspaceState(workspaceState)) {
-    console.warn(`Ignoring stored layout for user ${userId}: payload was not a WorkspaceState snapshot.`);
+  if (!isLayoutJson(layoutJson)) {
+    console.warn(`Ignoring stored layout for user ${userId}: payload was not a valid FlexLayout model.`);
     return null;
   }
 
   return {
     version: CURRENT_LAYOUT_VERSION,
-    workspaceState: sanitizeWorkspaceState(workspaceState),
+    layoutJson,
     updatedAt: row.updated_at,
     preferences,
   };

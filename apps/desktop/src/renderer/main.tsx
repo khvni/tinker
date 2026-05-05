@@ -2,7 +2,8 @@ import { StrictMode, Suspense, lazy, useEffect, type JSX, type ReactNode } from 
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/host-grotesk';
 import { ToastProvider } from '@tinker/design';
-import '@tinker/panes/styles.css';
+import 'flexlayout-react/style/light.css';
+import './workspace/flexlayout-overrides.css';
 import { App } from './App.js';
 import { registerWorkspacePanes } from './workspace/register-panes.js';
 import { applyTheme, readTheme } from './theme.js';

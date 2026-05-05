@@ -17,7 +17,7 @@
 - **OpenCode** runs as a bundled sidecar process. The webview talks to it directly over HTTP + SSE.
 - **Tinker Bridge** (`packages/bridge`) shapes OpenCode stream events and handles memory injection before prompts.
 - **Memory** (`packages/memory`) stores entities, relationships, and layout state in SQLite through Tauri's SQL plugin.
-- **Desktop UI** (`apps/desktop`) is Tauri v2 + React 19 + `@tinker/panes` for the workspace layout (recursive split tree, tabs, drag-drop).
+- **Desktop UI** (`apps/desktop`) is Tauri v2 + React 19 + **FlexLayout** (`flexlayout-react`) for the workspace layout (split panes, tabsets, drag-drop).
 
 **Key files to read first:**
 
@@ -69,7 +69,7 @@ How this shows up in practice:
 | Package manager | **pnpm** workspace |
 | Desktop shell | **Tauri v2** |
 | UI | **React 19 + Vite** |
-| Workspace layout | **`@tinker/panes`** (recursive split tree + tabs, zustand-backed; Dockview deprecated per [[D16]]) |
+| Workspace layout | **`flexlayout-react`** (FlexLayout — tabsets, splits, drag-drop, Model + Actions API) |
 | Agent backend | **OpenCode** sidecar |
 | Bridge SDK | **`@opencode-ai/sdk`** |
 | Model runtime | **OpenCode** (provider + model auth owned by OpenCode; Tinker ships a GUI model picker over its SDK) |
@@ -143,9 +143,9 @@ How this shows up in practice:
 
 ## 8. Workspace UI Invariants
 
-- `@tinker/panes` is the only sanctioned layout engine (per [[D16]]). Do not add `dockview-react` or `flexlayout-react` imports.
-- Split panes, movable tabs, and restored layout must work. Pane payload is typed (`Pane<TData>`); each `kind` registers a renderer in a `PaneRegistry`.
-- Workspace state serializes via `selectWorkspaceSnapshot()`; persistence uses `WorkspaceState<TData>` from `@tinker/panes`.
+- **FlexLayout** (`flexlayout-react`) is the sanctioned layout engine. Each pane kind registers via the factory function pattern (`node.getComponent()` → renderer). Do not add `dockview-react` or `@tinker/panes` imports.
+- Split panes, movable tabs, and restored layout must work. Pane payload is stored in FlexLayout tab `config` (typed as `TinkerPaneData`); each `component` string maps to a renderer in the factory.
+- Workspace state serializes via `model.toJson()`; persistence uses `IJsonModel` from FlexLayout.
 - The app must stay usable when integrations are disconnected.
 - No modal-heavy core flows. Agent-initiated clarifications use the `ask_user` overlay (per [[D20]]), not freeform chat prompts.
 - Dark, focused UI. All colors/spacing/radius/font values come from `@tinker/design` tokens (per [[D14]] / [[D15]]).
@@ -194,7 +194,7 @@ All agent-readable context lives under `agent-knowledge/`. Do not split it acros
 - "Let me hardcode a single default model." No — model choice is delegated to OpenCode. Tinker ships a model picker UI that surfaces OpenCode's configured providers (local + cloud).
 - "Let me write our own OAuth / session layer." No — identity is handled by Better Auth (per [[D2]]). Adding a provider = extending Better Auth config, not rolling a new auth path.
 - "Let me store tokens in a file." No — use the system keychain.
-- "Let me add `dockview-react` or `flexlayout-react` back." No — register a `kind` in `PaneRegistry` per [[D16]].
+- "Let me add `dockview-react` or `@tinker/panes` back." No — use FlexLayout's factory pattern. Register a new `component` string and add a case to the factory function.
 - "Let me stash config on the coordinator and call start later." No — pass config per call per [[D22]].
 - "Let me derive `hostId` from a config field." No — intrinsic only per [[D17]].
 - "Let me ship a sync layer alongside host/device split." No — deferred per [[D18]].

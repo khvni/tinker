@@ -53,13 +53,14 @@ const renderWithRuntime = (overrides: Partial<SettingsPaneRuntime>): string => {
 };
 
 describe('SettingsPane', () => {
-  it('renders Account, Model, and Memory sections from runtime context', () => {
+  it('renders Account, Model, Memory, and Connections sections from runtime context', () => {
     const markup = renderWithRuntime({});
 
     expect(markup).toContain('Settings');
     expect(markup).toContain('Account');
     expect(markup).toContain('Model');
     expect(markup).toContain('Memory');
+    expect(markup).toContain('Connections');
     expect(markup).toContain('Continue as guest');
     expect(markup).toContain('Continue with GitHub');
   });

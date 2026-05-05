@@ -8,7 +8,6 @@
 
 .tinker-add-tool-picker__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
   margin: 0;
   padding: 0;
@@ -17,7 +16,7 @@
 
 .tinker-add-tool-picker__card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -28,8 +27,12 @@
 }
 
 .tinker-add-tool-picker__card[aria-disabled='true'] {
-  opacity: 0.7;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+.tinker-add-tool-picker__card--custom {
+  border-style: dashed;
 }
 
 .tinker-add-tool-picker__card-body {
@@ -51,21 +54,36 @@
   color: var(--color-text-muted);
 }
 
-.tinker-add-tool-picker__ticket {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-elevated);
-  white-space: nowrap;
+.tinker-add-tool-picker__card-secret {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  flex-shrink: 0;
 }
 
-.tinker-add-tool-picker__ticket:hover,
-.tinker-add-tool-picker__ticket:focus-visible {
-  color: var(--color-text-primary);
-  border-color: var(--color-border-default);
-  outline: none;
+.tinker-add-tool-picker__custom-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.tinker-add-tool-picker__fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tinker-add-tool-picker__field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.tinker-add-tool-picker__field-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.tinker-add-tool-picker__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

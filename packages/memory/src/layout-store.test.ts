@@ -1,6 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CURRENT_LAYOUT_VERSION, hydrateLayoutRow, serializeLayoutState } from './layout-store.js';
 
+const SAMPLE_LAYOUT_JSON = {
+  global: {},
+  borders: [],
+  layout: {
+    type: 'row',
+    weight: 100,
+    children: [
+      {
+        type: 'tabset',
+        weight: 100,
+        children: [
+          { type: 'tab', id: 'chat-1', name: 'Chat', component: 'chat', config: { kind: 'chat' } },
+        ],
+      },
+    ],
+  },
+};
+
 describe('hydrateLayoutRow', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -19,7 +37,7 @@ describe('hydrateLayoutRow', () => {
   it('returns null and warns when the stored version is incompatible', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION + 1,
-      workspace_state_json: '{"tabs":[],"activeTabId":null,"version":2}',
+      workspace_state_json: JSON.stringify({ layoutJson: SAMPLE_LAYOUT_JSON }),
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
@@ -53,176 +71,33 @@ describe('hydrateLayoutRow', () => {
       version: CURRENT_LAYOUT_VERSION,
       workspace_state_json: serializeLayoutState({
         version: CURRENT_LAYOUT_VERSION,
-        workspaceState: {
-          version: CURRENT_LAYOUT_VERSION,
-          tabs: [],
-          activeTabId: null,
-        },
+        layoutJson: SAMPLE_LAYOUT_JSON,
         updatedAt: '2026-04-15T00:00:00.000Z',
-        preferences: {
-          autoOpenAgentWrittenFiles: false,
-          isLeftRailVisible: true,
-          isRightInspectorVisible: false,
-          activeRoute: 'connections',
-        },
+        preferences: { autoOpenAgentWrittenFiles: false, isLeftRailVisible: true, isRightInspectorVisible: false, activeRoute: 'workspace', customMcps: [] },
       }),
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
     expect(hydrateLayoutRow(row, 'user')).toEqual({
       version: CURRENT_LAYOUT_VERSION,
-      workspaceState: {
-        version: CURRENT_LAYOUT_VERSION,
-        tabs: [],
-        activeTabId: null,
-      },
+      layoutJson: SAMPLE_LAYOUT_JSON,
       updatedAt: '2026-04-15T00:00:00.000Z',
-      preferences: {
-        autoOpenAgentWrittenFiles: false,
-        isLeftRailVisible: true,
-        isRightInspectorVisible: false,
-        activeRoute: 'connections',
-      },
+      preferences: { autoOpenAgentWrittenFiles: false, isLeftRailVisible: true, isRightInspectorVisible: false, activeRoute: 'workspace', customMcps: [] },
     });
   });
 
-  it('defaults auto-open on when loading a raw workspace payload', () => {
+  it('defaults preferences when loading a raw layout payload', () => {
     const row = {
       version: CURRENT_LAYOUT_VERSION,
-      workspace_state_json: '{"version":2,"tabs":[],"activeTabId":null}',
+      workspace_state_json: JSON.stringify({ layoutJson: SAMPLE_LAYOUT_JSON }),
       updated_at: '2026-04-15T00:00:00.000Z',
     };
 
     expect(hydrateLayoutRow(row, 'user')).toEqual({
       version: CURRENT_LAYOUT_VERSION,
-      workspaceState: {
-        version: CURRENT_LAYOUT_VERSION,
-        tabs: [],
-        activeTabId: null,
-      },
+      layoutJson: SAMPLE_LAYOUT_JSON,
       updatedAt: '2026-04-15T00:00:00.000Z',
-      preferences: {
-        autoOpenAgentWrittenFiles: true,
-        isLeftRailVisible: true,
-        isRightInspectorVisible: false,
-        activeRoute: 'workspace',
-      },
+      preferences: { autoOpenAgentWrittenFiles: true, isLeftRailVisible: true, isRightInspectorVisible: false, activeRoute: 'workspace', customMcps: [] },
     });
-  });
-
-  it('drops route-only utility panes from serialized workspace snapshots', () => {
-    const workspaceStateJson = JSON.stringify({
-      workspaceState: {
-        version: CURRENT_LAYOUT_VERSION,
-        activeTabId: 'tab-1',
-        tabs: [
-          {
-            id: 'tab-1',
-            createdAt: 1,
-            layout: {
-              kind: 'stack',
-              id: 'stack-1',
-              paneIds: ['chat-1', 'memory-1'],
-              activePaneId: 'memory-1',
-            },
-            panes: {
-              'chat-1': {
-                id: 'chat-1',
-                kind: 'chat',
-                data: { kind: 'chat' },
-              },
-              'memory-1': {
-                id: 'memory-1',
-                kind: 'memory',
-                data: { kind: 'memory' },
-              },
-            },
-            activePaneId: 'memory-1',
-            activeStackId: 'stack-1',
-          },
-        ],
-      },
-      preferences: {
-        autoOpenAgentWrittenFiles: true,
-        isLeftRailVisible: true,
-        isRightInspectorVisible: false,
-        activeRoute: 'memory',
-      },
-    });
-    const row = {
-      version: CURRENT_LAYOUT_VERSION,
-      workspace_state_json: workspaceStateJson,
-      updated_at: '2026-04-15T00:00:00.000Z',
-    };
-
-    expect(hydrateLayoutRow(row, 'user')).toMatchObject({
-      preferences: {
-        activeRoute: 'memory',
-      },
-      workspaceState: {
-        tabs: [
-          {
-            layout: {
-              kind: 'stack',
-              paneIds: ['chat-1'],
-              activePaneId: 'chat-1',
-            },
-            activePaneId: 'chat-1',
-            panes: {
-              'chat-1': {
-                data: { kind: 'chat' },
-              },
-            },
-          },
-        ],
-      },
-    });
-  });
-
-  it('drops route-only utility panes before serializing workspace snapshots', () => {
-    const serialized = serializeLayoutState({
-      version: CURRENT_LAYOUT_VERSION,
-      workspaceState: {
-        version: CURRENT_LAYOUT_VERSION,
-        activeTabId: 'tab-1',
-        tabs: [
-          {
-            id: 'tab-1',
-            createdAt: 1,
-            layout: {
-              kind: 'stack',
-              id: 'stack-1',
-              paneIds: ['chat-1'],
-              activePaneId: 'chat-1',
-            },
-            panes: {
-              'chat-1': {
-                id: 'chat-1',
-                kind: 'chat',
-                data: { kind: 'chat' },
-              },
-            },
-            activePaneId: 'chat-1',
-            activeStackId: 'stack-1',
-          },
-        ],
-      },
-      updatedAt: '2026-04-15T00:00:00.000Z',
-      preferences: {
-        autoOpenAgentWrittenFiles: true,
-        isLeftRailVisible: true,
-        isRightInspectorVisible: false,
-        activeRoute: 'memory',
-      },
-    });
-    const parsed = JSON.parse(serialized) as {
-      readonly workspaceState: {
-        readonly tabs: ReadonlyArray<{
-          readonly layout: { readonly paneIds: ReadonlyArray<string> };
-        }>;
-      };
-    };
-
-    expect(parsed.workspaceState.tabs[0]?.layout.paneIds).toEqual(['chat-1']);
   });
 });

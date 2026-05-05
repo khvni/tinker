@@ -22,9 +22,7 @@
     "lint": "eslint src",
     "test": "echo 'no tests'"
   },
-  "dependencies": {
-    "@tinker/panes": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.6.3"
   }

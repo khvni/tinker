@@ -14,6 +14,9 @@ describe('ConnectionsSection', () => {
           'smart-connections': { status: 'connected' },
           exa: { status: 'connected' },
         }}
+        customMcps={[]}
+        onAddCustomMcp={vi.fn()}
+        onRemoveCustomMcp={vi.fn()}
         onRequestRespawn={vi.fn(async () => undefined)}
       />,
     );
@@ -36,6 +39,9 @@ describe('ConnectionsSection', () => {
           'smart-connections': { status: 'connected' },
           exa: { status: 'connected' },
         }}
+        customMcps={[]}
+        onAddCustomMcp={vi.fn()}
+        onRemoveCustomMcp={vi.fn()}
         onRequestRespawn={vi.fn(async () => undefined)}
       />,
     );
@@ -57,6 +63,9 @@ describe('ConnectionsSection', () => {
           'smart-connections': { status: 'connected' },
           exa: { status: 'connected' },
         }}
+        customMcps={[]}
+        onAddCustomMcp={vi.fn()}
+        onRemoveCustomMcp={vi.fn()}
         onRequestRespawn={vi.fn(async () => undefined)}
       />,
     );
@@ -76,6 +85,9 @@ describe('ConnectionsSection', () => {
           'smart-connections': { status: 'connected' },
           exa: { status: 'connected' },
         }}
+        customMcps={[]}
+        onAddCustomMcp={vi.fn()}
+        onRemoveCustomMcp={vi.fn()}
         onRequestRespawn={vi.fn(async () => undefined)}
       />,
     );
@@ -94,11 +106,66 @@ describe('ConnectionsSection', () => {
           'smart-connections': { status: 'connected' },
           exa: { status: 'connected' },
         }}
+        customMcps={[]}
+        onAddCustomMcp={vi.fn()}
+        onRemoveCustomMcp={vi.fn()}
         onRequestRespawn={vi.fn(async () => undefined)}
       />,
     );
 
-    // The picker modal only mounts when `open` flips true via interaction.
     expect(markup).not.toContain('Add a tool');
+  });
+
+  it('renders custom MCP rows when provided', () => {
+    const markup = renderToStaticMarkup(
+      <ConnectionsSection
+        opencode={null}
+        vaultPath={null}
+        memoryPath={null}
+        seedStatuses={{
+          qmd: { status: 'connected' },
+          'smart-connections': { status: 'connected' },
+          exa: { status: 'connected' },
+        }}
+        customMcps={[
+          {
+            id: 'composio',
+            label: 'Composio',
+            url: 'https://connect.composio.dev/mcp',
+            headerName: 'x-consumer-api-key',
+            enabled: true,
+          },
+        ]}
+        onAddCustomMcp={vi.fn()}
+        onRemoveCustomMcp={vi.fn()}
+        onRequestRespawn={vi.fn(async () => undefined)}
+      />,
+    );
+
+    expect(markup).toContain('Custom tools');
+    expect(markup).toContain('Composio');
+    expect(markup).toContain('https://connect.composio.dev/mcp');
+    expect(markup).toContain('Remove');
+  });
+
+  it('hides Custom tools subheading when no custom MCPs exist', () => {
+    const markup = renderToStaticMarkup(
+      <ConnectionsSection
+        opencode={null}
+        vaultPath={null}
+        memoryPath={null}
+        seedStatuses={{
+          qmd: { status: 'connected' },
+          'smart-connections': { status: 'connected' },
+          exa: { status: 'connected' },
+        }}
+        customMcps={[]}
+        onAddCustomMcp={vi.fn()}
+        onRemoveCustomMcp={vi.fn()}
+        onRequestRespawn={vi.fn(async () => undefined)}
+      />,
+    );
+
+    expect(markup).not.toContain('Custom tools');
   });
 });

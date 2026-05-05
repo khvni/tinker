@@ -1,4 +1,4 @@
-import { findStackContainingPane, type WorkspaceStore } from '@tinker/panes';
+import { Actions, DockLocation, type Model, type TabNode } from 'flexlayout-react';
 import type { TinkerPaneData } from '@tinker/shared-types';
 import { resolveFilePaneMime } from '../panes/FilePane/file-mime.js';
 import {
@@ -7,46 +7,50 @@ import {
   isAbsolutePath,
 } from '../renderers/file-utils.js';
 
-const createWorkspaceTabId = (): string => {
-  return `workspace-${crypto.randomUUID()}`;
-};
-
-// Paper 9I-0: LeftPane 833 / RightPane 555 ≈ 0.60 of the 1388px content area.
 export const FILE_PANE_SPLIT_RATIO = 0.6;
 
 export type ResolveWorkspaceFileMime = (absolutePath: string) => Promise<string>;
 
 type ExistingFilePane = {
-  paneId: string;
-  tabId: string;
+  nodeId: string;
   data: Extract<TinkerPaneData, { readonly kind: 'file' }>;
 };
 
 const findFilePaneByPath = (
-  store: WorkspaceStore<TinkerPaneData>,
+  model: Model,
   absolutePath: string,
 ): ExistingFilePane | null => {
-  const state = store.getState();
-
-  for (const tab of state.tabs) {
-    const existingPane = Object.values(tab.panes).find((pane) => {
-      return pane.data.kind === 'file' && pane.data.path === absolutePath;
-    });
-
-    if (existingPane?.data.kind === 'file') {
-      return {
-        paneId: existingPane.id,
-        tabId: tab.id,
-        data: existingPane.data,
-      };
+  let found: ExistingFilePane | null = null;
+  model.visitNodes((node) => {
+    if (found) return;
+    if (node.getType() !== 'tab') return;
+    const tabNode = node as TabNode;
+    const config = tabNode.getConfig() as TinkerPaneData | undefined;
+    if (config?.kind === 'file' && config.path === absolutePath) {
+      found = { nodeId: tabNode.getId(), data: config };
     }
-  }
+  });
+  return found;
+};
 
-  return null;
+const findFirstFilePane = (
+  model: Model,
+): TabNode | null => {
+  let found: TabNode | null = null;
+  model.visitNodes((node) => {
+    if (found) return;
+    if (node.getType() !== 'tab') return;
+    const tabNode = node as TabNode;
+    const config = tabNode.getConfig() as TinkerPaneData | undefined;
+    if (config?.kind === 'file') {
+      found = tabNode;
+    }
+  });
+  return found;
 };
 
 export const openWorkspaceFile = async (
-  store: WorkspaceStore<TinkerPaneData>,
+  model: Model,
   absolutePath: string,
   resolveMime: ResolveWorkspaceFileMime = resolveFilePaneMime,
 ): Promise<void> => {
@@ -61,81 +65,72 @@ export const openWorkspaceFile = async (
     console.warn(`Failed to resolve pane MIME for "${absolutePath}".`, error);
   }
 
-  const samePathPane = findFilePaneByPath(store, absolutePath);
+  const samePathPane = findFilePaneByPath(model, absolutePath);
   if (samePathPane) {
-    const { actions } = store.getState();
     if (samePathPane.data.mime !== mime) {
-      actions.updatePaneData(samePathPane.tabId, samePathPane.paneId, (data) => {
-        if (data.kind !== 'file') {
-          return data;
-        }
-
-        return { ...data, mime };
-      });
+      model.doAction(
+        Actions.updateNodeAttributes(samePathPane.nodeId, {
+          config: { ...samePathPane.data, mime },
+        }),
+      );
     }
-
-    actions.activateTab(samePathPane.tabId);
-    actions.focusPane(samePathPane.tabId, samePathPane.paneId);
+    model.doAction(Actions.selectTab(samePathPane.nodeId));
     return;
   }
 
-  const filePane = {
+  const fileTabJson = {
+    type: 'tab' as const,
     id: getPanelIdForPath('file', absolutePath),
-    kind: 'file',
-    title: getPanelTitleForPath(absolutePath),
-    data: {
-      kind: 'file',
+    name: getPanelTitleForPath(absolutePath),
+    component: 'file',
+    config: {
+      kind: 'file' as const,
       path: absolutePath,
       mime,
-    } as const,
+    },
   };
 
-  const state = store.getState();
-  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
-
-  if (!activeTab) {
-    state.actions.openTab({
-      id: createWorkspaceTabId(),
-      pane: filePane,
-    });
+  const existingFilePane = findFirstFilePane(model);
+  if (existingFilePane) {
+    const tabsetId = existingFilePane.getParent()?.getId();
+    model.doAction(Actions.deleteTab(existingFilePane.getId()));
+    const targetId = tabsetId && model.getNodeById(tabsetId)
+      ? tabsetId
+      : model.getActiveTabset()?.getId() ?? model.getFirstTabSet().getId();
+    model.doAction(
+      Actions.addTab(
+        fileTabJson,
+        targetId,
+        DockLocation.CENTER,
+        -1,
+        true,
+      ),
+    );
     return;
   }
 
-  // Replace-in-place: a different FilePane already exists in the active tab — swap its
-  // data + title. Keeps the split layout, preserves Chat state, respects the
-  // "single-tab-per-pane" invariant from TIN-190.
-  const existingFilePaneId = Object.values(activeTab.panes).find(
-    (pane) => pane.data.kind === 'file',
-  )?.id;
-  if (existingFilePaneId) {
-    state.actions.updatePaneData(activeTab.id, existingFilePaneId, (data) => {
-      if (data.kind !== 'file') {
-        return data;
-      }
-
-      return { ...data, path: absolutePath, mime };
-    });
-    state.actions.renamePane(activeTab.id, existingFilePaneId, getPanelTitleForPath(absolutePath));
-    state.actions.focusPane(activeTab.id, existingFilePaneId);
+  const activeTabset = model.getActiveTabset();
+  if (activeTabset) {
+    model.doAction(
+      Actions.addTab(
+        fileTabJson,
+        activeTabset.getId(),
+        DockLocation.RIGHT,
+        -1,
+        true,
+      ),
+    );
     return;
   }
 
-  // Auto-split per Paper 9I-0: Chat stays in the anchor stack on the left,
-  // FilePane opens in a fresh stack on the right at the 0.60 ratio.
-  const anchorPaneId = activeTab.activePaneId ?? Object.keys(activeTab.panes)[0] ?? null;
-  if (anchorPaneId) {
-    const anchorStack = findStackContainingPane(activeTab.layout, anchorPaneId);
-    if (anchorStack) {
-      state.actions.splitStack(
-        activeTab.id,
-        anchorStack.id,
-        'right',
-        filePane,
-        FILE_PANE_SPLIT_RATIO,
-      );
-      return;
-    }
-  }
-
-  state.actions.addPane(activeTab.id, filePane, { activate: true });
+  const firstTabset = model.getFirstTabSet();
+  model.doAction(
+    Actions.addTab(
+      fileTabJson,
+      firstTabset.getId(),
+      DockLocation.CENTER,
+      -1,
+      true,
+    ),
+  );
 };

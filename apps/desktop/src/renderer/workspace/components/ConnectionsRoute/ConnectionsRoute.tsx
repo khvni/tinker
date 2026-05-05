@@ -1,4 +1,6 @@
-import { useState, type JSX } from 'react';
+import { useCallback, useState, type JSX } from 'react';
+import type { CustomMcpEntry } from '@tinker/shared-types';
+import { saveMcpSecret, clearMcpSecret } from '../../../../bindings.js';
 import { ConnectionsSection } from '../../../panes/Settings/ConnectionsSection/index.js';
 import { useSettingsPaneRuntime } from '../../settings-pane-runtime.js';
 import './ConnectionsRoute.css';
@@ -10,6 +12,33 @@ export const ConnectionsRoute = (): JSX.Element => {
   const [activeTab, setActiveTab] = useState<ConnectionsTab>('mcps-tools');
   const connectedAppsActive = activeTab === 'connected-apps';
   const mcpsToolsActive = activeTab === 'mcps-tools';
+  const handleAddCustomMcp = useCallback(
+    (entry: CustomMcpEntry, secret: string) => {
+      if (secret) {
+        void saveMcpSecret(entry.id, secret);
+      }
+
+      const prefs = runtime.workspacePreferences;
+      runtime.onWorkspacePreferencesChange({
+        ...prefs,
+        customMcps: [...prefs.customMcps, entry],
+      });
+    },
+    [runtime],
+  );
+
+  const handleRemoveCustomMcp = useCallback(
+    (id: string) => {
+      void clearMcpSecret(id);
+
+      const prefs = runtime.workspacePreferences;
+      runtime.onWorkspacePreferencesChange({
+        ...prefs,
+        customMcps: prefs.customMcps.filter((m) => m.id !== id),
+      });
+    },
+    [runtime],
+  );
 
   return (
     <main className="tinker-connections-route" aria-labelledby="tinker-connections-route-heading">
@@ -59,6 +88,9 @@ export const ConnectionsRoute = (): JSX.Element => {
             vaultPath={runtime.vaultPath}
             memoryPath={runtime.memoryPath}
             seedStatuses={runtime.mcpSeedStatuses}
+            customMcps={runtime.workspacePreferences.customMcps}
+            onAddCustomMcp={handleAddCustomMcp}
+            onRemoveCustomMcp={handleRemoveCustomMcp}
             onRequestRespawn={runtime.onRequestRespawn}
           />
         </section>

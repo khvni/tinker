@@ -24,15 +24,6 @@ describe('pane registry', () => {
     );
   });
 
-  it('supports every split-tree pane kind', () => {
-    registerPane('chat', () => 'c');
-    registerPane('file', () => 'f');
-
-    expect(getRenderer('chat')({ kind: 'chat' })).toBe('c');
-    expect(
-      getRenderer('file')({ kind: 'file', path: '/a', mime: 'text/plain' }),
-    ).toBe('f');
-  });
 
   it('throws a descriptive error when the kind has no renderer', () => {
     expect(() => getRenderer('chat')).toThrowError(
