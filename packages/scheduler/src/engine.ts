@@ -2,6 +2,8 @@ import type { OpencodeClient, Part } from '@opencode-ai/sdk/v2/client';
 import type { ScheduledJob, ScheduledJobRun, ScheduledJobStore, ScheduledOutputSink, VaultService } from '@tinker/shared-types';
 import { countSkippedRuns, getFutureRunAfter } from './schedule.js';
 
+export type MemorySweepTaskRunner = () => Promise<string>;
+
 export type SchedulerEngineOptions = {
   jobStore: ScheduledJobStore;
   vaultService: VaultService | null;
@@ -11,6 +13,7 @@ export type SchedulerEngineOptions = {
   now?: () => Date;
   pollIntervalMs?: number;
   runGraceMs?: number;
+  runMemorySweep?: MemorySweepTaskRunner;
 };
 
 export type SchedulerEngine = {
@@ -83,6 +86,22 @@ const truncateNotificationBody = (value: string): string => {
 const serializeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+const runMemorySweepTask = async (options: SchedulerEngineOptions): Promise<string> => {
+  if (!options.runMemorySweep) {
+    throw new Error('Memory sweep job requires a runMemorySweep handler.');
+  }
+  return options.runMemorySweep();
+};
+
+const runJobTask = async (job: ScheduledJob, options: SchedulerEngineOptions): Promise<string> => {
+  switch (job.task.kind) {
+    case 'memory-sweep':
+      return runMemorySweepTask(options);
+    case 'prompt':
+      return runPromptWithClient(options.createClient(), job.name, job.prompt);
+  }
+};
+
 const deliverOutput = async (
   job: ScheduledJob,
   outputText: string,
@@ -141,7 +160,7 @@ export const createSchedulerEngine = (options: SchedulerEngineOptions): Schedule
       trigger === 'schedule' ? getFutureRunAfter(job.schedule, job.timezone, new Date(scheduledFor)) : job.nextRunAt;
 
     try {
-      const outputText = await runPromptWithClient(options.createClient(), job.name, job.prompt);
+      const outputText = await runJobTask(job, options);
       const finishedAt = now().toISOString();
       const delivery = await deliverOutput(job, outputText, finishedAt, options);
       const status = delivery.errors.length === 0 ? 'success' : 'error';

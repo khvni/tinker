@@ -132,6 +132,8 @@ export const Workspace = ({
   currentUserAvatarUrl,
   nativeRuntimeAvailable,
   layoutStore,
+  schedulerStore,
+  schedulerRevision,
   skillStore,
   modelConnected,
   modelAuthBusy,
@@ -151,6 +153,8 @@ export const Workspace = ({
   vaultPath,
   activeSkillsRevision,
   skillsRootPath,
+  memorySweepState,
+  memorySweepBusy,
   onActiveSkillsChanged,
   onContinueAsGuest,
   onConnectModel,
@@ -162,6 +166,7 @@ export const Workspace = ({
   onDisconnectGithub,
   onDisconnectMicrosoft,
   onMemoryCommitted,
+  onRunMemorySweep,
   mcpStatus,
   onRequestMcpRespawn,
   getConnectionForPane,
@@ -618,6 +623,12 @@ export const Workspace = ({
       opencode,
       vaultPath,
       mcpSeedStatuses,
+      memorySweepState,
+      memorySweepBusy,
+      memorySweepCanRun: Boolean(vaultPath) && modelConnected,
+      memorySweepRevision: schedulerRevision,
+      schedulerStore,
+      onRunMemorySweep,
       onSignOut: async (session: SSOSession) => {
         await disconnectByProvider[session.provider]();
       },
@@ -667,6 +678,11 @@ export const Workspace = ({
     vaultPath,
     mcpStatus,
     onRequestMcpRespawn,
+    memorySweepState,
+    memorySweepBusy,
+    schedulerRevision,
+    schedulerStore,
+    onRunMemorySweep,
   ]);
 
   const userInitial = (currentUserId.trim()[0] ?? 'T').toUpperCase();

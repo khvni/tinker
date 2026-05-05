@@ -3,7 +3,6 @@ import {
   applyMemoryUpdates,
   getMemoryRunState,
   runMemoryMaintenanceSweep,
-  shouldRunDailySweep,
   type MemoryRunState,
   type MemoryWriteSummary,
 } from '@tinker/memory';
@@ -15,6 +14,14 @@ export type ConversationMemoryInput = {
   userMessage: string;
   assistantMessage: string;
   toolResults: Array<{ name: string; output: string }>;
+};
+
+export type DailyMemorySweepSummary = {
+  entitiesIndexed: number;
+  entitiesFlagged: number;
+  appendedFacts: number;
+  created: number;
+  updated: number;
 };
 
 export const readDailySweepState = async (): Promise<MemoryRunState> => {
@@ -39,36 +46,34 @@ export const captureConversationMemory = async (
   );
 };
 
-export const runDailyMemorySweepIfDue = async (
+export const runDailyMemorySweepNow = async (
   connection: OpencodeConnection,
-  vaultPath: string | null,
-  options?: { force?: boolean; observedOn?: string },
-): Promise<{ changed: boolean; state: MemoryRunState }> => {
-  const initialState = await readDailySweepState();
-  if (!vaultPath) {
-    return { changed: false, state: initialState };
-  }
-
-  if (!options?.force && !(await shouldRunDailySweep())) {
-    return { changed: false, state: initialState };
-  }
-
+  vaultPath: string,
+  options?: { observedOn?: string },
+): Promise<DailyMemorySweepSummary> => {
   const observedOn = options?.observedOn ?? new Date().toISOString().slice(0, 10);
   const client = createWorkspaceClient(connection, getOpencodeDirectory(vaultPath));
   const maintenance = await runMemoryMaintenanceSweep({ path: vaultPath, isNew: false });
   const payload = await runDailyMemorySweep(client, observedOn);
-  const result = await applyMemoryUpdates(
+  const writes = await applyMemoryUpdates(
     { path: vaultPath, isNew: false },
     payload.entities,
     { runKey: 'daily-sweep' },
   );
 
   return {
-    changed:
-      maintenance.entitiesPruned > 0
-      || result.appendedFacts > 0
-      || result.created.length > 0
-      || result.updated.length > 0,
-    state: await readDailySweepState(),
+    entitiesIndexed: maintenance.entitiesIndexed,
+    entitiesFlagged: maintenance.entitiesFlagged,
+    appendedFacts: writes.appendedFacts,
+    created: writes.created.length,
+    updated: writes.updated.length,
   };
+};
+
+export const formatDailyMemorySweepSummary = (summary: DailyMemorySweepSummary): string => {
+  const { entitiesIndexed, entitiesFlagged, appendedFacts, created, updated } = summary;
+  return [
+    `Indexed ${entitiesIndexed} entities; flagged ${entitiesFlagged} stale.`,
+    `Appended ${appendedFacts} facts (${created} new, ${updated} updated).`,
+  ].join(' ');
 };

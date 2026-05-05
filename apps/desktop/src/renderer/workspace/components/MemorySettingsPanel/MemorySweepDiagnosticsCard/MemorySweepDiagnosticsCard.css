@@ -1,0 +1,100 @@
+.tk-memory-sweep-diagnostics__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.tk-memory-sweep-diagnostics__stats > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.tk-memory-sweep-diagnostics__stats dt {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.tk-memory-sweep-diagnostics__stats dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+}
+
+.tk-memory-sweep-diagnostics__error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  background: var(--color-error-soft);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.tk-memory-sweep-diagnostics__history {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tk-memory-sweep-diagnostics__history-title {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.tk-memory-sweep-diagnostics__history-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-memory-sweep-diagnostics__history-item {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) max-content 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+}
+
+.tk-memory-sweep-diagnostics__history-item--error {
+  border-color: var(--color-error);
+}
+
+.tk-memory-sweep-diagnostics__history-item--skipped {
+  border-color: var(--color-border-default);
+}
+
+.tk-memory-sweep-diagnostics__history-status {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tk-memory-sweep-diagnostics__history-time {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+}
+
+.tk-memory-sweep-diagnostics__history-detail {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

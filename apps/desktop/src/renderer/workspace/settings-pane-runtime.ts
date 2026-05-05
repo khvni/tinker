@@ -1,7 +1,17 @@
 import { createContext, useContext } from 'react';
-import type { SSOSession, SSOStatus, User, WorkspacePreferences } from '@tinker/shared-types';
+import type { MemoryRunState } from '@tinker/memory';
+import type {
+  ScheduledJobRun,
+  ScheduledJobStore,
+  SSOSession,
+  SSOStatus,
+  User,
+  WorkspacePreferences,
+} from '@tinker/shared-types';
 import type { AuthProvider, OpencodeConnection } from '../../bindings.js';
 import type { BuiltinMcpName, MCPStatus } from '../integrations.js';
+
+export type { ScheduledJobRun };
 
 export type ProviderBusyState = Record<AuthProvider, boolean>;
 export type ProviderMessageState = Partial<Record<AuthProvider, string | null>>;
@@ -27,6 +37,12 @@ export type SettingsPaneRuntime = {
   readonly opencode: OpencodeConnection | null;
   readonly vaultPath: string | null;
   readonly mcpSeedStatuses: Partial<Record<BuiltinMcpName, MCPStatus>>;
+  readonly memorySweepState: MemoryRunState | null;
+  readonly memorySweepBusy: boolean;
+  readonly memorySweepCanRun: boolean;
+  readonly memorySweepRevision: number;
+  readonly schedulerStore: ScheduledJobStore;
+  onRunMemorySweep(): Promise<void>;
   // One-shot navigation hint. When set, SettingsPane seeds SettingsShell with this
   // section id on its next render, then calls `onPendingSectionConsumed` so the hint
   // is cleared and subsequent local-state nav wins. Avoids controlled-mode plumbing

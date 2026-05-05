@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createDefaultWorkspacePreferences, type SSOStatus } from '@tinker/shared-types';
+import {
+  createDefaultWorkspacePreferences,
+  type ScheduledJobStore,
+  type SSOStatus,
+} from '@tinker/shared-types';
 import { SettingsPane } from './SettingsPane.js';
 import {
   SettingsPaneRuntimeContext,
@@ -8,6 +12,17 @@ import {
 } from '../../settings-pane-runtime.js';
 
 const emptySessions: SSOStatus = { google: null, github: null, microsoft: null };
+
+const stubSchedulerStore: ScheduledJobStore = {
+  listJobs: async () => [],
+  getJob: async () => null,
+  saveJob: async () => undefined,
+  deleteJob: async () => undefined,
+  listDueJobs: async () => [],
+  recordRun: async () => undefined,
+  listRuns: async () => [],
+  listTodayEntries: async () => [],
+};
 
 const baseRuntime: SettingsPaneRuntime = {
   nativeRuntimeAvailable: true,
@@ -30,6 +45,12 @@ const baseRuntime: SettingsPaneRuntime = {
   opencode: null,
   vaultPath: null,
   mcpSeedStatuses: {},
+  memorySweepState: null,
+  memorySweepBusy: false,
+  memorySweepCanRun: false,
+  memorySweepRevision: 0,
+  schedulerStore: stubSchedulerStore,
+  onRunMemorySweep: vi.fn().mockResolvedValue(undefined),
   pendingSectionId: null,
   onPendingSectionConsumed: vi.fn(),
   onSignOut: vi.fn().mockResolvedValue(undefined),

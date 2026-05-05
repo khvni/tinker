@@ -1,12 +1,20 @@
 import type { JSX } from 'react';
 import { Button, Toggle } from '@tinker/design';
-import type { WorkspacePreferences } from '@tinker/shared-types';
+import type { MemoryRunState } from '@tinker/memory';
+import type { ScheduledJobStore, WorkspacePreferences } from '@tinker/shared-types';
+import { MemorySweepDiagnosticsCard } from './MemorySweepDiagnosticsCard/index.js';
 import { useMemoryRootControls } from './useMemoryRootControls.js';
 import './MemorySettingsPanel.css';
 
 export type MemorySettingsPanelProps = {
   readonly workspacePreferences: WorkspacePreferences;
   onWorkspacePreferencesChange(nextPreferences: WorkspacePreferences): void;
+  readonly memorySweepState: MemoryRunState | null;
+  readonly memorySweepBusy: boolean;
+  readonly memorySweepCanRun: boolean;
+  readonly memorySweepRevision: number;
+  readonly schedulerStore: ScheduledJobStore;
+  onRunMemorySweep(): Promise<void>;
 };
 
 const getProgressPercent = (copiedFiles: number, totalFiles: number): number => {
@@ -20,6 +28,12 @@ const getProgressPercent = (copiedFiles: number, totalFiles: number): number => 
 export const MemorySettingsPanel = ({
   workspacePreferences,
   onWorkspacePreferencesChange,
+  memorySweepState,
+  memorySweepBusy,
+  memorySweepCanRun,
+  memorySweepRevision,
+  schedulerStore,
+  onRunMemorySweep,
 }: MemorySettingsPanelProps): JSX.Element => {
   const {
     changeMemoryRoot,
@@ -113,6 +127,15 @@ export const MemorySettingsPanel = ({
             Automatic memory capture: {memoryAutoAppendEnabled ? 'On' : 'Off'}
           </p>
         </article>
+
+        <MemorySweepDiagnosticsCard
+          memorySweepState={memorySweepState}
+          memorySweepBusy={memorySweepBusy}
+          memorySweepCanRun={memorySweepCanRun}
+          memorySweepRevision={memorySweepRevision}
+          schedulerStore={schedulerStore}
+          onRunMemorySweep={onRunMemorySweep}
+        />
 
         <article className="tk-memory-settings__card">
           <div className="tk-memory-settings__row">

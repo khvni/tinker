@@ -95,6 +95,12 @@ export const SettingsPane = (): JSX.Element => {
           <MemorySettingsPanel
             workspacePreferences={runtime.workspacePreferences}
             onWorkspacePreferencesChange={runtime.onWorkspacePreferencesChange}
+            memorySweepState={runtime.memorySweepState}
+            memorySweepBusy={runtime.memorySweepBusy}
+            memorySweepCanRun={runtime.memorySweepCanRun}
+            memorySweepRevision={runtime.memorySweepRevision}
+            schedulerStore={runtime.schedulerStore}
+            onRunMemorySweep={runtime.onRunMemorySweep}
           />
         ),
       },

@@ -25,7 +25,8 @@ export const DATABASE_SCHEMA = [
     aliases_json TEXT NOT NULL,
     sources_json TEXT NOT NULL,
     attributes_json TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL
+    last_seen_at TEXT NOT NULL,
+    stale_since TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS relationships (
     subject_id TEXT NOT NULL,
@@ -118,7 +119,8 @@ export const DATABASE_SCHEMA = [
     last_run_status TEXT,
     next_run_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    task_kind TEXT NOT NULL DEFAULT 'prompt'
   )`,
   `CREATE TABLE IF NOT EXISTS job_runs (
     id TEXT PRIMARY KEY,
@@ -170,6 +172,28 @@ export const ensureRelationshipTableColumns = async (
   }
 };
 
+export const ensureEntityTableColumns = async (
+  database: Pick<Database, 'execute' | 'select'>,
+): Promise<void> => {
+  const rows = await database.select<TableInfoRow[]>('PRAGMA table_info(entities)');
+  const columns = new Set(rows.map((row) => row.name));
+
+  if (!columns.has('stale_since')) {
+    await database.execute('ALTER TABLE entities ADD COLUMN stale_since TEXT');
+  }
+};
+
+export const ensureJobTableColumns = async (
+  database: Pick<Database, 'execute' | 'select'>,
+): Promise<void> => {
+  const rows = await database.select<TableInfoRow[]>('PRAGMA table_info(jobs)');
+  const columns = new Set(rows.map((row) => row.name));
+
+  if (!columns.has('task_kind')) {
+    await database.execute("ALTER TABLE jobs ADD COLUMN task_kind TEXT NOT NULL DEFAULT 'prompt'");
+  }
+};
+
 const ensureLayoutTableShape = async (database: Database): Promise<void> => {
   const columns = await database.select<TableInfoRow[]>(`PRAGMA table_info(layouts)`);
   const hasWorkspaceColumn = columns.some((column) => column.name === LAYOUT_STATE_COLUMN);
@@ -211,6 +235,8 @@ export const getDatabase = async (sqlUrl = DEFAULT_SQL_URL): Promise<Database> =
       }
       await ensureSessionTableColumns(database);
       await ensureRelationshipTableColumns(database);
+      await ensureEntityTableColumns(database);
+      await ensureJobTableColumns(database);
       await ensureLayoutTableShape(database);
       return database;
     });

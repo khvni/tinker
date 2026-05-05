@@ -17,10 +17,15 @@ import {
   upsertUser,
   type MemoryRunState,
 } from '@tinker/memory';
-import { createSchedulerEngine, type SchedulerEngine } from '@tinker/scheduler';
+import {
+  createSchedulerEngine,
+  ensureDailyMemorySweepJob,
+  SYSTEM_DAILY_MEMORY_SWEEP_JOB_ID,
+  type SchedulerEngine,
+} from '@tinker/scheduler';
 import type { LayoutStore, MemoryStore, ScheduledJobStore, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
-import { readDailySweepState, runDailyMemorySweepIfDue } from './memory.js';
+import { formatDailyMemorySweepSummary, readDailySweepState, runDailyMemorySweepNow } from './memory.js';
 import {
   BUILTIN_MCP_NAMES,
   checkTrackedMcpBootHealth,
@@ -698,15 +703,34 @@ export const App = (): JSX.Element => {
       sendNotification(payload);
     };
 
+    const runMemorySweep = async (): Promise<string> => {
+      if (!state.vaultPath) {
+        throw new Error('Memory sweep requires a connected vault.');
+      }
+      if (!state.modelConnected) {
+        throw new Error('Memory sweep requires a connected model.');
+      }
+
+      const summary = await runDailyMemorySweepNow(defaultConnection(state), state.vaultPath);
+      handleMemoryCommitted();
+      return formatDailyMemorySweepSummary(summary);
+    };
+
     const engine = createSchedulerEngine({
       jobStore: state.schedulerStore,
       vaultService: state.vaultPath ? vaultService : null,
       createClient: () => createWorkspaceClient(defaultConnection(state), getOpencodeDirectory(state.vaultPath)),
       notify,
       onMutation: bumpSchedulerRevision,
+      runMemorySweep,
     });
 
     schedulerEngineRef.current = engine;
+    void ensureDailyMemorySweepJob(state.schedulerStore)
+      .then(() => bumpSchedulerRevision())
+      .catch((error) => {
+        console.warn('Failed to seed daily memory sweep job.', error);
+      });
     engine.start();
 
     return () => {
@@ -721,6 +745,7 @@ export const App = (): JSX.Element => {
     state.status === 'ready' ? defaultConnection(state) : null,
     state.status === 'ready' ? state.schedulerStore : null,
     state.status === 'ready' ? state.vaultPath : null,
+    state.status === 'ready' ? state.modelConnected : null,
     vaultService,
   ]);
 
@@ -730,9 +755,8 @@ export const App = (): JSX.Element => {
     }
 
     let active = true;
-    let intervalId: number | null = null;
 
-    const refreshSweepState = async (): Promise<void> => {
+    void (async () => {
       try {
         const nextState = await readDailySweepState();
         if (active) {
@@ -743,64 +767,15 @@ export const App = (): JSX.Element => {
           console.warn('Failed to read daily memory sweep state.', error);
         }
       }
-    };
-
-    const maybeRunSweep = async (force = false): Promise<void> => {
-      await refreshSweepState();
-
-      if (!state.vaultPath || !state.modelConnected) {
-        return;
-      }
-
-      setMemorySweepBusy(true);
-      try {
-        const result = await runDailyMemorySweepIfDue(defaultConnection(state), state.vaultPath, { force });
-        if (!active) {
-          return;
-        }
-
-        setMemorySweepState(result.state);
-        if (result.changed) {
-          setState((current) =>
-            current.status !== 'ready' || current.vaultPath !== state.vaultPath
-              ? current
-              : {
-                  ...current,
-                  vaultRevision: current.vaultRevision + 1,
-                },
-          );
-        }
-      } catch (error) {
-        if (active) {
-          console.warn('Daily memory sweep failed.', error);
-          void refreshSweepState();
-        }
-      } finally {
-        if (active) {
-          setMemorySweepBusy(false);
-        }
-      }
-    };
-
-    void maybeRunSweep(false);
-    intervalId = window.setInterval(() => {
-      void maybeRunSweep(false);
-    }, 60 * 60 * 1000);
+    })();
 
     return () => {
       active = false;
-      if (intervalId !== null) {
-        window.clearInterval(intervalId);
-      }
     };
   }, [
     nativeRuntime,
     state.status,
-    state.status === 'ready' ? state.modelConnected : false,
-    state.status === 'ready' ? defaultConnection(state).baseUrl : null,
-    state.status === 'ready' ? defaultConnection(state).username : null,
-    state.status === 'ready' ? defaultConnection(state).password : null,
-    state.status === 'ready' ? state.vaultPath : null,
+    state.status === 'ready' ? state.schedulerRevision : null,
   ]);
 
   useEffect(() => {
@@ -971,21 +946,22 @@ export const App = (): JSX.Element => {
   };
 
   const handleRunMemorySweep = async (): Promise<void> => {
-    if (memorySweepBusy || !state.vaultPath || !state.modelConnected) {
+    const engine = schedulerEngineRef.current;
+    if (memorySweepBusy || !engine || !state.vaultPath || !state.modelConnected) {
       return;
     }
 
     setMemorySweepBusy(true);
     try {
-      const result = await runDailyMemorySweepIfDue(defaultConnection(state), state.vaultPath, { force: true });
-      setMemorySweepState(result.state);
-      if (result.changed) {
-        handleMemoryCommitted();
-      }
+      await engine.runNow(SYSTEM_DAILY_MEMORY_SWEEP_JOB_ID);
     } catch (error) {
       console.warn('Manual memory sweep failed.', error);
-      setMemorySweepState(await readDailySweepState());
     } finally {
+      try {
+        setMemorySweepState(await readDailySweepState());
+      } catch (error) {
+        console.warn('Failed to read daily memory sweep state.', error);
+      }
       setMemorySweepBusy(false);
     }
   };

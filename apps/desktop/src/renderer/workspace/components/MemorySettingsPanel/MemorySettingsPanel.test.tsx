@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ScheduledJobStore } from '@tinker/shared-types';
 import { createDefaultWorkspacePreferences } from '@tinker/shared-types';
 import { MemorySettingsPanel } from './MemorySettingsPanel.js';
 
@@ -10,6 +11,26 @@ const { mockUseMemoryRootControls } = vi.hoisted(() => ({
 vi.mock('./useMemoryRootControls.js', () => ({
   useMemoryRootControls: mockUseMemoryRootControls,
 }));
+
+const stubSchedulerStore: ScheduledJobStore = {
+  listJobs: async () => [],
+  getJob: async () => null,
+  saveJob: async () => undefined,
+  deleteJob: async () => undefined,
+  listDueJobs: async () => [],
+  recordRun: async () => undefined,
+  listRuns: async () => [],
+  listTodayEntries: async () => [],
+};
+
+const sweepProps = {
+  memorySweepState: null,
+  memorySweepBusy: false,
+  memorySweepCanRun: true,
+  memorySweepRevision: 0,
+  schedulerStore: stubSchedulerStore,
+  onRunMemorySweep: async () => undefined,
+};
 
 describe('MemorySettingsPanel', () => {
   beforeEach(() => {
@@ -39,6 +60,7 @@ describe('MemorySettingsPanel', () => {
       <MemorySettingsPanel
         workspacePreferences={createDefaultWorkspacePreferences()}
         onWorkspacePreferencesChange={vi.fn()}
+        {...sweepProps}
       />,
     );
 
@@ -64,6 +86,7 @@ describe('MemorySettingsPanel', () => {
       <MemorySettingsPanel
         workspacePreferences={{ ...createDefaultWorkspacePreferences(), autoOpenAgentWrittenFiles: false }}
         onWorkspacePreferencesChange={vi.fn()}
+        {...sweepProps}
       />,
     );
 

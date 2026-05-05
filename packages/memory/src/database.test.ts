@@ -1,7 +1,13 @@
 import type Database from '@tauri-apps/plugin-sql';
 import type { QueryResult } from '@tauri-apps/plugin-sql';
 import { describe, expect, it, vi } from 'vitest';
-import { DATABASE_SCHEMA, ensureRelationshipTableColumns, ensureSessionTableColumns } from './database.js';
+import {
+  DATABASE_SCHEMA,
+  ensureEntityTableColumns,
+  ensureJobTableColumns,
+  ensureRelationshipTableColumns,
+  ensureSessionTableColumns,
+} from './database.js';
 
 describe('DATABASE_SCHEMA', () => {
   it('creates the users table with the shared-user columns', () => {
@@ -119,5 +125,83 @@ describe('DATABASE_SCHEMA', () => {
     } as unknown as Pick<Database, 'execute' | 'select'>);
 
     expect(execute).toHaveBeenCalledWith("ALTER TABLE relationships ADD COLUMN sources_json TEXT NOT NULL DEFAULT '[]'");
+  });
+
+  it('declares stale_since on the entities table for non-destructive cleanup flagging', () => {
+    expect(
+      DATABASE_SCHEMA.some(
+        (statement) =>
+          statement.includes('CREATE TABLE IF NOT EXISTS entities') &&
+          statement.includes('stale_since TEXT'),
+      ),
+    ).toBe(true);
+  });
+
+  it('declares task_kind on the jobs table with a prompt default for the discriminator', () => {
+    expect(
+      DATABASE_SCHEMA.some(
+        (statement) =>
+          statement.includes('CREATE TABLE IF NOT EXISTS jobs') &&
+          statement.includes("task_kind TEXT NOT NULL DEFAULT 'prompt'"),
+      ),
+    ).toBe(true);
+  });
+
+  it('adds stale_since to legacy entities tables', async () => {
+    const execute = vi.fn<Database['execute']>().mockResolvedValue({
+      rowsAffected: 0,
+    } satisfies QueryResult);
+    const select = vi.fn().mockResolvedValue([{ name: 'id' }, { name: 'kind' }, { name: 'name' }]);
+
+    await ensureEntityTableColumns({
+      execute,
+      select,
+    } as unknown as Pick<Database, 'execute' | 'select'>);
+
+    expect(execute).toHaveBeenCalledWith('ALTER TABLE entities ADD COLUMN stale_since TEXT');
+  });
+
+  it('skips stale_since migration when the column already exists', async () => {
+    const execute = vi.fn<Database['execute']>().mockResolvedValue({
+      rowsAffected: 0,
+    } satisfies QueryResult);
+    const select = vi.fn().mockResolvedValue([{ name: 'id' }, { name: 'stale_since' }]);
+
+    await ensureEntityTableColumns({
+      execute,
+      select,
+    } as unknown as Pick<Database, 'execute' | 'select'>);
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('adds task_kind to legacy jobs tables', async () => {
+    const execute = vi.fn<Database['execute']>().mockResolvedValue({
+      rowsAffected: 0,
+    } satisfies QueryResult);
+    const select = vi.fn().mockResolvedValue([{ name: 'id' }, { name: 'name' }, { name: 'prompt' }]);
+
+    await ensureJobTableColumns({
+      execute,
+      select,
+    } as unknown as Pick<Database, 'execute' | 'select'>);
+
+    expect(execute).toHaveBeenCalledWith(
+      "ALTER TABLE jobs ADD COLUMN task_kind TEXT NOT NULL DEFAULT 'prompt'",
+    );
+  });
+
+  it('skips task_kind migration when the column already exists', async () => {
+    const execute = vi.fn<Database['execute']>().mockResolvedValue({
+      rowsAffected: 0,
+    } satisfies QueryResult);
+    const select = vi.fn().mockResolvedValue([{ name: 'id' }, { name: 'task_kind' }]);
+
+    await ensureJobTableColumns({
+      execute,
+      select,
+    } as unknown as Pick<Database, 'execute' | 'select'>);
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });
