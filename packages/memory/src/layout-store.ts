@@ -20,6 +20,14 @@ type StoredLayoutPayload = {
   preferences?: unknown;
 };
 
+type PaneDataRecord = {
+  readonly kind?: unknown;
+};
+
+type PersistedTab = PersistedWorkspaceState['tabs'][number];
+type PersistedPane = PersistedTab['panes'][string];
+type PersistedLayoutNode = PersistedTab['layout'];
+
 const parseStoredLayout = (raw: string): unknown | null => {
   try {
     return JSON.parse(raw) as unknown;
@@ -48,6 +56,13 @@ const normalizePreferences = (value: unknown): WorkspacePreferences => {
       typeof candidate.isRightInspectorVisible === 'boolean'
         ? candidate.isRightInspectorVisible
         : defaults.isRightInspectorVisible,
+    activeRoute:
+      candidate.activeRoute === 'workspace' ||
+      candidate.activeRoute === 'memory' ||
+      candidate.activeRoute === 'settings' ||
+      candidate.activeRoute === 'connections'
+        ? candidate.activeRoute
+        : defaults.activeRoute,
   };
 };
 
@@ -64,9 +79,98 @@ const isWorkspaceState = (value: unknown): value is PersistedWorkspaceState => {
   );
 };
 
+const isPaneDataRecord = (value: unknown): value is PaneDataRecord => {
+  return Boolean(value && typeof value === 'object');
+};
+
+const isPersistablePane = (pane: PersistedPane): boolean => {
+  return isPaneDataRecord(pane.data) && (pane.data.kind === 'chat' || pane.data.kind === 'file');
+};
+
+const pruneLayoutNode = (
+  node: PersistedLayoutNode,
+  paneIds: ReadonlySet<string>,
+): PersistedLayoutNode | null => {
+  if (node.kind === 'stack') {
+    const retainedPaneIds = node.paneIds.filter((paneId) => paneIds.has(paneId));
+    if (retainedPaneIds.length === 0) {
+      return null;
+    }
+
+    return {
+      ...node,
+      paneIds: retainedPaneIds,
+      activePaneId:
+        node.activePaneId && retainedPaneIds.includes(node.activePaneId)
+          ? node.activePaneId
+          : (retainedPaneIds[0] ?? null),
+    };
+  }
+
+  const a = pruneLayoutNode(node.a, paneIds);
+  const b = pruneLayoutNode(node.b, paneIds);
+
+  if (a && b) {
+    return { ...node, a, b };
+  }
+
+  return a ?? b;
+};
+
+const collectStackIds = (node: PersistedLayoutNode): ReadonlyArray<string> => {
+  if (node.kind === 'stack') {
+    return [node.id];
+  }
+
+  return [...collectStackIds(node.a), ...collectStackIds(node.b)];
+};
+
+const sanitizeTab = (tab: PersistedTab): PersistedTab | null => {
+  const panes = Object.fromEntries(
+    Object.entries(tab.panes).filter((entry): entry is [string, PersistedPane] => {
+      const [, pane] = entry;
+      return isPersistablePane(pane);
+    }),
+  ) as Record<string, PersistedPane>;
+  const retainedPaneIds = new Set(Object.keys(panes));
+  const layout = pruneLayoutNode(tab.layout, retainedPaneIds);
+
+  if (!layout || Object.keys(panes).length === 0) {
+    return null;
+  }
+
+  const stackIds = collectStackIds(layout);
+  const firstStackId = stackIds[0] ?? null;
+
+  return {
+    ...tab,
+    layout,
+    panes,
+    activePaneId:
+      tab.activePaneId && retainedPaneIds.has(tab.activePaneId)
+        ? tab.activePaneId
+        : (Object.keys(panes)[0] ?? null),
+    activeStackId:
+      tab.activeStackId && stackIds.includes(tab.activeStackId)
+        ? tab.activeStackId
+        : firstStackId,
+  };
+};
+
+const sanitizeWorkspaceState = (state: PersistedWorkspaceState): PersistedWorkspaceState => {
+  const tabs = state.tabs.map(sanitizeTab).filter((tab): tab is NonNullable<ReturnType<typeof sanitizeTab>> => tab !== null);
+  const tabIds = new Set(tabs.map((tab) => tab.id));
+
+  return {
+    ...state,
+    tabs,
+    activeTabId: state.activeTabId && tabIds.has(state.activeTabId) ? state.activeTabId : (tabs[0]?.id ?? null),
+  };
+};
+
 export const serializeLayoutState = (state: LayoutState): string => {
   const payload: StoredLayoutPayload = {
-    workspaceState: state.workspaceState,
+    workspaceState: sanitizeWorkspaceState(state.workspaceState),
     preferences: state.preferences,
   };
 
@@ -103,7 +207,7 @@ export const hydrateLayoutRow = (row: LayoutRow | undefined, userId: string): La
 
   return {
     version: CURRENT_LAYOUT_VERSION,
-    workspaceState,
+    workspaceState: sanitizeWorkspaceState(workspaceState),
     updatedAt: row.updated_at,
     preferences,
   };

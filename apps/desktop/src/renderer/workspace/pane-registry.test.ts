@@ -24,18 +24,14 @@ describe('pane registry', () => {
     );
   });
 
-  it('supports every kind in the TinkerPaneKind union', () => {
+  it('supports every split-tree pane kind', () => {
     registerPane('chat', () => 'c');
     registerPane('file', () => 'f');
-    registerPane('settings', () => 's');
-    registerPane('memory', () => 'm');
 
     expect(getRenderer('chat')({ kind: 'chat' })).toBe('c');
     expect(
       getRenderer('file')({ kind: 'file', path: '/a', mime: 'text/plain' }),
     ).toBe('f');
-    expect(getRenderer('settings')({ kind: 'settings' })).toBe('s');
-    expect(getRenderer('memory')({ kind: 'memory' })).toBe('m');
   });
 
   it('throws a descriptive error when the kind has no renderer', () => {
@@ -44,8 +40,8 @@ describe('pane registry', () => {
     );
 
     registerPane('file', () => null);
-    expect(() => getRenderer('memory')).toThrowError(
-      /no renderer registered for pane kind "memory".*Registered kinds: file/,
+    expect(() => getRenderer('chat')).toThrowError(
+      /no renderer registered for pane kind "chat".*Registered kinds: file/,
     );
   });
 

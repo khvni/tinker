@@ -1,5 +1,4 @@
 import { useEffect, useState, type JSX } from 'react';
-import type { TinkerPaneKind } from '@tinker/shared-types';
 import {
   ChatsIcon,
   ConnectionsIcon,
@@ -9,7 +8,7 @@ import {
 } from './icons.js';
 import './WorkspaceSidebar.css';
 
-export type WorkspaceRailItem = TinkerPaneKind | 'connections';
+export type WorkspaceRailItem = 'chat' | 'file' | 'memory' | 'settings' | 'connections';
 
 export type WorkspaceSidebarProps = {
   readonly userInitial: string;

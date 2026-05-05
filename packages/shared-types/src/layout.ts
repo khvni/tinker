@@ -20,6 +20,7 @@ export type WorkspacePreferences = {
   autoOpenAgentWrittenFiles: boolean;
   isLeftRailVisible: boolean;
   isRightInspectorVisible: boolean;
+  activeRoute: 'workspace' | 'memory' | 'settings' | 'connections';
 };
 
 export const createDefaultWorkspacePreferences = (): WorkspacePreferences => {
@@ -27,6 +28,7 @@ export const createDefaultWorkspacePreferences = (): WorkspacePreferences => {
     autoOpenAgentWrittenFiles: true,
     isLeftRailVisible: true,
     isRightInspectorVisible: false,
+    activeRoute: 'workspace',
   };
 };
 

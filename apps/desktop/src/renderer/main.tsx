@@ -4,12 +4,10 @@ import '@fontsource-variable/host-grotesk';
 import { ToastProvider } from '@tinker/design';
 import '@tinker/panes/styles.css';
 import { App } from './App.js';
-import { registerWorkspacePaneRenderers } from './workspace/register-pane-renderers.js';
 import { registerWorkspacePanes } from './workspace/register-panes.js';
 import { applyTheme, readTheme } from './theme.js';
 import './styles.css';
 
-registerWorkspacePaneRenderers();
 registerWorkspacePanes();
 
 applyTheme(readTheme() ?? 'light');

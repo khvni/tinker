@@ -11,7 +11,6 @@ export type TitlebarProps = {
   isRightInspectorVisible: boolean;
   onToggleLeftRail: () => void;
   onToggleRightInspector: () => void;
-  onOpenPlaybook?: () => void;
 };
 
 const basename = (path: string): string => getPanelTitleForPath(path.replace(/[\\/]+$/u, ''));
@@ -53,14 +52,6 @@ const RightPaneToggleIcon = (): JSX.Element => (
   </svg>
 );
 
-const PlaybookIcon = (): JSX.Element => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5Z" />
-    <path d="M7 5v14" />
-    <path d="M9 9h5M9 12h5" />
-  </svg>
-);
-
 export const Titlebar = ({
   sessionFolderPath,
   currentUserName = 'Guest',
@@ -69,7 +60,6 @@ export const Titlebar = ({
   isRightInspectorVisible,
   onToggleLeftRail,
   onToggleRightInspector,
-  onOpenPlaybook,
 }: TitlebarProps): JSX.Element => {
   const crumb = sessionFolderPath !== null ? basename(sessionFolderPath) : null;
   const pathLabel = sessionFolderPath !== null ? shortPath(sessionFolderPath) : null;
@@ -121,15 +111,6 @@ export const Titlebar = ({
           aria-pressed={!isRightInspectorVisible}
           onClick={onToggleRightInspector}
         />
-        {onOpenPlaybook ? (
-          <IconButton
-            variant="ghost"
-            size="s"
-            icon={<PlaybookIcon />}
-            label="Playbook"
-            onClick={onOpenPlaybook}
-          />
-        ) : null}
       </div>
     </header>
   );
