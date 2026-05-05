@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import {
   countUnreadPanes,
   createAttentionStore,
@@ -51,7 +51,7 @@ const NotesRenderer = ({ pane }: { pane: { data: DemoData } }): JSX.Element => {
 const TimerRenderer = ({ pane }: { pane: { data: DemoData } }): JSX.Element => {
   if (pane.data.kind !== 'timer') return <div />;
   const [now, setNow] = useState(() => Date.now());
-  useMemo(() => {
+  useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);

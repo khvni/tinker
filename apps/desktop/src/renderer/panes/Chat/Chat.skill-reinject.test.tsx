@@ -223,6 +223,36 @@ describe('<Chat> — skill re-inject decoupled from session reset', () => {
     expect(mocks.client.session.abort.mock.calls.length).toBe(0);
   });
 
+  it('does NOT re-run the session-reset effect when onPersistSessionId changes', async () => {
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
+        </ToastProvider>,
+      );
+    });
+    await flushEffects();
+
+    if (!mocks.findLatestChatHistorySessionId) {
+      throw new Error('mock not installed');
+    }
+
+    const hydrateCallsAfterMount = mocks.findLatestChatHistorySessionId.mock.calls.length;
+    expect(hydrateCallsAfterMount).toBeGreaterThanOrEqual(1);
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
+        </ToastProvider>,
+      );
+    });
+    await flushEffects();
+
+    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
+    expect(mocks.client?.session.abort.mock.calls.length).toBe(0);
+  });
+
   it('DOES re-run the session-reset effect when sessionFolderPath changes (guard: the effect still fires for real triggers)', async () => {
     await act(async () => {
       root.render(

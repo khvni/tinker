@@ -1037,7 +1037,13 @@ export const App = (): JSX.Element => {
 
   const currentSessions = currentUserState.sessions;
 
-  const bindSessionFolder = async (folderPath: string, isNew: boolean): Promise<void> => {
+  const currentUser = resolveCurrentUser(currentSessions);
+  const currentUserId =
+    currentUserState.authState === 'authenticated'
+      ? currentUserState.user.id
+      : pickCurrentUserId(currentSessions);
+
+  const bindSessionFolder = useCallback(async (folderPath: string, isNew: boolean): Promise<void> => {
     requireNativeRuntime('Selecting a folder');
     setSessionFolderBusy(true);
 
@@ -1075,7 +1081,7 @@ export const App = (): JSX.Element => {
     } finally {
       setSessionFolderBusy(false);
     }
-  };
+  }, [acquireOpencode, currentSessions, currentUserId, nativeRuntime, state, stopBinding, vaultService]);
 
   const handleActivateSession = async (session: Session): Promise<void> => {
     await updateLastActive(session.id, new Date().toISOString());
@@ -1243,7 +1249,7 @@ export const App = (): JSX.Element => {
     }
   };
 
-  const handleSelectSessionFolder = async (): Promise<string | null> => {
+  const handleSelectSessionFolder = useCallback(async (): Promise<string | null> => {
     if (sessionFolderBusy) {
       return null;
     }
@@ -1256,14 +1262,14 @@ export const App = (): JSX.Element => {
 
     await bindSessionFolder(folderPath, false);
     return folderPath;
-  };
+  }, [bindSessionFolder, nativeRuntime, sessionFolderBusy]);
 
-  const handleCreateDefaultVault = async (): Promise<void> => {
+  const handleCreateDefaultVault = useCallback(async (): Promise<void> => {
     requireNativeRuntime('Creating the default vault');
     const home = await homeDir();
     const defaultPath = await join(home, 'Tinker', 'knowledge');
     await bindSessionFolder(defaultPath, true);
-  };
+  }, [bindSessionFolder, nativeRuntime]);
 
   const handleRunScheduledJobNow = async (jobId: string): Promise<void> => {
     const engine = schedulerEngineRef.current;
@@ -1273,12 +1279,6 @@ export const App = (): JSX.Element => {
 
     await engine.runNow(jobId);
   };
-
-  const currentUser = resolveCurrentUser(currentSessions);
-  const currentUserId =
-    currentUserState.authState === 'authenticated'
-      ? currentUserState.user.id
-      : pickCurrentUserId(currentSessions);
 
   return (
     <div className="tinker-app">

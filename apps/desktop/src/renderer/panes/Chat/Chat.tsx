@@ -339,6 +339,8 @@ export const Chat = ({
   }, [saveAsSkillOpen, messages]);
   const releaseRef = useRef(onReleaseOpencode);
   releaseRef.current = onReleaseOpencode;
+  const persistSessionIdRef = useRef(onPersistSessionId);
+  persistSessionIdRef.current = onPersistSessionId;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -535,7 +537,7 @@ export const Chat = ({
         const restoredCreatedAt = pinnedSession?.createdAt ?? existingSession?.createdAt ?? new Date().toISOString();
         setRequiresMcpConnectionGate(false);
         activateSession(restoredSessionID, restoredCreatedAt);
-        onPersistSessionId?.(restoredSessionID);
+        persistSessionIdRef.current?.(restoredSessionID);
 
         if (!pinnedSession && !existingSession) {
           try {
@@ -586,7 +588,7 @@ export const Chat = ({
     // installing a skill used to force this effect — which aborts the live
     // OpenCode session, wipes messages, and rehydrates from disk. Re-injection
     // now happens lazily in `injectActiveSkillsIfStale` before each prompt.
-  }, [activateSession, client, createFreshSession, currentUserId, onPersistSessionId, paneSessionId, readyStatus, sessionFolderPath]);
+  }, [activateSession, client, createFreshSession, currentUserId, paneSessionId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     if (!activeSessionId || !selectedModel) {
@@ -851,7 +853,7 @@ export const Chat = ({
 
     const timestamp = new Date().toISOString();
     activateSession(session.id, timestamp);
-    onPersistSessionId?.(session.id);
+    persistSessionIdRef.current?.(session.id);
     setRequiresMcpConnectionGate(false);
 
     if (selectedModel) {

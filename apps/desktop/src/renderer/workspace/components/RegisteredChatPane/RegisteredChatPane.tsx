@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { useCallback, type JSX } from 'react';
 import type { FlashReason } from '@tinker/attention';
 import type { TinkerPaneData } from '@tinker/shared-types';
 import { Chat } from '../../../panes/Chat/index.js';
@@ -36,6 +36,14 @@ export const RegisteredChatPane = ({
 
   const paneDataWithDefaults = paneData ?? ({ kind: 'chat' } as Extract<TinkerPaneData, { readonly kind: 'chat' }>);
   const opencode = getConnectionForPane ? getConnectionForPane(paneDataWithDefaults) : chatRuntime.opencode;
+  const handlePersistSessionId = useCallback(
+    (sessionId: string): void => {
+      if (persistPaneSessionId && tabId && paneId) {
+        persistPaneSessionId(tabId, paneId, sessionId);
+      }
+    },
+    [paneId, persistPaneSessionId, tabId],
+  );
 
   return (
     <Chat
@@ -55,8 +63,7 @@ export const RegisteredChatPane = ({
       }}
       {...(persistPaneSessionId && tabId && paneId
         ? {
-            onPersistSessionId: (sessionId: string) =>
-              persistPaneSessionId(tabId, paneId, sessionId),
+            onPersistSessionId: handlePersistSessionId,
           }
         : {})}
     />
