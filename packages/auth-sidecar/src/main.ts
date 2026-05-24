@@ -51,7 +51,7 @@ type RefreshAuthRequest = {
 const TRANSFER_TTL_MS = 5 * 60 * 1000;
 const SESSION_FALLBACK_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_BETTER_AUTH_PORT = 3147;
-const BRIDGE_SECRET_HEADER = 'x-tinker-bridge-secret';
+export const BRIDGE_SECRET_HEADER = 'x-tinker-bridge-secret';
 
 const requiredEnv = (name: string): string => {
   const value = process.env[name];
@@ -177,7 +177,7 @@ const auth = betterAuth({
   socialProviders,
 });
 
-const isDesktopProvider = (value: string): value is DesktopProvider => {
+export const isDesktopProvider = (value: string): value is DesktopProvider => {
   return value === 'google' || value === 'github' || value === 'microsoft';
 };
 
@@ -228,7 +228,7 @@ const toHeaders = (request: IncomingMessage): Headers => {
   return headers;
 };
 
-const toRequest = async (request: IncomingMessage): Promise<Request> => {
+export const toRequest = async (request: IncomingMessage): Promise<Request> => {
   const url = new URL(request.url ?? '/', baseURL);
   const body = await readBody(request);
 
@@ -255,7 +255,7 @@ const getSetCookieValues = (headers: Headers): string[] => {
   return value ? [value] : [];
 };
 
-const sendResponse = async (response: Response, reply: ServerResponse): Promise<void> => {
+export const sendResponse = async (response: Response, reply: ServerResponse): Promise<void> => {
   reply.statusCode = response.status;
   reply.statusMessage = response.statusText;
 
@@ -283,7 +283,7 @@ const authorizedBridgeRequest = (request: Request): boolean => {
   return request.headers.get(BRIDGE_SECRET_HEADER) === bridgeSecret;
 };
 
-const parseStartAuthRequest = (value: unknown): StartAuthRequest | null => {
+export const parseStartAuthRequest = (value: unknown): StartAuthRequest | null => {
   if (!isRecord(value) || typeof value.provider !== 'string' || !isDesktopProvider(value.provider)) {
     return null;
   }
@@ -291,7 +291,7 @@ const parseStartAuthRequest = (value: unknown): StartAuthRequest | null => {
   return { provider: value.provider };
 };
 
-const parseRefreshAuthRequest = (value: unknown): RefreshAuthRequest | null => {
+export const parseRefreshAuthRequest = (value: unknown): RefreshAuthRequest | null => {
   if (
     !isRecord(value)
     || typeof value.provider !== 'string'
@@ -476,7 +476,7 @@ const readSessionPayload = async (request: Request, provider: DesktopProvider): 
   };
 };
 
-const parseScopeList = (value: unknown): string[] => {
+export const parseScopeList = (value: unknown): string[] => {
   if (typeof value !== 'string') {
     return [];
   }
@@ -484,7 +484,7 @@ const parseScopeList = (value: unknown): string[] => {
   return value.split(/[ ,]+/u).map((scope) => scope.trim()).filter((scope) => scope.length > 0);
 };
 
-const parseExpiresAt = (expiresIn: unknown): string => {
+export const parseExpiresAt = (expiresIn: unknown): string => {
   const value = typeof expiresIn === 'number' ? expiresIn : Number.parseInt(String(expiresIn), 10);
   if (!Number.isFinite(value) || value <= 0) {
     return new Date(Date.now() + SESSION_FALLBACK_TTL_MS).toISOString();
@@ -493,7 +493,7 @@ const parseExpiresAt = (expiresIn: unknown): string => {
   return new Date(Date.now() + value * 1000).toISOString();
 };
 
-const parseRefreshError = (value: unknown): string => {
+export const parseRefreshError = (value: unknown): string => {
   if (!isRecord(value)) {
     return 'refresh_failed';
   }
@@ -832,7 +832,7 @@ const logoutAuthSession = async (request: Request): Promise<Response> => {
   return new Response(null, { status: 204 });
 };
 
-const handleRequest = async (request: Request): Promise<Response> => {
+export const handleRequest = async (request: Request): Promise<Response> => {
   pruneTransfers();
 
   const url = new URL(request.url);
