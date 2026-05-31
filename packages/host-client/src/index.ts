@@ -8,4 +8,5 @@ export {
   type RunEventStream,
   type RunListResponse,
   type RunReplayResponse,
+  type WorkspaceCurrentResponse,
 } from './createHostClient.js';

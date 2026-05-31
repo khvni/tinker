@@ -8,6 +8,16 @@ export {
   type RunEventLog,
 } from './goose/index.js';
 export { loadHostIdentity, type HostIdentity, type LoadHostIdentityOptions } from './identity.js';
+export { resolveDataPaths, ensureDataPaths, type HostDataPaths, type ResolveDataPathsOptions } from './dataPaths.js';
+export {
+  writeManifest,
+  readManifest,
+  listManifests,
+  validateManifestSecret,
+  removeManifest,
+  type ManifestEntry,
+  type WriteManifestOptions,
+} from './manifest.js';
 export { HOST_SERVICE_VERSION } from './version.js';
 export type {
   GitCredentialProvider,
@@ -19,4 +29,6 @@ export type {
   HostProviders,
   IntegrationCredentialWriter,
   ModelProviderResolver,
+  RunStatus,
+  WorkspaceCurrentResponse,
 } from './types.js';

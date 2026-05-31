@@ -17,6 +17,7 @@ import type {
   HostConfig,
   HostInfoResponse,
   HostProviders,
+  WorkspaceCurrentResponse,
 } from './types.js';
 import { HOST_SERVICE_VERSION } from './version.js';
 
@@ -142,12 +143,17 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
       return;
     }
 
-    if (matchPath(req, 'GET', '/host.info')) {
+    const requireAuth = (): boolean => {
       const token = extractBearerToken(req.headers.authorization);
       if (!providers.hostAuth.validate(token)) {
         writeError(res, 401, 'Invalid or missing PSK.');
-        return;
+        return false;
       }
+      return true;
+    };
+
+    if (matchPath(req, 'GET', '/host.info')) {
+      if (!requireAuth()) return;
 
       const body: HostInfoResponse = {
         hostId: identity.hostId,
@@ -298,6 +304,23 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
       req.on('close', () => {
         unsubscribe();
       });
+      return;
+    }
+
+    if (matchPath(req, 'GET', '/workspace.current')) {
+      const token = extractBearerToken(req.headers.authorization);
+      if (!providers.hostAuth.validate(token)) {
+        writeError(res, 401, 'Invalid or missing PSK.');
+        return;
+      }
+
+      const body: WorkspaceCurrentResponse = {
+        hostId: identity.hostId,
+        vaultRoot: config.vaultRoot,
+        activeRuns: eventLog.list().filter(s => s.status === 'running').length,
+        uptimeMs: Date.now() - startedAtMs,
+      };
+      writeJson(res, 200, body, cors);
       return;
     }
 
