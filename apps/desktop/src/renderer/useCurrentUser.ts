@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { invoke } from './electron-shims.js';
 import { listUsersByLastSeen, upsertUser } from '@tinker/memory';
 import type { SSOSession, SSOStatus, User } from '@tinker/shared-types';
-import { DEFAULT_USER_ID, readAuthStatus as readAuthStatusFromBindings, restoreAuthSession, type AuthProvider } from '../bindings.js';
+import { DEFAULT_USER_ID, restoreAuthSession, type AuthProvider, type AuthStatus } from '../bindings.js';
 
 const SESSION_REFRESH_SKEW_MS = 30_000;
 
@@ -99,7 +100,7 @@ const orderedSessions = (sessions: SSOStatus): SSOSession[] => {
 };
 
 const readAuthStatus = async (): Promise<SSOStatus> => {
-  return withDefaultSessions(await readAuthStatusFromBindings());
+  return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
 };
 
 const readRestoredState = async (

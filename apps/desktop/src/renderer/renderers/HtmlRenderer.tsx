@@ -1,6 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import DOMPurify from 'dompurify';
-import { readTextFile } from '../../native-fs.js';
+import { readTextFile } from '../electron-shims-fs.js';
 import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 
 export const HTML_PREVIEW_SANDBOX = 'allow-same-origin';

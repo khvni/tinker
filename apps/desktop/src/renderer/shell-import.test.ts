@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { openExternalUrl } from '../native-fs.js';
+import { open } from './electron-shims-shell.js';
 
 describe('shell import', () => {
-  it('imports openExternalUrl as a function', () => {
-    expect(typeof openExternalUrl).toBe('function');
+  it('imports open as a function', () => {
+    expect(typeof open).toBe('function');
   });
 });

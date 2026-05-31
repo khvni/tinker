@@ -1,4 +1,8 @@
 /* Paper 9K-0 shell: 36h pad 0/16 gap 12 bg bg-panel border subtle. */
+.tinker-titlebar--draggable {
+  -webkit-app-region: drag;
+}
+
 .tinker-titlebar {
   display: flex;
   align-items: center;
@@ -11,8 +15,7 @@
   user-select: none;
 }
 
-/* macOS traffic-light reservation. OS draws stoplights over this. 68px matches Paper 9L-0.
-   Inherits `data-tauri-drag-region` from the header so dragging from the top-left works. */
+/* macOS traffic-light reservation. OS draws stoplights over this. 68px matches Paper 9L-0. */
 .tinker-titlebar__spacer {
   width: 68px;
   flex-shrink: 0;
@@ -69,6 +72,7 @@
 
 /* Paper 9Q-0: WindowActions is a 68×15 flex cluster, 10 px gap, two 15 px glyphs, end-aligned. */
 .tinker-titlebar__actions {
+  -webkit-app-region: no-drag;
   display: flex;
   align-items: center;
   justify-content: flex-end;

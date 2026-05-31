@@ -14,7 +14,7 @@ const { mockReadTextFile, mockWriteTextFile, mockRenderMarkdown } = vi.hoisted((
   mockRenderMarkdown: vi.fn<(text: string) => Promise<string>>(),
 }));
 
-vi.mock('../../../../../native-fs.js', () => ({
+vi.mock('../../../../electron-shims-fs.js', () => ({
   readTextFile: mockReadTextFile,
   writeTextFile: mockWriteTextFile,
 }));

@@ -20,13 +20,15 @@ const stubSecretsWriter: IntegrationCredentialWriter = {
   delete: async () => undefined,
 };
 
-const buildConfig = (overrides: Partial<HostConfig> = {}): HostConfig => ({
+const buildConfig = (scratch: string, overrides: Partial<HostConfig> = {}): HostConfig => ({
   dbPath: '/tmp/tinker-host-test.sqlite',
   vaultRoot: null,
   migrationsPath: '/tmp/tinker-host-test-migrations',
+  runsDir: join(scratch, 'runs'),
   allowedOrigins: [],
   listenHost: '127.0.0.1',
   listenPort: 0,
+  gooseBin: null,
   ...overrides,
 });
 
@@ -51,7 +53,7 @@ describe('createHostApp', () => {
 
   it('binds a free port and exposes hostId via /health.check without auth', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('test-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -72,7 +74,7 @@ describe('createHostApp', () => {
 
   it('rejects /host.info without a valid PSK', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -93,7 +95,7 @@ describe('createHostApp', () => {
 
   it('returns full host.info payload when authenticated', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -119,7 +121,7 @@ describe('createHostApp', () => {
 
   it('returns 404 for unknown routes', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -135,7 +137,7 @@ describe('createHostApp', () => {
 
   it('honors the CORS allowlist on preflight requests', async () => {
     const app = createHostApp({
-      config: buildConfig({ allowedOrigins: ['https://allowed.example'] }),
+      config: buildConfig(scratch, { allowedOrigins: ['https://allowed.example'] }),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -162,7 +164,7 @@ describe('createHostApp', () => {
 
   it('throws when start is called twice without stop', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -177,7 +179,7 @@ describe('createHostApp', () => {
 
   it('treats stop as idempotent before and after start', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });

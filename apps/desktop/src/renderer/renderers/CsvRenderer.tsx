@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { Badge, Button } from '@tinker/design';
-import { readTextFile } from '../../native-fs.js';
+import { readTextFile } from '../electron-shims-fs.js';
 import Papa, { type ParseResult } from 'papaparse';
 import { getPanelTitleForPath } from './file-utils.js';
 

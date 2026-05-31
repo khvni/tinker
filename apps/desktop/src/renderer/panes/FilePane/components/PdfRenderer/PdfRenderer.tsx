@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Badge, Button } from '@tinker/design';
-import { readFile } from '../../../../../native-fs.js';
+import { readFile } from '../../../../electron-shims-fs.js';
 import {
   AnnotationMode,
   GlobalWorkerOptions,

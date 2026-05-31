@@ -1,12 +1,12 @@
-import { openExternalUrl as openExternal } from '../../../native-fs.js';
+import { open as openExternal } from '../../electron-shims-shell.js';
 import { isValidElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { XLSX_MIME } from '../../renderers/file-utils.js';
 import { getRenderer, resetPaneRegistry } from '../../workspace/pane-registry.js';
 
-vi.mock('../../../native-fs.js', () => ({
-  openExternalUrl: vi.fn(),
+vi.mock('../../electron-shims-shell.js', () => ({
+  open: vi.fn(),
 }));
 
 import {

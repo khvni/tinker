@@ -21,7 +21,7 @@ const pdfTestMocks = vi.hoisted(() => ({
   renderTaskCancelMock: vi.fn(),
 }));
 
-vi.mock('../../../../../native-fs.js', () => ({
+vi.mock('../../../../electron-shims-fs.js', () => ({
   readFile: pdfTestMocks.readFileMock,
 }));
 

@@ -64,7 +64,7 @@ export const Titlebar = ({
   const pathLabel = sessionFolderPath !== null ? tildify(sessionFolderPath, homeDirPath) : null;
 
   return (
-    <header className="tinker-titlebar" data-tauri-drag-region>
+    <header className="tinker-titlebar tinker-titlebar--draggable">
       <div className="tinker-titlebar__spacer" aria-hidden="true" />
 
       <div className="tinker-titlebar__center">
@@ -93,7 +93,7 @@ export const Titlebar = ({
         />
       </div>
 
-      <div className="tinker-titlebar__actions" data-tauri-drag-region="false">
+      <div className="tinker-titlebar__actions">
         <IconButton
           variant="ghost"
           size="s"

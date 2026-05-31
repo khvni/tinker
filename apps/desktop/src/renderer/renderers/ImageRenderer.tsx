@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
-import { readFile } from '../../native-fs.js';
+import { readFile } from '../electron-shims-fs.js';
 import { getImageMimeType, getPanelTitleForPath } from './file-utils.js';
 
 export type ImageRendererProps = {
@@ -24,7 +24,7 @@ export const ImageRenderer = ({ path }: ImageRendererProps): JSX.Element => {
       try {
         setError(null);
         const bytes = await readFile(path);
-        const blob = new Blob([bytes as BlobPart], { type: getImageMimeType(path) });
+        const blob = new Blob([bytes], { type: getImageMimeType(path) });
         const nextObjectUrl = URL.createObjectURL(blob);
 
         if (!active) {

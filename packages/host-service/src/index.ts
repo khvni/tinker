@@ -1,5 +1,12 @@
 export { createHostApp, type CreateHostAppArgs } from './createHostApp.js';
 export { createSharedSecretAuth, extractBearerToken } from './auth.js';
+export {
+  createGooseRuntimeAdapter,
+  createRunEventLog,
+  type GooseRuntimeAdapter,
+  type CreateAdapterOptions,
+  type RunEventLog,
+} from './goose/index.js';
 export { loadHostIdentity, type HostIdentity, type LoadHostIdentityOptions } from './identity.js';
 export { HOST_SERVICE_VERSION } from './version.js';
 export type {

@@ -8,7 +8,7 @@ import {
   type JSX,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { openFileDialog as openDialog } from '../../../../native-fs.js';
+import { open as openDialog } from '../../../electron-shims-dialog.js';
 import {
   Badge,
   Button,

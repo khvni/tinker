@@ -5,4 +5,7 @@ export {
   type HealthCheckResponse,
   type HostClient,
   type HostInfoResponse,
+  type RunEventStream,
+  type RunListResponse,
+  type RunReplayResponse,
 } from './createHostClient.js';

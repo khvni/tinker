@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react';
-import { openExternalUrl as openExternal } from '../../../../../native-fs.js';
+import { open as openExternal } from '../../../../electron-shims-shell.js';
 import { Button } from '@tinker/design';
 import { getPanelTitleForPath } from '../../../../renderers/file-utils.js';
 
