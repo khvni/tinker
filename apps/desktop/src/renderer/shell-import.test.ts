@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { Command } from '@tauri-apps/plugin-shell';
+import { open } from './electron-shims-shell.js';
 
 describe('shell import', () => {
-  it('imports Command as a function', () => {
-    expect(typeof Command).toBe('function');
+  it('imports open as a function', () => {
+    expect(typeof open).toBe('function');
   });
 });

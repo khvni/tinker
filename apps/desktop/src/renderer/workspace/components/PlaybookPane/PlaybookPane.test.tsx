@@ -22,7 +22,7 @@ import {
   matchesPlaybookFilter,
 } from './playbookFilters.js';
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({
+vi.mock('../../../electron-shims-dialog.js', () => ({
   open: vi.fn(),
 }));
 

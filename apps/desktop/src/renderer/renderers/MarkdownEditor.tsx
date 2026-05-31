@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { Badge, Textarea } from '@tinker/design';
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile } from '../electron-shims-fs.js';
 import { getPanelTitleForPath } from './file-utils.js';
 
 const isSaveShortcut = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {

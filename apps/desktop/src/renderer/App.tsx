@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { homeDir, join } from '@tauri-apps/api/path';
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
-import { open as openExternal } from '@tauri-apps/plugin-shell';
+import { invoke, homeDir, join, isPermissionGranted, requestPermission, sendNotification, openExternal } from './electron-shims.js';
 import {
   createLayoutStore,
   createMemoryStore,
@@ -35,7 +32,7 @@ import {
   type MCPStatus,
 } from './integrations.js';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
-import { isTauriRuntime } from './runtime.js';
+import { isDesktopRuntime } from './runtime.js';
 import {
   buildStoredUserId,
   toStoredUser,
@@ -326,7 +323,7 @@ const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath
 };
 
 export const App = (): JSX.Element => {
-  const nativeRuntime = useMemo(() => isTauriRuntime(), []);
+  const nativeRuntime = useMemo(() => isDesktopRuntime(), []);
   const memoryStore = useMemo(() => createMemoryStore(), []);
   const layoutStore = useMemo(() => createLayoutStore(), []);
   const schedulerStore = useMemo(() => createScheduledJobStore(), []);

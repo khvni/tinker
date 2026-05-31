@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { Badge, Button } from '@tinker/design';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile } from '../electron-shims-fs.js';
 import Papa, { type ParseResult } from 'papaparse';
 import { getPanelTitleForPath } from './file-utils.js';
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
-import { readFile } from '@tauri-apps/plugin-fs';
+import { readFile } from '../electron-shims-fs.js';
 import { getImageMimeType, getPanelTitleForPath } from './file-utils.js';
 
 export type ImageRendererProps = {
