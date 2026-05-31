@@ -31,6 +31,7 @@ import {
   EXA_MCP_NAME,
   type MCPStatus,
 } from './integrations.js';
+import { createHostClient } from '@tinker/host-client';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
 import { isDesktopRuntime } from './runtime.js';
 import {
@@ -105,6 +106,9 @@ const WEB_PREVIEW_CONNECTION: OpencodeConnection = {
   username: 'preview',
   password: 'preview',
 };
+
+const HOST_SERVICE_DEFAULT_PORT = 51724;
+const DEFAULT_HOST_SECRET = 'tinker-dev';
 
 const providerDisplayName = (provider: AuthProvider): string => {
   switch (provider) {
@@ -1269,6 +1273,15 @@ export const App = (): JSX.Element => {
     await engine.runNow(jobId);
   };
 
+  const hostClient = useMemo(
+    () =>
+      createHostClient({
+        baseUrl: `http://127.0.0.1:${HOST_SERVICE_DEFAULT_PORT}`,
+        secret: DEFAULT_HOST_SECRET,
+      }),
+    [],
+  );
+
   return (
     <div className="tinker-app">
       <Workspace
@@ -1297,6 +1310,7 @@ export const App = (): JSX.Element => {
         microsoftAuthBusy={providerBusy.microsoft}
         microsoftAuthMessage={providerMessages.microsoft}
         opencode={defaultConnection(state)}
+        hostClient={hostClient}
         sessions={currentSessions}
         mcpStatus={state.mcpStatus}
         vaultPath={state.vaultPath}

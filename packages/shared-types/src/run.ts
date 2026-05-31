@@ -1,69 +1,106 @@
-export const RUN_STATUSES = [
-  'queued',
-  'running',
-  'waiting_for_approval',
-  'completed',
-  'failed',
-  'aborted',
-] as const;
+/**
+ * Goose run types — the normalized surface between host-service and the
+ * renderer. Chat and Runs panes consume these; the host-service produces
+ * them by translating from whatever agent backend is active (OpenCode today,
+ * Goose tomorrow). Renderer code never imports `@opencode-ai/sdk` directly.
+ */
 
+export const RUN_STATUSES = ['active', 'completed', 'failed', 'aborted', 'waiting-for-approval'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
-export type RunEventText = {
-  type: 'text';
-  runId: string;
-  content: string;
-  stream: 'stdout' | 'stderr';
-  timestamp: string;
+/**
+ * Normalized run event union. Every field that the Chat UI needs to render
+ * streaming output, tool disclosures, approval gates, and subagent activity
+ * is expressed here. Host-service translates backend-specific events into
+ * this shape before streaming them to the renderer via SSE.
+ *
+ * Field naming matches existing Tinker conventions: `partID`, `providerID`,
+ * `modelID` (capital D) for consistency with `TinkerStreamEvent` and `Block`.
+ */
+export type RunEvent =
+  | { type: 'token'; partID: string; text: string }
+  | { type: 'reasoning'; partID: string; text: string }
+  | { type: 'tool_call'; partID: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; partID: string; name: string; output: string }
+  | { type: 'tool_error'; partID: string; name: string; message: string }
+  | {
+      type: 'approval_request';
+      partID: string;
+      tool: string;
+      input: Record<string, unknown>;
+      description: string;
+    }
+  | {
+      type: 'subagent';
+      partID: string;
+      agent: string;
+      description: string;
+      prompt: string;
+      providerID: string | null;
+      modelID: string | null;
+    }
+  | { type: 'agent_invoked'; partID: string; name: string }
+  | {
+      type: 'delegate';
+      partID: string;
+      agent: string;
+      protocol: string;
+      description: string;
+    }
+  | {
+      type: 'context_usage';
+      providerID: string | null;
+      modelID: string | null;
+      tokens: RunContextTokens;
+    }
+  | { type: 'artifact'; path: string }
+  | { type: 'error'; message: string }
+  | { type: 'status_changed'; status: RunStatus }
+  | { type: 'done' };
+
+export type RunContextTokens = {
+  total?: number | undefined;
+  input: number;
+  output: number;
+  reasoning: number;
 };
 
-export type RunEventStatus = {
-  type: 'status';
-  runId: string;
+/** Persisted run record returned by `GET /runs.list` and `GET /runs.get`. */
+export type Run = {
+  id: string;
+  title: string;
   status: RunStatus;
-  timestamp: string;
-};
-
-export type RunEventError = {
-  type: 'error';
-  runId: string;
-  message: string;
-  recoverable: boolean;
-  timestamp: string;
-};
-
-export type RunEvent = RunEventText | RunEventStatus | RunEventError;
-
-export type RunConfig = {
-  cwd: string;
-  prompt: string;
-  mode: string | null;
-};
-
-export type RunSummary = {
-  runId: string;
-  status: RunStatus;
-  config: RunConfig;
+  projectPath: string | null;
   createdAt: string;
-  finishedAt: string | null;
-  eventCount: number;
+  updatedAt: string;
+  modelID: string | null;
+  providerID: string | null;
 };
 
-export type StartRunRequest = {
-  cwd: string;
-  prompt: string;
-  mode?: string;
+export type CreateRunRequest = {
+  title?: string | undefined;
+  projectPath?: string | null | undefined;
+  modelID?: string | undefined;
+  providerID?: string | undefined;
 };
 
-export type StartRunResponse = {
+export type PromptRunRequest = {
   runId: string;
+  text: string;
+  agent?: string | undefined;
+  variant?: string | undefined;
+  model?: {
+    providerID: string;
+    modelID: string;
+  } | undefined;
 };
 
 export type AbortRunRequest = {
   runId: string;
 };
 
-export type AbortRunResponse = {
+export type ApprovalResponse = {
   runId: string;
-  aborted: boolean;
+  partID: string;
+  approved: boolean;
 };

@@ -66,6 +66,12 @@ importers:
       '@tinker/design':
         specifier: workspace:*
         version: link:../../packages/design
+      '@tinker/host-client':
+        specifier: workspace:*
+        version: link:../../packages/host-client
+      '@tinker/host-service':
+        specifier: workspace:*
+        version: link:../../packages/host-service
       '@tinker/memory':
         specifier: workspace:*
         version: link:../../packages/memory

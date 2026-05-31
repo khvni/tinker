@@ -8,6 +8,7 @@ export {
   type RunEventLog,
 } from './goose/index.js';
 export { loadHostIdentity, type HostIdentity, type LoadHostIdentityOptions } from './identity.js';
+export { createRunManager, type RunEventListener, type RunManager, type StoredRunEvent } from './runs.js';
 export { HOST_SERVICE_VERSION } from './version.js';
 export {
   discoverAcpConnectors,

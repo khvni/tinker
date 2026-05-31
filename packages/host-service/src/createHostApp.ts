@@ -1,16 +1,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { platform as nodePlatform } from 'node:os';
-import type {
-  AbortRunRequest,
-  AbortRunResponse,
-  RunEvent,
-  RunSummary,
-  StartRunRequest,
-  StartRunResponse,
-} from '@tinker/shared-types';
+import type { AbortRunRequest, ApprovalResponse, CreateRunRequest, PromptRunRequest, RunEvent } from '@tinker/shared-types';
 import { extractBearerToken } from './auth.js';
-import { createGooseRuntimeAdapter, createRunEventLog, type CreateAdapterOptions, type GooseRuntimeAdapter } from './goose/index.js';
 import { loadHostIdentity, type LoadHostIdentityOptions } from './identity.js';
+import { createRunManager } from './runs.js';
 import type {
   HealthCheckResponse,
   HostAppHandle,
@@ -28,6 +21,11 @@ export type CreateHostAppArgs = {
 };
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' } as const;
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  Connection: 'keep-alive',
+} as const;
 
 const writeJson = (res: ServerResponse, status: number, body: unknown, extraHeaders: Record<string, string> = {}): void => {
   res.writeHead(status, { ...JSON_HEADERS, ...extraHeaders });
@@ -36,6 +34,35 @@ const writeJson = (res: ServerResponse, status: number, body: unknown, extraHead
 
 const writeError = (res: ServerResponse, status: number, message: string): void => {
   writeJson(res, status, { error: message });
+};
+
+const readJsonBody = (req: IncomingMessage): Promise<unknown> => {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const text = Buffer.concat(chunks).toString('utf-8');
+        resolve(text.length > 0 ? JSON.parse(text) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const matchPathPrefix = (req: IncomingMessage, method: string, prefix: string): string | null => {
+  if (req.method !== method) return null;
+  const url = req.url ?? '';
+  const queryStart = url.indexOf('?');
+  const pathOnly = queryStart === -1 ? url : url.slice(0, queryStart);
+  if (!pathOnly.startsWith(prefix)) return null;
+  return pathOnly.slice(prefix.length);
 };
 
 const corsHeaders = (origin: string | undefined, allowed: readonly string[]): Record<string, string> => {
@@ -63,46 +90,6 @@ const matchPath = (req: IncomingMessage, method: string, path: string): boolean 
   return pathOnly === path;
 };
 
-const readQueryParam = (req: IncomingMessage, key: string): string | null => {
-  const url = req.url ?? '';
-  const queryStart = url.indexOf('?');
-  if (queryStart === -1) return null;
-  const params = new URLSearchParams(url.slice(queryStart + 1));
-  return params.get(key);
-};
-
-const readJsonBody = (req: IncomingMessage): Promise<unknown> => {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (raw.length === 0) {
-        resolve(null);
-        return;
-      }
-      try {
-        resolve(JSON.parse(raw));
-      } catch {
-        reject(new Error('Invalid JSON body.'));
-      }
-    });
-    req.on('error', reject);
-  });
-};
-
-const isStartRunRequest = (value: unknown): value is StartRunRequest => {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return typeof v['cwd'] === 'string' && typeof v['prompt'] === 'string';
-};
-
-const isAbortRunRequest = (value: unknown): value is AbortRunRequest => {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return typeof v['runId'] === 'string';
-};
-
 /**
  * Construct the host app. No listener is bound until `start()` is called.
  *
@@ -114,16 +101,141 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
   const { config, providers, identityOptions } = args;
   const identity = loadHostIdentity(identityOptions);
   const startedAtMs = Date.now();
+  const runManager = createRunManager();
   let server: Server | null = null;
 
-  const eventLog = createRunEventLog(config.runsDir);
-  const adapterOptions: CreateAdapterOptions = { eventLog };
-  if (config.gooseBin !== null) {
-    adapterOptions.gooseBin = config.gooseBin;
-  }
-  const goose: GooseRuntimeAdapter = createGooseRuntimeAdapter(adapterOptions);
+  const requireAuth = (req: IncomingMessage, res: ServerResponse, cors: Record<string, string>): boolean => {
+    const token = extractBearerToken(req.headers.authorization);
+    if (!providers.hostAuth.validate(token)) {
+      writeError(res, 401, 'Invalid or missing PSK.');
+      return false;
+    }
+    // suppress unused variable warning — cors is threaded through for future use
+    void cors;
+    return true;
+  };
 
-  const handleRequest = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+  const handleRunRoutes = (req: IncomingMessage, res: ServerResponse, cors: Record<string, string>): boolean => {
+    if (matchPath(req, 'POST', '/runs.create')) {
+      if (!requireAuth(req, res, cors)) return true;
+      void readJsonBody(req).then((body) => {
+        const parsed = isRecord(body) ? body : {};
+        const run = runManager.create({
+          title: typeof parsed['title'] === 'string' ? parsed['title'] : undefined,
+          projectPath: typeof parsed['projectPath'] === 'string' ? parsed['projectPath'] : null,
+          modelID: typeof parsed['modelID'] === 'string' ? parsed['modelID'] : undefined,
+          providerID: typeof parsed['providerID'] === 'string' ? parsed['providerID'] : undefined,
+        } satisfies CreateRunRequest);
+        writeJson(res, 201, run, cors);
+      }).catch(() => writeError(res, 400, 'Invalid JSON body.'));
+      return true;
+    }
+
+    if (matchPath(req, 'GET', '/runs.list')) {
+      if (!requireAuth(req, res, cors)) return true;
+      writeJson(res, 200, runManager.list(), cors);
+      return true;
+    }
+
+    const getRunId = matchPathPrefix(req, 'GET', '/runs.get/');
+    if (getRunId !== null) {
+      if (!requireAuth(req, res, cors)) return true;
+      const run = runManager.get(getRunId);
+      if (!run) {
+        writeError(res, 404, `Run not found: ${getRunId}`);
+        return true;
+      }
+      writeJson(res, 200, run, cors);
+      return true;
+    }
+
+    if (matchPath(req, 'POST', '/runs.prompt')) {
+      if (!requireAuth(req, res, cors)) return true;
+      void readJsonBody(req).then((body) => {
+        if (!isRecord(body) || typeof body['runId'] !== 'string' || typeof body['text'] !== 'string') {
+          writeError(res, 400, 'Missing runId or text.');
+          return;
+        }
+        const request: PromptRunRequest = {
+          runId: body['runId'],
+          text: body['text'],
+          agent: typeof body['agent'] === 'string' ? body['agent'] : undefined,
+          variant: typeof body['variant'] === 'string' ? body['variant'] : undefined,
+        };
+        if (isRecord(body['model'])) {
+          const model = body['model'];
+          if (typeof model['providerID'] === 'string' && typeof model['modelID'] === 'string') {
+            request.model = { providerID: model['providerID'], modelID: model['modelID'] };
+          }
+        }
+        runManager.prompt(request);
+        writeJson(res, 200, { ok: true }, cors);
+      }).catch(() => writeError(res, 400, 'Invalid JSON body.'));
+      return true;
+    }
+
+    if (matchPath(req, 'POST', '/runs.abort')) {
+      if (!requireAuth(req, res, cors)) return true;
+      void readJsonBody(req).then((body) => {
+        if (!isRecord(body) || typeof body['runId'] !== 'string') {
+          writeError(res, 400, 'Missing runId.');
+          return;
+        }
+        runManager.abort({ runId: body['runId'] } satisfies AbortRunRequest);
+        writeJson(res, 200, { ok: true }, cors);
+      }).catch(() => writeError(res, 400, 'Invalid JSON body.'));
+      return true;
+    }
+
+    if (matchPath(req, 'POST', '/runs.approve')) {
+      if (!requireAuth(req, res, cors)) return true;
+      void readJsonBody(req).then((body) => {
+        if (!isRecord(body) || typeof body['runId'] !== 'string' || typeof body['partID'] !== 'string' || typeof body['approved'] !== 'boolean') {
+          writeError(res, 400, 'Missing runId, partID, or approved.');
+          return;
+        }
+        runManager.respondToApproval({
+          runId: body['runId'],
+          partID: body['partID'],
+          approved: body['approved'],
+        } satisfies ApprovalResponse);
+        writeJson(res, 200, { ok: true }, cors);
+      }).catch(() => writeError(res, 400, 'Invalid JSON body.'));
+      return true;
+    }
+
+    const eventsRunId = matchPathPrefix(req, 'GET', '/runs.events/');
+    if (eventsRunId !== null) {
+      if (!requireAuth(req, res, cors)) return true;
+      const run = runManager.get(eventsRunId);
+      if (!run) {
+        writeError(res, 404, `Run not found: ${eventsRunId}`);
+        return true;
+      }
+      res.writeHead(200, { ...SSE_HEADERS, ...cors });
+
+      const sendEvent = (event: RunEvent): void => {
+        if (res.destroyed) return;
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      };
+
+      const unsubscribe = runManager.subscribe(eventsRunId, sendEvent);
+      req.on('close', unsubscribe);
+      return true;
+    }
+
+    const replayRunId = matchPathPrefix(req, 'GET', '/runs.replay/');
+    if (replayRunId !== null) {
+      if (!requireAuth(req, res, cors)) return true;
+      const log = runManager.getEventLog(replayRunId);
+      writeJson(res, 200, log, cors);
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleRequest = (req: IncomingMessage, res: ServerResponse): void => {
     const cors = corsHeaders(req.headers.origin, config.allowedOrigins);
 
     if (req.method === 'OPTIONS') {
@@ -143,11 +255,7 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
     }
 
     if (matchPath(req, 'GET', '/host.info')) {
-      const token = extractBearerToken(req.headers.authorization);
-      if (!providers.hostAuth.validate(token)) {
-        writeError(res, 401, 'Invalid or missing PSK.');
-        return;
-      }
+      if (!requireAuth(req, res, cors)) return;
 
       const body: HostInfoResponse = {
         hostId: identity.hostId,
@@ -161,145 +269,7 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
       return;
     }
 
-    // --- Run endpoints (all PSK-authenticated) ---
-
-    if (matchPath(req, 'POST', '/run.start')) {
-      const token = extractBearerToken(req.headers.authorization);
-      if (!providers.hostAuth.validate(token)) {
-        writeError(res, 401, 'Invalid or missing PSK.');
-        return;
-      }
-
-      let body: unknown;
-      try {
-        body = await readJsonBody(req);
-      } catch {
-        writeError(res, 400, 'Invalid JSON body.');
-        return;
-      }
-
-      if (!isStartRunRequest(body)) {
-        writeError(res, 400, 'Missing required fields: cwd, prompt.');
-        return;
-      }
-
-      const runId = goose.startRun({
-        cwd: body.cwd,
-        prompt: body.prompt,
-        mode: body.mode ?? null,
-      });
-
-      const response: StartRunResponse = { runId };
-      writeJson(res, 200, response, cors);
-      return;
-    }
-
-    if (matchPath(req, 'POST', '/run.abort')) {
-      const token = extractBearerToken(req.headers.authorization);
-      if (!providers.hostAuth.validate(token)) {
-        writeError(res, 401, 'Invalid or missing PSK.');
-        return;
-      }
-
-      let body: unknown;
-      try {
-        body = await readJsonBody(req);
-      } catch {
-        writeError(res, 400, 'Invalid JSON body.');
-        return;
-      }
-
-      if (!isAbortRunRequest(body)) {
-        writeError(res, 400, 'Missing required field: runId.');
-        return;
-      }
-
-      const aborted = goose.abortRun(body.runId);
-      const response: AbortRunResponse = { runId: body.runId, aborted };
-      writeJson(res, 200, response, cors);
-      return;
-    }
-
-    if (matchPath(req, 'GET', '/run.replay')) {
-      const token = extractBearerToken(req.headers.authorization);
-      if (!providers.hostAuth.validate(token)) {
-        writeError(res, 401, 'Invalid or missing PSK.');
-        return;
-      }
-
-      const runId = readQueryParam(req, 'runId');
-      if (typeof runId !== 'string' || runId.length === 0) {
-        writeError(res, 400, 'Missing required query parameter: runId.');
-        return;
-      }
-
-      const events: RunEvent[] = eventLog.replay(runId);
-      writeJson(res, 200, { runId, events }, cors);
-      return;
-    }
-
-    if (matchPath(req, 'GET', '/run.list')) {
-      const token = extractBearerToken(req.headers.authorization);
-      if (!providers.hostAuth.validate(token)) {
-        writeError(res, 401, 'Invalid or missing PSK.');
-        return;
-      }
-
-      const summaries: RunSummary[] = eventLog.list();
-      writeJson(res, 200, { runs: summaries }, cors);
-      return;
-    }
-
-    if (matchPath(req, 'GET', '/run.events')) {
-      const token = extractBearerToken(req.headers.authorization);
-      if (!providers.hostAuth.validate(token)) {
-        writeError(res, 401, 'Invalid or missing PSK.');
-        return;
-      }
-
-      const runId = readQueryParam(req, 'runId');
-      if (typeof runId !== 'string' || runId.length === 0) {
-        writeError(res, 400, 'Missing required query parameter: runId.');
-        return;
-      }
-
-      res.writeHead(200, {
-        ...cors,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      });
-
-      // Replay existing events first
-      const existing = eventLog.replay(runId);
-      for (const event of existing) {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
-      }
-
-      // Subscribe to new events
-      const unsubscribe = goose.subscribe((event: RunEvent) => {
-        if (event.runId !== runId) return;
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
-
-        if (event.type === 'status' && (event.status === 'completed' || event.status === 'failed' || event.status === 'aborted')) {
-          res.end();
-          unsubscribe();
-        }
-      });
-
-      // If the run is already terminal, close immediately
-      const summary = eventLog.summary(runId);
-      if (summary !== null && (summary.status === 'completed' || summary.status === 'failed' || summary.status === 'aborted')) {
-        res.end();
-        unsubscribe();
-        return;
-      }
-
-      req.on('close', () => {
-        unsubscribe();
-      });
-      return;
-    }
+    if (handleRunRoutes(req, res, cors)) return;
 
     writeError(res, 404, `Unknown route: ${req.method ?? 'UNKNOWN'} ${req.url ?? ''}`);
   };
@@ -309,14 +279,7 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
       throw new Error('Host app already started.');
     }
 
-    const next = createServer((req, res) => {
-      handleRequest(req, res).catch((err) => {
-        const message = err instanceof Error ? err.message : 'Internal server error.';
-        if (!res.headersSent) {
-          writeError(res, 500, message);
-        }
-      });
-    });
+    const next = createServer(handleRequest);
     next.on('clientError', (_err, socket) => {
       if (socket.writable) {
         socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
@@ -347,8 +310,6 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
   };
 
   const stop = async (): Promise<void> => {
-    goose.shutdown();
-
     const current = server;
     if (current === null) {
       return;

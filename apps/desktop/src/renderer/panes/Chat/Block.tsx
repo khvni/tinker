@@ -1,6 +1,5 @@
-import type { JSX } from 'react';
-import type { Part } from '@opencode-ai/sdk/v2/client';
-import { Disclosure } from '@tinker/design';
+import { type JSX, useCallback } from 'react';
+import { Button, Disclosure } from '@tinker/design';
 
 export type Block =
   | { kind: 'text'; partID: string; text: string }
@@ -11,58 +10,29 @@ export type Block =
       name: string;
       input: Record<string, unknown>;
       state: 'pending' | 'completed' | 'error';
-      output?: string;
-      error?: string;
+      output?: string | undefined;
+      error?: string | undefined;
     }
   | {
-      kind: 'delegated_agent';
+      kind: 'approval';
+      partID: string;
+      tool: string;
+      input: Record<string, unknown>;
+      description: string;
+    }
+  | {
+      kind: 'delegate';
       partID: string;
       agent: string;
-      title: string;
-      status: 'pending' | 'running' | 'completed' | 'errored';
-      content: ReadonlyArray<{ readonly type: string; readonly text: string }>;
+      protocol: string;
+      description: string;
+    }
+  | {
+      kind: 'subagent';
+      partID: string;
+      agent: string;
+      description: string;
     };
-
-export const partToBlock = (part: Part): Block | null => {
-  if (part.type === 'text') {
-    return { kind: 'text', partID: part.id, text: part.text };
-  }
-  if (part.type === 'reasoning') {
-    return { kind: 'reasoning', partID: part.id, text: part.text };
-  }
-  if (part.type !== 'tool') {
-    return null;
-  }
-  switch (part.state.status) {
-    case 'pending':
-    case 'running':
-      return {
-        kind: 'tool',
-        partID: part.id,
-        name: part.tool,
-        input: part.state.input,
-        state: 'pending',
-      };
-    case 'completed':
-      return {
-        kind: 'tool',
-        partID: part.id,
-        name: part.tool,
-        input: part.state.input,
-        state: 'completed',
-        output: part.state.output,
-      };
-    case 'error':
-      return {
-        kind: 'tool',
-        partID: part.id,
-        name: part.tool,
-        input: part.state.input,
-        state: 'error',
-        error: part.state.error,
-      };
-  }
-};
 
 export const messageTextFromBlocks = (blocks: readonly Block[]): string => {
   let out = '';
@@ -86,44 +56,57 @@ type MessageBlockProps = {
   block: Block;
   isOpen: boolean;
   onToggle: (next: boolean) => void;
+  onApprove?: (partID: string, approved: boolean) => void;
 };
 
-export const MessageBlock = ({ block, isOpen, onToggle }: MessageBlockProps): JSX.Element | null => {
+export const MessageBlock = ({ block, isOpen, onToggle, onApprove }: MessageBlockProps): JSX.Element | null => {
+  const handleApprove = useCallback(() => onApprove?.(block.partID, true), [block.partID, onApprove]);
+  const handleDeny = useCallback(() => onApprove?.(block.partID, false), [block.partID, onApprove]);
+
   if (block.kind === 'text') {
     return <p className="tinker-message-text">{block.text}</p>;
   }
 
   if (block.kind === 'reasoning') {
     return (
-      <Disclosure summary="Thinking…" tone="reasoning" open={isOpen} onOpenChange={onToggle}>
+      <Disclosure summary="Thinking\u2026" tone="reasoning" open={isOpen} onOpenChange={onToggle}>
         <p className="tinker-message-text">{block.text}</p>
       </Disclosure>
     );
   }
 
-  if (block.kind === 'delegated_agent') {
-    const statusLabel =
-      block.status === 'pending'
-        ? 'delegating to'
-        : block.status === 'running'
-          ? 'running on'
-          : block.status === 'errored'
-            ? 'failed on'
-            : 'completed by';
-    const summary = `${statusLabel} ${block.agent}: ${block.title}`;
-    const bodyText = block.content.map((c) => c.text).join('\n');
+  if (block.kind === 'approval') {
     return (
-      <Disclosure summary={summary} tone="delegation" open={isOpen} onOpenChange={onToggle}>
-        {bodyText.length > 0 ? (
-          <pre className="tinker-tool-pre">{bodyText}</pre>
-        ) : (
-          <p className="tinker-message-text tinker-muted">Waiting for response…</p>
-        )}
+      <Disclosure summary={`Approval: ${block.tool}`} tone="tool" open={isOpen} onOpenChange={onToggle}>
+        <p className="tinker-message-text">{block.description}</p>
+        <pre className="tinker-tool-pre">{formatToolInput(block.input)}</pre>
+        {onApprove ? (
+          <div className="tinker-approval-actions">
+            <Button variant="primary" size="s" onClick={handleApprove}>Approve</Button>
+            <Button variant="ghost" size="s" onClick={handleDeny}>Deny</Button>
+          </div>
+        ) : null}
       </Disclosure>
     );
   }
 
-  const summary = block.state === 'pending' ? `running ${block.name}…` : `used ${block.name}`;
+  if (block.kind === 'delegate') {
+    return (
+      <Disclosure summary={`Delegate: ${block.agent} (${block.protocol})`} tone="tool" open={isOpen} onOpenChange={onToggle}>
+        <p className="tinker-message-text">{block.description}</p>
+      </Disclosure>
+    );
+  }
+
+  if (block.kind === 'subagent') {
+    return (
+      <Disclosure summary={`Subagent: ${block.agent}`} tone="tool" open={isOpen} onOpenChange={onToggle}>
+        <p className="tinker-message-text">{block.description}</p>
+      </Disclosure>
+    );
+  }
+
+  const summary = block.state === 'pending' ? `running ${block.name}\u2026` : `used ${block.name}`;
   return (
     <Disclosure summary={summary} tone="tool" open={isOpen} onOpenChange={onToggle}>
       <pre className="tinker-tool-pre">{formatToolInput(block.input)}</pre>
