@@ -1055,6 +1055,15 @@ export const App = (): JSX.Element => {
     await bindSessionFolder(defaultPath, true);
   }, [bindSessionFolder, nativeRuntime]);
 
+  const hostClient = useMemo(
+    () =>
+      createHostClient({
+        baseUrl: `http://127.0.0.1:${HOST_SERVICE_DEFAULT_PORT}`,
+        secret: DEFAULT_HOST_SECRET,
+      }),
+    [],
+  );
+
   if (state.status === 'loading' || currentUserState.status === 'loading') {
     return (
       <div className="tinker-app">
@@ -1272,15 +1281,6 @@ export const App = (): JSX.Element => {
 
     await engine.runNow(jobId);
   };
-
-  const hostClient = useMemo(
-    () =>
-      createHostClient({
-        baseUrl: `http://127.0.0.1:${HOST_SERVICE_DEFAULT_PORT}`,
-        secret: DEFAULT_HOST_SECRET,
-      }),
-    [],
-  );
 
   return (
     <div className="tinker-app">
