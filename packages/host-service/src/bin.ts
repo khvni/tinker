@@ -51,9 +51,11 @@ const config: HostConfig = {
   dbPath: `${paths.db}/tinker.sqlite`,
   vaultRoot: vaultRoot === '' ? null : vaultRoot,
   migrationsPath: `${paths.db}/migrations`,
+  runsDir: `${paths.host}/runs`,
   allowedOrigins: [],
   listenHost: host,
   listenPort: port,
+  gooseBin: null,
 };
 
 const providers: HostProviders = {
