@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { type ChildProcess, fork } from 'node:child_process';
+import { fork } from 'node:child_process';
 import { resolve } from 'node:path';
 import {
   resolveDataPaths,
@@ -104,7 +104,7 @@ export const spawnHost = (options: SpawnHostOptions = {}): Promise<HostHandle> =
   const host = options.host ?? '127.0.0.1';
 
   return new Promise<HostHandle>((resolvePromise, reject) => {
-    const child: ChildProcess = fork(BIN_PATH, [], {
+    const child = fork(BIN_PATH, [], {
       execArgv: ['--import', 'tsx'],
       env: {
         ...process.env,
@@ -119,12 +119,14 @@ export const spawnHost = (options: SpawnHostOptions = {}): Promise<HostHandle> =
 
     let settled = false;
     let stdout = '';
+    let stderr = '';
 
     const timeout = setTimeout(() => {
       if (!settled) {
         settled = true;
         child.kill();
-        reject(new Error('Host boot timed out after 30s.'));
+        const detail = stderr.trim() ? ` stderr: ${stderr.trim()}` : '';
+        reject(new Error(`Host boot timed out after 30s.${detail}`));
       }
     }, 30_000);
 
@@ -152,6 +154,7 @@ export const spawnHost = (options: SpawnHostOptions = {}): Promise<HostHandle> =
 
       child.unref();
 
+      const spawnedPid = bootInfo.pid;
       resolvePromise({
         connection: {
           baseUrl: `http://${host}:${bootInfo.port}`,
@@ -159,24 +162,21 @@ export const spawnHost = (options: SpawnHostOptions = {}): Promise<HostHandle> =
           hostId: bootInfo.hostId,
         },
         paths,
-        pid: bootInfo.pid,
-        stop: () => child.kill('SIGTERM'),
+        pid: spawnedPid,
+        stop: () => { try { process.kill(spawnedPid, 'SIGTERM'); } catch { /* already dead */ } },
       });
     });
 
     child.stderr?.on('data', (chunk: Buffer) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        reject(new Error(`Host stderr: ${chunk.toString('utf8').trim()}`));
-      }
+      stderr += chunk.toString('utf8');
     });
 
     child.on('exit', (code) => {
       if (!settled) {
         settled = true;
         clearTimeout(timeout);
-        reject(new Error(`Host exited before boot with code ${code ?? 'null'}.`));
+        const detail = stderr.trim() ? ` stderr: ${stderr.trim()}` : '';
+        reject(new Error(`Host exited before boot with code ${code ?? 'null'}.${detail}`));
       }
     });
 
