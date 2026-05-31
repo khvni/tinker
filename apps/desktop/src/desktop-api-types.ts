@@ -28,9 +28,30 @@ export type AuthHandle = {
 
 export type RefreshTokenProvider = 'google' | 'github' | 'microsoft';
 
+export type FileDialogOptions = {
+  readonly multiple?: boolean;
+  readonly directory?: boolean;
+  readonly title?: string;
+  readonly filters?: Array<{ name: string; extensions: string[] }>;
+};
+
+export type FileStat = {
+  readonly isFile: boolean;
+  readonly isDirectory: boolean;
+  readonly size: number;
+};
+
 export type DesktopApi = {
   dialog: {
     openFolder(): Promise<string>;
+    openFile(options?: FileDialogOptions): Promise<string | null>;
+  };
+  fs: {
+    readTextFile(path: string): Promise<string>;
+    readFile(path: string): Promise<Uint8Array>;
+    writeTextFile(path: string, contents: string): Promise<void>;
+    exists(path: string): Promise<boolean>;
+    stat(path: string): Promise<FileStat>;
   };
   shell: {
     openExternal(url: string): Promise<void>;

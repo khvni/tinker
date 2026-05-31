@@ -4,6 +4,15 @@ import type { DesktopApi } from '../src/desktop-api-types.js';
 const desktopApi: DesktopApi = {
   dialog: {
     openFolder: () => ipcRenderer.invoke('dialog:openFolder') as Promise<string>,
+    openFile: (options) => ipcRenderer.invoke('dialog:openFile', options) as Promise<string | null>,
+  },
+  fs: {
+    readTextFile: (filePath) => ipcRenderer.invoke('fs:readTextFile', filePath) as Promise<string>,
+    readFile: (filePath) => ipcRenderer.invoke('fs:readFile', filePath) as Promise<Uint8Array>,
+    writeTextFile: (filePath, contents) =>
+      ipcRenderer.invoke('fs:writeTextFile', filePath, contents) as Promise<void>,
+    exists: (filePath) => ipcRenderer.invoke('fs:exists', filePath) as Promise<boolean>,
+    stat: (filePath) => ipcRenderer.invoke('fs:stat', filePath),
   },
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<void>,

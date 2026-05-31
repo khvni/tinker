@@ -1,43 +1,39 @@
 import { getDesktopApi } from './desktop-api.js';
+import type { FileDialogOptions } from './desktop-api-types.js';
 
-const isTauri = (): boolean => getDesktopApi() === null && typeof window !== 'undefined';
+export type { FileDialogOptions };
 
 export const readTextFile = async (path: string): Promise<string> => {
-  if (!isTauri()) {
-    throw new Error('File system access requires Tauri or Electron shell.');
-  }
+  const api = getDesktopApi();
+  if (api) return api.fs.readTextFile(path);
   const mod = await import('@tauri-apps/plugin-fs');
   return mod.readTextFile(path);
 };
 
 export const readFile = async (path: string): Promise<Uint8Array> => {
-  if (!isTauri()) {
-    throw new Error('File system access requires Tauri or Electron shell.');
-  }
+  const api = getDesktopApi();
+  if (api) return api.fs.readFile(path);
   const mod = await import('@tauri-apps/plugin-fs');
   return mod.readFile(path);
 };
 
 export const writeTextFile = async (path: string, contents: string): Promise<void> => {
-  if (!isTauri()) {
-    throw new Error('File system write requires Tauri or Electron shell.');
-  }
+  const api = getDesktopApi();
+  if (api) return api.fs.writeTextFile(path, contents);
   const mod = await import('@tauri-apps/plugin-fs');
   return mod.writeTextFile(path, contents);
 };
 
 export const exists = async (path: string): Promise<boolean> => {
-  if (!isTauri()) {
-    throw new Error('File system access requires Tauri or Electron shell.');
-  }
+  const api = getDesktopApi();
+  if (api) return api.fs.exists(path);
   const mod = await import('@tauri-apps/plugin-fs');
   return mod.exists(path);
 };
 
 export const stat = async (path: string): Promise<{ isFile: boolean; isDirectory: boolean; size: number }> => {
-  if (!isTauri()) {
-    throw new Error('File system access requires Tauri or Electron shell.');
-  }
+  const api = getDesktopApi();
+  if (api) return api.fs.stat(path);
   const mod = await import('@tauri-apps/plugin-fs');
   const s = await mod.stat(path);
   return { isFile: s.isFile, isDirectory: s.isDirectory, size: s.size };
@@ -50,18 +46,14 @@ export const openExternalUrl = async (url: string): Promise<void> => {
   return mod.open(url);
 };
 
-type FileDialogOptions = {
-  multiple?: boolean;
-  directory?: boolean;
-  title?: string;
-  filters?: Array<{ name: string; extensions: string[] }>;
-};
-
 export const openFileDialog = async (options?: FileDialogOptions): Promise<string | null> => {
   const api = getDesktopApi();
   if (api) {
-    const result = await api.dialog.openFolder();
-    return result.length > 0 ? result : null;
+    if (options?.directory) {
+      const result = await api.dialog.openFolder();
+      return result.length > 0 ? result : null;
+    }
+    return api.dialog.openFile(options);
   }
   const mod = await import('@tauri-apps/plugin-dialog');
   const result = await mod.open(options ?? { directory: false, multiple: false });

@@ -9,7 +9,7 @@ import {
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import type { ProjectMode, ProjectState, RecentProject } from '../src/desktop-api-types.js';
+import type { FileDialogOptions, ProjectMode, ProjectState, RecentProject } from '../src/desktop-api-types.js';
 
 const isDev = !app.isPackaged;
 const devUrl = process.env.TINKER_DEV_URL ?? 'http://localhost:1420/';
@@ -57,6 +57,48 @@ const registerIpcHandlers = (): void => {
     return result.canceled || result.filePaths.length === 0 ? '' : result.filePaths[0]!;
   });
 
+  ipcMain.handle('dialog:openFile', async (_event, options?: FileDialogOptions) => {
+    const properties: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'createDirectory'> =
+      options?.directory ? ['openDirectory', 'createDirectory'] : ['openFile'];
+    if (options?.multiple) properties.push('multiSelections');
+    const dialogFilters = options?.filters?.map((f) => ({ name: f.name, extensions: f.extensions }));
+    const result = await dialog.showOpenDialog({
+      title: options?.title,
+      properties,
+      filters: dialogFilters,
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0] ?? null;
+  });
+
+  // --- File system ---
+  ipcMain.handle('fs:readTextFile', async (_event, filePath: string) => {
+    return fs.promises.readFile(filePath, 'utf-8');
+  });
+
+  ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
+    const buf = await fs.promises.readFile(filePath);
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+  });
+
+  ipcMain.handle('fs:writeTextFile', async (_event, filePath: string, contents: string) => {
+    await fs.promises.writeFile(filePath, contents, 'utf-8');
+  });
+
+  ipcMain.handle('fs:exists', async (_event, filePath: string) => {
+    try {
+      await fs.promises.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  ipcMain.handle('fs:stat', async (_event, filePath: string) => {
+    const s = await fs.promises.stat(filePath);
+    return { isFile: s.isFile(), isDirectory: s.isDirectory(), size: s.size };
+  });
+
   ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     await shell.openExternal(url);
   });
@@ -85,7 +127,10 @@ const registerIpcHandlers = (): void => {
   );
 
   // --- Keychain ---
-  // Uses safeStorage for encryption. Tokens stored as encrypted files in userData.
+  // Uses safeStorage to encrypt/decrypt secrets. Encrypted blobs stored in userData/keychain/.
+  // TODO: Migrate to @electron/keytar for true OS keychain (macOS Keychain, Windows Credential
+  // Vault, Linux libsecret) once the native build pipeline supports it. safeStorage still uses
+  // OS-level encryption (DPAPI on Windows, Keychain Services on macOS for the master key).
   const keychainDir = (): string => {
     const dir = path.join(app.getPath('userData'), 'keychain');
     fs.mkdirSync(dir, { recursive: true });
