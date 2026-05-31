@@ -34,6 +34,10 @@ const getBlockSignature = (block: Block): string => {
     return `${block.partID}:${block.kind}:${block.text}`;
   }
 
+  if (block.kind === 'delegated_agent') {
+    return `${block.partID}:${block.kind}:${block.status}:${block.agent}:${block.content.length}:${block.content.at(-1)?.text ?? ''}`;
+  }
+
   return `${block.partID}:${block.kind}:${block.state}:${block.output ?? ''}:${block.error ?? ''}`;
 };
 

@@ -1,4 +1,5 @@
 export * from './chat-history.js';
+export * from './goose-client.js';
 export * from './memory-extractor.js';
 export * from './memory-injector.js';
 export * from './orchestrator.js';

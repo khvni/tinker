@@ -76,3 +76,16 @@
   color: var(--color-text-secondary);
   font-style: italic;
 }
+
+.tk-disclosure--delegation {
+  border-color: var(--color-border-default);
+  border-left: 3px solid var(--color-accent-secondary, var(--color-border-default));
+}
+
+.tk-disclosure--delegation .tk-disclosure__summary {
+  font-weight: var(--font-weight-semibold);
+}
+
+.tk-disclosure--delegation .tk-disclosure__body {
+  background: var(--color-bg-surface, var(--color-bg-elevated));
+}

@@ -58,6 +58,15 @@ export const draftReducer = (state: Block[], action: DraftAction): Block[] => {
         : null,
     );
   }
+  if (e.type === 'delegated_agent') {
+    return upsertBlock(state, e.id, (prev) =>
+      !prev
+        ? { kind: 'delegated_agent', partID: e.id, agent: e.agent, title: e.title, status: e.status, content: e.content }
+        : prev.kind === 'delegated_agent'
+          ? { ...prev, status: e.status, title: e.title, content: e.content }
+          : null,
+    );
+  }
 
   return state;
 };

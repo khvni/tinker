@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { cx } from '../cx.js';
 import './Disclosure.css';
 
-export type DisclosureTone = 'tool' | 'reasoning';
+export type DisclosureTone = 'tool' | 'reasoning' | 'delegation';
 
 export type DisclosureProps = {
   summary: string;

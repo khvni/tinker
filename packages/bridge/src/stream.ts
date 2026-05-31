@@ -37,6 +37,14 @@ export type TinkerStreamEvent =
       tokens: ContextUsageTokens;
     }
   | { type: 'file_written'; path: string }
+  | {
+      type: 'delegated_agent';
+      id: string;
+      agent: string;
+      title: string;
+      status: 'pending' | 'running' | 'completed' | 'errored';
+      content: ReadonlyArray<{ readonly type: string; readonly text: string }>;
+    }
   | { type: 'done' }
   | { type: 'error'; message: string };
 

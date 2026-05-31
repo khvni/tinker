@@ -1049,6 +1049,7 @@ export const Chat = ({
             || event.type === 'tool_call'
             || event.type === 'tool_result'
             || event.type === 'tool_error'
+            || event.type === 'delegated_agent'
           ) {
             dispatchDraft({ type: 'event', event });
           } else if (event.type === 'context_usage') {

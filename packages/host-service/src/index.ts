@@ -9,6 +9,14 @@ export {
 } from './goose/index.js';
 export { loadHostIdentity, type HostIdentity, type LoadHostIdentityOptions } from './identity.js';
 export { HOST_SERVICE_VERSION } from './version.js';
+export {
+  discoverAcpConnectors,
+  type AcpConnectorId,
+  type AcpConnectorState,
+  type AcpConnectorStatus,
+  type AcpDiscoveryResult,
+  type GooseStatus,
+} from './acp-discovery.js';
 export type {
   GitCredentialProvider,
   HealthCheckResponse,
