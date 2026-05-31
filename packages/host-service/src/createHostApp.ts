@@ -285,6 +285,25 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
       return;
     }
 
+    if (matchPath(req, 'GET', '/context-sources')) {
+      const token = extractBearerToken(req.headers.authorization);
+      if (!providers.hostAuth.validate(token)) {
+        writeError(res, 401, 'Invalid or missing PSK.');
+        return;
+      }
+
+      if (!providers.contextSources) {
+        writeJson(res, 200, { sources: [] }, cors);
+        return;
+      }
+
+      void providers.contextSources.listEnabled().then(
+        (sources) => writeJson(res, 200, { sources }, cors),
+        (err) => writeJson(res, 500, { error: err instanceof Error ? err.message : 'Internal error' }, cors),
+      );
+      return;
+    }
+
     writeError(res, 404, `Unknown route: ${req.method ?? 'UNKNOWN'} ${req.url ?? ''}`);
   };
 

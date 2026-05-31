@@ -1,6 +1,7 @@
 export * from './memory.js';
 export * from './coach.js';
 export * from './layout.js';
+export * from './notes.js';
 export * from './pane.js';
 export * from './skill.js';
 export * from './scheduler.js';

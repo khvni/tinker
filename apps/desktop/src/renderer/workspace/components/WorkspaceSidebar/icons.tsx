@@ -34,6 +34,18 @@ export const MemoryIcon = (): JSX.Element => (
   </svg>
 );
 
+export const NotesIcon = (): JSX.Element => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M5 3h8a1.5 1.5 0 011.5 1.5v9A1.5 1.5 0 0113 15H5a1.5 1.5 0 01-1.5-1.5v-9A1.5 1.5 0 015 3z"
+      stroke={INK}
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+    />
+    <path d="M6.5 7h5M6.5 9.5h5M6.5 12h3" stroke={INK} strokeWidth="1.2" strokeLinecap="round" />
+  </svg>
+);
+
 export const NewTabIcon = (): JSX.Element => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <path d="M8 2v12M2 8h12" stroke={MUTED} strokeWidth="1.5" strokeLinecap="round" />

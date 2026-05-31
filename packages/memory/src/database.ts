@@ -142,6 +142,19 @@ export const DATABASE_SCHEMA = [
     last_completed_at TEXT,
     last_error TEXT
   )`,
+  `CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    context_enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+    id UNINDEXED,
+    title,
+    body
+  )`,
 ];
 
 export const ensureSessionTableColumns = async (

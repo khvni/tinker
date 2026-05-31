@@ -4,11 +4,12 @@ import {
   ConnectionsIcon,
   MemoryIcon,
   NewTabIcon,
+  NotesIcon,
   SettingsIcon,
 } from './icons.js';
 import './WorkspaceSidebar.css';
 
-export type WorkspaceRailItem = 'chat' | 'file' | 'memory' | 'settings' | 'connections';
+export type WorkspaceRailItem = 'chat' | 'file' | 'memory' | 'notes' | 'settings' | 'connections';
 
 export type WorkspaceSidebarProps = {
   readonly userInitial: string;
@@ -17,6 +18,7 @@ export type WorkspaceSidebarProps = {
   readonly activeRailItem: WorkspaceRailItem | null;
   readonly onOpenChat: () => void;
   readonly onOpenMemory: () => void;
+  readonly onOpenNotes: () => void;
   readonly onOpenSettings: () => void;
   readonly onOpenAccount: () => void;
   readonly onOpenConnections: () => void;
@@ -56,6 +58,7 @@ export const WorkspaceSidebar = ({
   activeRailItem,
   onOpenChat,
   onOpenMemory,
+  onOpenNotes,
   onOpenSettings,
   onOpenAccount,
   onOpenConnections,
@@ -84,6 +87,13 @@ export const WorkspaceSidebar = ({
           icon={<MemoryIcon />}
           isActive={activeRailItem === 'memory'}
           onClick={onOpenMemory}
+        />
+        <RailItem
+          label="Notes"
+          title="Notes"
+          icon={<NotesIcon />}
+          isActive={activeRailItem === 'notes'}
+          onClick={onOpenNotes}
         />
         <RailItem
           label="Connections"
