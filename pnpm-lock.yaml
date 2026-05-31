@@ -243,6 +243,10 @@ importers:
         version: 2.1.9(@types/node@20.19.39)(jsdom@25.0.1(canvas@2.11.2))
 
   packages/host-client:
+    dependencies:
+      '@tinker/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
     devDependencies:
       '@tinker/host-service':
         specifier: workspace:*
@@ -258,6 +262,10 @@ importers:
         version: 2.1.9(@types/node@20.19.39)(jsdom@25.0.1(canvas@2.11.2))
 
   packages/host-service:
+    dependencies:
+      '@tinker/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
     devDependencies:
       '@types/node':
         specifier: ^20.11.30

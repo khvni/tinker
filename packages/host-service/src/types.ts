@@ -14,12 +14,16 @@ export type HostConfig = {
   vaultRoot: string | null;
   /** Absolute path to the SQL migrations directory. */
   migrationsPath: string;
+  /** Absolute path to the directory where run event logs are persisted. */
+  runsDir: string;
   /** CORS allowlist for browser-style devices. Empty array disables all cross-origin access. */
   allowedOrigins: readonly string[];
   /** Bind host. `'127.0.0.1'` for co-resident, `'0.0.0.0'` for LAN host. */
   listenHost: string;
   /** Bind port. `0` lets the OS pick a free port. */
   listenPort: number;
+  /** Path to the Goose CLI binary. Defaults to `'goose'` (resolved via PATH). */
+  gooseBin: string | null;
 };
 
 /**
@@ -76,6 +80,6 @@ export type HostAppHandle = {
    * Returns the actual bound port (relevant when `listenPort: 0`).
    */
   start(): Promise<{ port: number; hostId: string }>;
-  /** Stop accepting new connections and close the listener. Idempotent. */
+  /** Stop accepting new connections, abort active runs, and close the listener. Idempotent. */
   stop(): Promise<void>;
 };
