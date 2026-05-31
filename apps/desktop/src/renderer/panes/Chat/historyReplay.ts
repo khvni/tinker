@@ -1,5 +1,4 @@
-import type { RunEvent } from '@tinker/shared-types';
-import type { StoredRunEvent } from '@tinker/host-service';
+import type { RunEvent, StoredRunEvent } from '@tinker/shared-types';
 import type { Block } from './Block.js';
 
 export type ChatMessageRecord = {

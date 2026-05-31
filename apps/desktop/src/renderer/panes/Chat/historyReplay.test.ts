@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { StoredRunEvent } from '@tinker/host-service';
-import type { RunEvent } from '@tinker/shared-types';
+import type { RunEvent, StoredRunEvent } from '@tinker/shared-types';
 import { replayRunEvents } from './historyReplay.js';
 
 const makeEntry = (event: RunEvent): StoredRunEvent => ({

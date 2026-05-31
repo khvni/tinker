@@ -33,7 +33,6 @@
     "@tinker/bridge": "workspace:*",
     "@tinker/design": "workspace:*",
     "@tinker/host-client": "workspace:*",
-    "@tinker/host-service": "workspace:*",
     "@tinker/memory": "workspace:*",
     "@tinker/scheduler": "workspace:*",
     "@tinker/shared-types": "workspace:*",

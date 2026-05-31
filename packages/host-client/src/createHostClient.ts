@@ -13,8 +13,8 @@ import type {
   PromptRunRequest,
   Run,
   RunEvent,
+  StoredRunEvent,
 } from '@tinker/shared-types';
-import type { StoredRunEvent } from '@tinker/host-service';
 
 export type HealthCheckResponse = {
   status: 'ok';

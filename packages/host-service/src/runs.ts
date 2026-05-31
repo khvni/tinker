@@ -19,16 +19,14 @@ import type {
   Run,
   RunEvent,
   RunStatus,
+  StoredRunEvent,
 } from '@tinker/shared-types';
 
 /** Callback that receives normalized run events as they arrive. */
 export type RunEventListener = (event: RunEvent) => void;
 
-/** Stored run event for replay after reload. */
-export type StoredRunEvent = {
-  ts: string;
-  event: RunEvent;
-};
+// Re-export so existing consumers of `@tinker/host-service` don't break.
+export type { StoredRunEvent } from '@tinker/shared-types';
 
 type ManagedRun = {
   run: Run;

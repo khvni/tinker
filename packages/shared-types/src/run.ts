@@ -104,3 +104,9 @@ export type ApprovalResponse = {
   partID: string;
   approved: boolean;
 };
+
+/** Stored run event for replay after reload. */
+export type StoredRunEvent = {
+  ts: string;
+  event: RunEvent;
+};
