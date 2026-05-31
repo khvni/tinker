@@ -14,7 +14,7 @@ const { mockReadTextFile, mockWriteTextFile, mockRenderMarkdown } = vi.hoisted((
   mockRenderMarkdown: vi.fn<(text: string) => Promise<string>>(),
 }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('../../../../../native-fs.js', () => ({
   readTextFile: mockReadTextFile,
   writeTextFile: mockWriteTextFile,
 }));

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { Badge, Button, SegmentedControl } from '@tinker/design';
-import { readFile } from '@tauri-apps/plugin-fs';
+import { readFile } from '../../../native-fs.js';
 import { getPanelTitleForPath, type FilePaneParams } from '../file-utils.js';
 import { getWorksheetPageCount, getWorksheetPageRows, XLSX_ROWS_PER_PAGE } from './constants.js';
 import './XlsxRenderer.css';

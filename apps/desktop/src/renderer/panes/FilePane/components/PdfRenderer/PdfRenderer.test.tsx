@@ -21,7 +21,7 @@ const pdfTestMocks = vi.hoisted(() => ({
   renderTaskCancelMock: vi.fn(),
 }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('../../../../../native-fs.js', () => ({
   readFile: pdfTestMocks.readFileMock,
 }));
 

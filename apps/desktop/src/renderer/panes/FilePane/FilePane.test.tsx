@@ -1,12 +1,12 @@
-import { open as openExternal } from '@tauri-apps/plugin-shell';
+import { openExternalUrl as openExternal } from '../../../native-fs.js';
 import { isValidElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { XLSX_MIME } from '../../renderers/file-utils.js';
 import { getRenderer, resetPaneRegistry } from '../../workspace/pane-registry.js';
 
-vi.mock('@tauri-apps/plugin-shell', () => ({
-  open: vi.fn(),
+vi.mock('../../../native-fs.js', () => ({
+  openExternalUrl: vi.fn(),
 }));
 
 import {

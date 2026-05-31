@@ -1,6 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import { Badge } from '@tinker/design';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile } from '../../native-fs.js';
 import { getCodeLanguage, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 import { highlightCode, MAX_HIGHLIGHTABLE_CODE_LENGTH } from './code-highlighter.js';
 

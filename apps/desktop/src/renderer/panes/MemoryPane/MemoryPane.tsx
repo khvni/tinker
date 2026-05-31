@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type JSX } from 'react';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile } from '../../../native-fs.js';
 import { EmptyState, Button } from '@tinker/design';
 import {
   DEMO_MEMORY_PREVIEW,

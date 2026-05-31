@@ -8,7 +8,7 @@ import {
   type JSX,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { openFileDialog as openDialog } from '../../../../native-fs.js';
 import {
   Badge,
   Button,

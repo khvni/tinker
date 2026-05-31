@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Badge, Button } from '@tinker/design';
-import { readFile } from '@tauri-apps/plugin-fs';
+import { readFile } from '../../../../../native-fs.js';
 import {
   AnnotationMode,
   GlobalWorkerOptions,

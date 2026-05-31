@@ -1,8 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { homeDir, join } from '@tauri-apps/api/path';
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
-import { open as openExternal } from '@tauri-apps/plugin-shell';
 import {
   createLayoutStore,
   createMemoryStore,
@@ -25,7 +21,25 @@ import {
   type SchedulerEngine,
 } from '@tinker/scheduler';
 import type { LayoutStore, MemoryStore, ScheduledJobStore, Session, SkillStore, SSOStatus, SSOSession, User } from '@tinker/shared-types';
-import { DEFAULT_USER_ID, GUEST_USER_ID, openFolderPicker, type AuthProvider, type AuthStatus, type OpencodeConnection, VAULT_PATH_KEY } from '../bindings.js';
+import {
+  authSignIn,
+  authSignOut,
+  DEFAULT_USER_ID,
+  getHomePath,
+  GUEST_USER_ID,
+  isNotificationPermissionGranted,
+  joinPath,
+  openExternal,
+  openFolderPicker,
+  readAuthStatus,
+  requestNotificationPermission,
+  sendDesktopNotification,
+  startOpencode,
+  stopOpencode,
+  VAULT_PATH_KEY,
+  type AuthProvider,
+  type OpencodeConnection,
+} from '../bindings.js';
 import { formatDailyMemorySweepSummary, readDailySweepState, runDailyMemorySweepNow } from './memory.js';
 import {
   BUILTIN_MCP_NAMES,
@@ -35,7 +49,7 @@ import {
   type MCPStatus,
 } from './integrations.js';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
-import { isTauriRuntime } from './runtime.js';
+import { isNativeRuntime } from './runtime.js';
 import {
   buildStoredUserId,
   toStoredUser,
@@ -173,8 +187,8 @@ const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSO
   };
 };
 
-const readAuthStatus = async (): Promise<SSOStatus> => {
-  return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
+const readAuthStatusWrapped = async (): Promise<SSOStatus> => {
+  return withDefaultSessions(await readAuthStatus());
 };
 
 const syncStoredUsers = async (sessions: SSOStatus): Promise<void> => {
@@ -326,7 +340,7 @@ const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath
 };
 
 export const App = (): JSX.Element => {
-  const nativeRuntime = useMemo(() => isTauriRuntime(), []);
+  const nativeRuntime = useMemo(() => isNativeRuntime(), []);
   const memoryStore = useMemo(() => createMemoryStore(), []);
   const layoutStore = useMemo(() => createLayoutStore(), []);
   const schedulerStore = useMemo(() => createScheduledJobStore(), []);
@@ -350,7 +364,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     if (!nativeRuntime) return;
     let cancelled = false;
-    void homeDir()
+    void getHomePath()
       .then((value) => {
         if (!cancelled) setHomeDirPath(value);
       })
@@ -397,7 +411,7 @@ export const App = (): JSX.Element => {
     async (folderPath: string, memorySubdir: string, userId: string): Promise<OpencodeConnection> => {
       requireNativeRuntime('Acquiring OpenCode connection');
       const key = bindingKey(folderPath, memorySubdir, userId);
-      const conn = await invoke<OpencodeConnection>('start_opencode', { folderPath, userId, memorySubdir });
+      const conn = await startOpencode(folderPath, userId, memorySubdir);
       refcountsRef.current[key] = (refcountsRef.current[key] ?? 0) + 1;
       setState((current) =>
         current.status !== 'ready'
@@ -426,7 +440,7 @@ export const App = (): JSX.Element => {
       const conn = state.opencodes[key];
       if (!conn) return;
 
-      await invoke('stop_opencode', { pid: conn.pid });
+      await stopOpencode(conn.pid ?? 0);
       setState((current) => {
         if (current.status !== 'ready') return current;
         const { [key]: _, ...rest } = current.opencodes;
@@ -443,7 +457,7 @@ export const App = (): JSX.Element => {
       if (!conn) return;
 
       refcountsRef.current[key] = 0;
-      await invoke('stop_opencode', { pid: conn.pid });
+      await stopOpencode(conn.pid ?? 0);
       setState((current) => {
         if (current.status !== 'ready') return current;
         const { [key]: _, ...rest } = current.opencodes;
@@ -506,11 +520,11 @@ export const App = (): JSX.Element => {
 
       try {
         for (const { key, nextKey, nextBinding } of nextBindings) {
-          const nextConn = await invoke<OpencodeConnection>('start_opencode', {
-            folderPath: nextBinding.folderPath,
-            userId: nextBinding.userId,
-            memorySubdir: nextBinding.memorySubdir,
-          });
+          const nextConn = await startOpencode(
+            nextBinding.folderPath,
+            nextBinding.userId,
+            nextBinding.memorySubdir,
+          );
           await syncConnectorState(nextConn, previousState.vaultPath, sessions);
           nextOpencodes[nextKey] = nextConn;
 
@@ -521,7 +535,7 @@ export const App = (): JSX.Element => {
       } catch (error) {
         for (const conn of Object.values(nextOpencodes)) {
           try {
-            await invoke('stop_opencode', { pid: conn.pid });
+            await stopOpencode(conn.pid ?? 0);
           } catch (stopError) {
             console.warn('Failed to stop a partially refreshed OpenCode sidecar.', stopError);
           }
@@ -532,7 +546,7 @@ export const App = (): JSX.Element => {
       await Promise.all(
         Object.values(previousState.opencodes).map(async (conn) => {
           try {
-            await invoke('stop_opencode', { pid: conn.pid });
+            await stopOpencode(conn.pid ?? 0);
           } catch (error) {
             console.warn('Failed to stop a replaced OpenCode sidecar.', error);
           }
@@ -631,7 +645,7 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const sessions = await readAuthStatus();
+        const sessions = await readAuthStatusWrapped();
         await migrateLocalUserIdentity('local-user', GUEST_USER_ID);
         await syncStoredUsers(sessions);
         await syncCurrentUserMemoryPath(sessions, { emit: false });
@@ -655,15 +669,15 @@ export const App = (): JSX.Element => {
           vaultRevision = 1;
         }
 
-        const defaultFolderPath = storedVaultPath ?? await homeDir();
+        const defaultFolderPath = storedVaultPath ?? await getHomePath();
         const defaultUserId = pickCurrentUserId(sessions);
         const defaultMemoryPath = await getActiveMemoryPath(defaultUserId);
         const defaultKey = bindingKey(defaultFolderPath, defaultMemoryPath, defaultUserId);
-        const opencode = await invoke<OpencodeConnection>('start_opencode', {
-          folderPath: defaultFolderPath,
-          userId: defaultUserId,
-          memorySubdir: defaultMemoryPath,
-        });
+        const opencode = await startOpencode(
+          defaultFolderPath,
+          defaultUserId,
+          defaultMemoryPath,
+        );
         await syncConnectorState(opencode, storedVaultPath, sessions);
         const modelConnected = await probeModelConnection(opencode, storedVaultPath);
 
@@ -835,16 +849,16 @@ export const App = (): JSX.Element => {
     }
 
     const notify = async (payload: { title: string; body: string }): Promise<void> => {
-      let granted = await isPermissionGranted();
+      let granted = await isNotificationPermissionGranted();
       if (!granted) {
-        granted = (await requestPermission()) === 'granted';
+        granted = (await requestNotificationPermission()) === 'granted';
       }
 
       if (!granted) {
         throw new Error('Notification permission denied.');
       }
 
-      sendNotification(payload);
+      await sendDesktopNotification(payload);
     };
 
     const runMemorySweep = async (): Promise<string> => {
@@ -1049,8 +1063,8 @@ export const App = (): JSX.Element => {
 
   const handleCreateDefaultVault = useCallback(async (): Promise<void> => {
     requireNativeRuntime('Creating the default vault');
-    const home = await homeDir();
-    const defaultPath = await join(home, 'Tinker', 'knowledge');
+    const home = await getHomePath();
+    const defaultPath = await joinPath(home, 'Tinker', 'knowledge');
     await bindSessionFolder(defaultPath, true);
   }, [bindSessionFolder, nativeRuntime]);
 
@@ -1196,7 +1210,7 @@ export const App = (): JSX.Element => {
 
     try {
       requireNativeRuntime(`Connecting ${providerDisplayName(provider)}`);
-      const session = await invoke<SSOSession>('auth_sign_in', { provider });
+      const session = await authSignIn(provider);
       if (providerNeedsRefreshToken(provider) && session.refreshToken.length === 0) {
         throw new Error(`${providerDisplayName(provider)} sign-in did not return refresh token. Try again.`);
       }
@@ -1221,7 +1235,7 @@ export const App = (): JSX.Element => {
 
     try {
       requireNativeRuntime(`Disconnecting ${providerDisplayName(provider)}`);
-      await invoke('auth_sign_out', { provider });
+      await authSignOut(provider);
 
       const nextState = await refreshCurrentUser();
       await respawnAllOpencodes(nextState.sessions);
@@ -1247,7 +1261,7 @@ export const App = (): JSX.Element => {
       );
 
       if (providersToClear.length > 0) {
-        await Promise.all(providersToClear.map((provider) => invoke('auth_sign_out', { provider })));
+        await Promise.all(providersToClear.map((provider) => authSignOut(provider)));
       }
 
       await upsertUser(createGuestUser());

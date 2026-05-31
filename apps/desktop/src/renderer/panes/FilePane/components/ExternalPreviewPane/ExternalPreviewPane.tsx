@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react';
-import { open as openExternal } from '@tauri-apps/plugin-shell';
+import { openExternalUrl as openExternal } from '../../../../../native-fs.js';
 import { Button } from '@tinker/design';
 import { getPanelTitleForPath } from '../../../../renderers/file-utils.js';
 

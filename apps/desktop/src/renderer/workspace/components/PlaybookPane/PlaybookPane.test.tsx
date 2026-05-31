@@ -22,8 +22,8 @@ import {
   matchesPlaybookFilter,
 } from './playbookFilters.js';
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  open: vi.fn(),
+vi.mock('../../../../native-fs.js', () => ({
+  openFileDialog: vi.fn(),
 }));
 
 // Silence the CSS import in jsdom.

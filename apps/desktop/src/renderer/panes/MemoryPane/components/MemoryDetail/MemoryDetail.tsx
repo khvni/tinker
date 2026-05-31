@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 import DOMPurify from 'dompurify';
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile } from '../../../../../native-fs.js';
 import { Badge, Button, EmptyState, IconButton, Textarea } from '@tinker/design';
 import {
   type MemoryCategoryId,

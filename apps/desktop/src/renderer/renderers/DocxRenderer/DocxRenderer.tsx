@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from 'react';
 import DOMPurify from 'dompurify';
-import { readFile } from '@tauri-apps/plugin-fs';
-import { open as openExternal } from '@tauri-apps/plugin-shell';
+import { readFile } from '../../../native-fs.js';
+import { openExternalUrl as openExternal } from '../../../native-fs.js';
 import { Button } from '@tinker/design';
 import type mammoth from 'mammoth';
 import { getPanelTitleForPath } from '../file-utils.js';

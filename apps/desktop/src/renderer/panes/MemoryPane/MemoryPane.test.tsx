@@ -85,7 +85,7 @@ const { mockReadTextFile, mockWriteTextFile, mockRenderMarkdown, mockApprove, mo
     mockDiff: vi.fn<(filePath: string) => Promise<string>>(),
   }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('../../../native-fs.js', () => ({
   readTextFile: mockReadTextFile,
   writeTextFile: mockWriteTextFile,
 }));

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { Command } from '@tauri-apps/plugin-shell';
+import { openExternalUrl } from '../native-fs.js';
 
 describe('shell import', () => {
-  it('imports Command as a function', () => {
-    expect(typeof Command).toBe('function');
+  it('imports openExternalUrl as a function', () => {
+    expect(typeof openExternalUrl).toBe('function');
   });
 });

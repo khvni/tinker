@@ -1,4 +1,4 @@
-import { exists, readFile } from '@tauri-apps/plugin-fs';
+import { exists, readFile } from '../../../native-fs.js';
 import { getFileExtension, getImageMimeType } from '../../renderers/file-utils.js';
 
 const GENERIC_BINARY_MIME = 'application/octet-stream';

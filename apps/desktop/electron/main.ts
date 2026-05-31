@@ -1,0 +1,262 @@
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Notification,
+  shell,
+} from 'electron';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import type { ProjectMode, ProjectState, RecentProject } from '../src/desktop-api-types.js';
+
+const isDev = !app.isPackaged;
+const devUrl = process.env.TINKER_DEV_URL ?? 'http://localhost:1420/';
+
+const MAX_RECENT_PROJECTS = 10;
+const PROJECT_STORE_FILE = 'tinker-project-state.json';
+
+const getProjectStorePath = (): string => {
+  return path.join(app.getPath('userData'), PROJECT_STORE_FILE);
+};
+
+const readProjectState = (): ProjectState => {
+  const fallback: ProjectState = {
+    mode: 'no-project',
+    recentProjects: [],
+    activeRoot: os.homedir(),
+  };
+
+  try {
+    const raw = fs.readFileSync(getProjectStorePath(), 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return fallback;
+    const obj = parsed as Record<string, unknown>;
+    return {
+      mode: obj['mode'] === 'project' ? 'project' : 'no-project',
+      recentProjects: Array.isArray(obj['recentProjects'])
+        ? (obj['recentProjects'] as RecentProject[]).slice(0, MAX_RECENT_PROJECTS)
+        : [],
+      activeRoot: typeof obj['activeRoot'] === 'string' ? obj['activeRoot'] : os.homedir(),
+    };
+  } catch {
+    return fallback;
+  }
+};
+
+const writeProjectState = (state: ProjectState): void => {
+  fs.writeFileSync(getProjectStorePath(), JSON.stringify(state, null, 2), 'utf-8');
+};
+
+const registerIpcHandlers = (): void => {
+  ipcMain.handle('dialog:openFolder', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return result.canceled || result.filePaths.length === 0 ? '' : result.filePaths[0]!;
+  });
+
+  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+    await shell.openExternal(url);
+  });
+
+  ipcMain.handle('app:getHomePath', () => os.homedir());
+
+  ipcMain.handle('app:joinPath', (_event, ...segments: string[]) => {
+    return path.join(...segments);
+  });
+
+  ipcMain.handle('notification:isPermissionGranted', () => {
+    return Notification.isSupported();
+  });
+
+  ipcMain.handle('notification:requestPermission', () => {
+    return Notification.isSupported() ? 'granted' : 'denied';
+  });
+
+  ipcMain.handle(
+    'notification:send',
+    (_event, payload: { title: string; body: string }) => {
+      if (Notification.isSupported()) {
+        new Notification(payload).show();
+      }
+    },
+  );
+
+  // --- Keychain ---
+  // Uses safeStorage for encryption. Tokens stored as encrypted files in userData.
+  const keychainDir = (): string => {
+    const dir = path.join(app.getPath('userData'), 'keychain');
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  };
+
+  const keychainPath = (namespace: string, key: string): string => {
+    const safeKey = Buffer.from(`${namespace}:${key}`).toString('base64url');
+    return path.join(keychainDir(), `${safeKey}.enc`);
+  };
+
+  ipcMain.handle(
+    'keychain:saveRefreshToken',
+    async (_event, provider: string, userId: string, token: string) => {
+      const { safeStorage } = await import('electron');
+      const encrypted = safeStorage.encryptString(token);
+      fs.writeFileSync(keychainPath('refresh', `${provider}:${userId}`), encrypted);
+    },
+  );
+
+  ipcMain.handle(
+    'keychain:loadRefreshToken',
+    async (_event, provider: string, userId: string) => {
+      const { safeStorage } = await import('electron');
+      const filePath = keychainPath('refresh', `${provider}:${userId}`);
+      if (!fs.existsSync(filePath)) return null;
+      const encrypted = fs.readFileSync(filePath);
+      return safeStorage.decryptString(encrypted);
+    },
+  );
+
+  ipcMain.handle(
+    'keychain:clearRefreshToken',
+    (_event, provider: string, userId: string) => {
+      const filePath = keychainPath('refresh', `${provider}:${userId}`);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    },
+  );
+
+  ipcMain.handle(
+    'keychain:saveMcpSecret',
+    async (_event, mcpId: string, secret: string) => {
+      const { safeStorage } = await import('electron');
+      const encrypted = safeStorage.encryptString(secret);
+      fs.writeFileSync(keychainPath('mcp', mcpId), encrypted);
+    },
+  );
+
+  ipcMain.handle('keychain:loadMcpSecret', async (_event, mcpId: string) => {
+    const { safeStorage } = await import('electron');
+    const filePath = keychainPath('mcp', mcpId);
+    if (!fs.existsSync(filePath)) return null;
+    const encrypted = fs.readFileSync(filePath);
+    return safeStorage.decryptString(encrypted);
+  });
+
+  ipcMain.handle('keychain:clearMcpSecret', (_event, mcpId: string) => {
+    const filePath = keychainPath('mcp', mcpId);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  });
+
+  // --- Process lifecycle ---
+  // Stubs for OpenCode sidecar management. Full implementation depends on
+  // the host-service layer; these handlers provide the IPC contract.
+  ipcMain.handle(
+    'process:startOpencode',
+    async (_event, _folderPath: string, _userId: string, _memorySubdir: string) => {
+      // TODO(TIN-233): Wire to host-service coordinator once available.
+      throw new Error('process:startOpencode not yet wired to host-service.');
+    },
+  );
+
+  ipcMain.handle('process:stopOpencode', async (_event, _pid: number) => {
+    // TODO(TIN-233): Wire to host-service coordinator once available.
+    throw new Error('process:stopOpencode not yet wired to host-service.');
+  });
+
+  // --- Auth ---
+  // Stubs for auth sidecar management. Auth flows will be wired through
+  // the host-service or a dedicated auth sidecar process.
+  ipcMain.handle('auth:startSidecar', async () => {
+    throw new Error('auth:startSidecar not yet wired.');
+  });
+
+  ipcMain.handle('auth:signIn', async (_event, _provider: string) => {
+    throw new Error('auth:signIn not yet wired.');
+  });
+
+  ipcMain.handle('auth:signOut', async (_event, _provider: string) => {
+    throw new Error('auth:signOut not yet wired.');
+  });
+
+  ipcMain.handle('auth:status', async () => {
+    return { google: null, github: null, microsoft: null };
+  });
+
+  ipcMain.handle(
+    'auth:restoreSession',
+    async (_event, _provider: string, _userId: string) => {
+      return null;
+    },
+  );
+
+  // --- Project state ---
+  ipcMain.handle('project:getState', () => readProjectState());
+
+  ipcMain.handle('project:setMode', (_event, mode: ProjectMode) => {
+    const state = readProjectState();
+    writeProjectState({ ...state, mode });
+  });
+
+  ipcMain.handle('project:addRecent', (_event, project: RecentProject) => {
+    const state = readProjectState();
+    const filtered = state.recentProjects.filter((p) => p.path !== project.path);
+    const recentProjects = [project, ...filtered].slice(0, MAX_RECENT_PROJECTS);
+    writeProjectState({ ...state, recentProjects });
+  });
+
+  ipcMain.handle('project:removeRecent', (_event, projectPath: string) => {
+    const state = readProjectState();
+    const recentProjects = state.recentProjects.filter((p) => p.path !== projectPath);
+    writeProjectState({ ...state, recentProjects });
+  });
+
+  ipcMain.handle('project:setActiveRoot', (_event, root: string) => {
+    const state = readProjectState();
+    writeProjectState({ ...state, activeRoot: root });
+  });
+};
+
+const createWindow = (): void => {
+  const win = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    minWidth: 980,
+    minHeight: 640,
+    show: false,
+    backgroundColor: '#fbf8f2',
+    title: 'Tinker',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: { x: 18, y: 13 },
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  win.once('ready-to-show', () => win.show());
+
+  if (isDev) {
+    void win.loadURL(devUrl);
+  } else {
+    void win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  }
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+};
+
+void app.whenReady().then(() => {
+  registerIpcHandlers();
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
