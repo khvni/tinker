@@ -7,6 +7,8 @@ const AUTOSAVE_DELAY_MS = 600;
 
 const store = createNoteStore();
 
+type PendingSave = { id: string; title: string; body: string };
+
 const formatDate = (iso: string): string => {
   const date = new Date(iso);
   const now = new Date();
@@ -27,6 +29,7 @@ export const NotesPane = (): JSX.Element => {
   const [titleDraft, setTitleDraft] = useState('');
   const [bodyDraft, setBodyDraft] = useState('');
   const saveTimerRef = useRef<number | null>(null);
+  const pendingSaveRef = useRef<PendingSave | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
 
   const refreshList = useCallback(async () => {
@@ -40,26 +43,45 @@ export const NotesPane = (): JSX.Element => {
     void refreshList();
   }, [refreshList]);
 
+  const saveNote = useCallback(async (id: string, title: string, body: string) => {
+    await store.update(id, { title, body });
+    void refreshList();
+  }, [refreshList]);
+
+  const flushPendingSave = useCallback(() => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pending = pendingSaveRef.current;
+    if (pending) {
+      pendingSaveRef.current = null;
+      void saveNote(pending.id, pending.title, pending.body);
+    }
+  }, [saveNote]);
+
+  useEffect(() => {
+    return () => { flushPendingSave(); };
+  }, [flushPendingSave]);
+
   const selectNote = useCallback(async (id: string) => {
+    flushPendingSave();
     const note = await store.get(id);
     if (!note) return;
     setSelectedId(id);
     setActiveNote(note);
     setTitleDraft(note.title);
     setBodyDraft(note.body);
-  }, []);
-
-  const saveNote = useCallback(async (id: string, title: string, body: string) => {
-    await store.update(id, { title, body });
-    void refreshList();
-  }, [refreshList]);
+  }, [flushPendingSave]);
 
   const scheduleSave = useCallback((id: string, title: string, body: string) => {
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
     }
+    pendingSaveRef.current = { id, title, body };
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
+      pendingSaveRef.current = null;
       void saveNote(id, title, body);
     }, AUTOSAVE_DELAY_MS);
   }, [saveNote]);
@@ -79,6 +101,7 @@ export const NotesPane = (): JSX.Element => {
   }, [selectedId, titleDraft, scheduleSave]);
 
   const handleCreate = useCallback(async () => {
+    flushPendingSave();
     const note = await store.create('Untitled', '');
     await refreshList();
     setSelectedId(note.id);
@@ -86,10 +109,16 @@ export const NotesPane = (): JSX.Element => {
     setTitleDraft(note.title);
     setBodyDraft(note.body);
     setTimeout(() => bodyRef.current?.focus(), 0);
-  }, [refreshList]);
+  }, [flushPendingSave, refreshList]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedId) return;
+    // Cancel any pending save for the note being deleted
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      pendingSaveRef.current = null;
+    }
     await store.remove(selectedId);
     setSelectedId(null);
     setActiveNote(null);
