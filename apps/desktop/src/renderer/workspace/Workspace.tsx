@@ -758,6 +758,9 @@ export const Workspace = ({
       pendingSectionId: pendingSettingsSectionId,
       onPendingSectionConsumed: handlePendingSettingsSectionConsumed,
       onWorkspacePreferencesChange: handleWorkspacePreferencesChange,
+      gooseInstalled: false,
+      gooseConnection: null,
+      acpConnectorStates: [],
       onRequestRespawn: onRequestMcpRespawn,
     };
   }, [

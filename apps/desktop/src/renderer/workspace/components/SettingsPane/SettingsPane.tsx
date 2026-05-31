@@ -4,6 +4,7 @@ import { saveMcpSecret, clearMcpSecret } from '../../../../bindings.js';
 import { MemorySettingsPanel } from '../MemorySettingsPanel/index.js';
 import { SettingsShell, type SettingsShellSection } from '../SettingsShell/index.js';
 import { useSettingsPaneRuntime } from '../../settings-pane-runtime.js';
+import { CodingAgentsSection } from '../../../panes/Settings/CodingAgentsSection/index.js';
 import { ConnectionsSection } from '../../../panes/Settings/ConnectionsSection/index.js';
 import { AccountSection } from './components/AccountSection/index.js';
 import { ModelSection } from './components/ModelSection/index.js';
@@ -101,6 +102,17 @@ export const SettingsPane = (): JSX.Element => {
             memorySweepRevision={runtime.memorySweepRevision}
             schedulerStore={runtime.schedulerStore}
             onRunMemorySweep={runtime.onRunMemorySweep}
+          />
+        ),
+      },
+      {
+        id: 'coding-agents',
+        label: 'Coding Agents',
+        content: (
+          <CodingAgentsSection
+            gooseInstalled={runtime.gooseInstalled}
+            gooseConnection={runtime.gooseConnection}
+            connectorStates={runtime.acpConnectorStates}
           />
         ),
       },

@@ -13,6 +13,14 @@ export type Block =
       state: 'pending' | 'completed' | 'error';
       output?: string;
       error?: string;
+    }
+  | {
+      kind: 'delegated_agent';
+      partID: string;
+      agent: string;
+      title: string;
+      status: 'pending' | 'running' | 'completed' | 'errored';
+      content: ReadonlyArray<{ readonly type: string; readonly text: string }>;
     };
 
 export const partToBlock = (part: Part): Block | null => {
@@ -89,6 +97,28 @@ export const MessageBlock = ({ block, isOpen, onToggle }: MessageBlockProps): JS
     return (
       <Disclosure summary="Thinking…" tone="reasoning" open={isOpen} onOpenChange={onToggle}>
         <p className="tinker-message-text">{block.text}</p>
+      </Disclosure>
+    );
+  }
+
+  if (block.kind === 'delegated_agent') {
+    const statusLabel =
+      block.status === 'pending'
+        ? 'delegating to'
+        : block.status === 'running'
+          ? 'running on'
+          : block.status === 'errored'
+            ? 'failed on'
+            : 'completed by';
+    const summary = `${statusLabel} ${block.agent}: ${block.title}`;
+    const bodyText = block.content.map((c) => c.text).join('\n');
+    return (
+      <Disclosure summary={summary} tone="delegation" open={isOpen} onOpenChange={onToggle}>
+        {bodyText.length > 0 ? (
+          <pre className="tinker-tool-pre">{bodyText}</pre>
+        ) : (
+          <p className="tinker-message-text tinker-muted">Waiting for response…</p>
+        )}
       </Disclosure>
     );
   }
