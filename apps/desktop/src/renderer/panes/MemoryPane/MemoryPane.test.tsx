@@ -85,7 +85,7 @@ const { mockReadTextFile, mockWriteTextFile, mockRenderMarkdown, mockApprove, mo
     mockDiff: vi.fn<(filePath: string) => Promise<string>>(),
   }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('../../electron-shims-fs.js', () => ({
   readTextFile: mockReadTextFile,
   writeTextFile: mockWriteTextFile,
 }));
@@ -102,6 +102,8 @@ vi.mock('./memory-commands.js', () => ({
 
 vi.mock('../../runtime.js', () => ({
   isTauriRuntime: () => true,
+  isElectronRuntime: () => false,
+  isDesktopRuntime: () => true,
 }));
 
 import { MemoryPane } from './MemoryPane.js';

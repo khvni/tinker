@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../../electron-shims.js';
 
 export const approveMemoryEntry = (filePath: string, destinationDir: string): Promise<string> => {
   return invoke<string>('memory_approve', { filePath, destinationDir });

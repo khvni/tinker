@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify';
 import { Renderer, marked, type Tokens } from 'marked';
 import { parseFrontmatter } from '@tinker/memory';
 import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile } from '../electron-shims-fs.js';
 import { highlightCode } from './code-highlighter.js';
 
 const escapeHtml = (value: string): string => {
