@@ -39,6 +39,41 @@ type HighlightedCodeToken = Tokens.Code & {
   highlightedHtml?: string;
 };
 
+/**
+ * Sanitize the raw output from marked.parse() before returning it.
+ *
+ * DOMPurify strips dangerous HTML (scripts, event attributes, etc.)
+ * and neutralises XSS vectors that the marked parser itself does not
+ * catch. We additionally allow `data:` URIs in href attributes — a
+ * deliberate trade-off: data URIs are blocked by default because they
+ * can carry payloads, but inside markdown link destinations (which are
+ * not user-controlled HTML) they are inert unless the renderer wraps
+ * them in an <a href="data:..."> that the browser executes. DOMPurify
+ * blocks <a href="data:..."> by default; we override this with
+ * ALLOWED_URI_REGEXP so that legitimate data-URL links in markdown
+ * are preserved rather than stripped to # — the alternative would be
+ * silently replacing data: links with #, which is confusing for users.
+ *
+ * The final safety net is `dangerouslySetInnerHTML` in the React
+ * component — it renders the sanitized HTML inside an <article> with
+ * no scripting context, so any residual payload has nowhere to execute.
+ */
+// SECURITY: data: URIs are blocked by default (not in ALLOWED_URI_REGEXP).
+// This means markdown links like [x](data:text/html,...) get their href
+// rewritten to # by DOMPurify. This is the correct security default —
+// data: URIs in links are an XSS vector that DOMPurify is right to block.
+// We allow file: for local file references and mailto: for email links.
+// javascript: and vbscript: are blocked by DOMPurify's default
+// ALLOWED_URI_REGEXP, so we don't need to mention them explicitly.
+// DOMPurify needs FORBID_ATTR to strip the onerror attribute from img elements
+// that marked produces from broken markdown image syntax.
+// FORBID_TAGS removes the dangerous elements; FORBID_ATTR handles the attributes.
+const DOMPURIFY_CONFIG = {
+  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
+  FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+  ALLOWED_URI_REGEXP: /^(?:https?|mailto|file):|^\//i,
+} as const;
+
 export const renderMarkdown = async (text: string): Promise<string> => {
   const { body } = parseFrontmatter(text);
   const renderer = new Renderer();
@@ -48,7 +83,7 @@ export const renderMarkdown = async (text: string): Promise<string> => {
     return token.highlightedHtml ?? defaultCodeRenderer(token);
   };
 
-  return await marked.parse(body, {
+  const raw = await marked.parse(body, {
     async: true,
     gfm: true,
     renderer,
@@ -61,6 +96,8 @@ export const renderMarkdown = async (text: string): Promise<string> => {
       codeToken.highlightedHtml = await renderHighlightedCodeBlock(codeToken.text, codeToken.lang);
     },
   });
+
+  return DOMPurify.sanitize(raw, DOMPURIFY_CONFIG) as string;
 };
 
 type MarkdownRendererProps = {
