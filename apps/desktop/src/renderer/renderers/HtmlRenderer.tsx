@@ -5,6 +5,10 @@ import { getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 
 export const HTML_PREVIEW_SANDBOX = 'allow-same-origin';
 
+/** Deny CSS injection via <style> tags and style attributes in iframe preview. */
+export const sanitizeHtml = (html: string): string =>
+  DOMPurify.sanitize(html, { FORBID_TAGS: ['style'], FORBID_ATTR: ['style'] });
+
 const SCRIPT_TAG_PATTERN = /<script\b/i;
 
 export const htmlNeedsExternalOpenHint = (html: string): boolean => {
@@ -39,7 +43,7 @@ export const HtmlRenderer = ({ params }: { params?: FilePaneParams }): JSX.Eleme
             );
           }
           setShowExternalHint(requiresExternalHint);
-          setHtml(DOMPurify.sanitize(text));
+          setHtml(sanitizeHtml(text));
         }
       } catch (nextError) {
         if (active) {
