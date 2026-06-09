@@ -154,16 +154,21 @@ export const DATABASE_SCHEMA = [
   )`,
 ];
 
-const normalizeParams = (params?: unknown[]): unknown[] => {
-  if (!params) return [];
-  return params.map((p) => (p === undefined ? null : p));
+const toNamedParams = (params?: unknown[]): Record<string, unknown> | undefined => {
+  if (!params || params.length === 0) return undefined;
+  const named: Record<string, unknown> = {};
+  for (let i = 0; i < params.length; i++) {
+    named[String(i + 1)] = params[i] === undefined ? null : params[i];
+  }
+  return named;
 };
 
 const createDatabaseWrapper = (db: BetterSqlite3.Database): Database => {
   return {
     async execute(sql: string, params?: unknown[]): Promise<QueryResult> {
       const stmt = db.prepare(sql);
-      const result = stmt.run(...normalizeParams(params));
+      const named = toNamedParams(params);
+      const result = named ? stmt.run(named) : stmt.run();
       const queryResult: QueryResult = { rowsAffected: result.changes };
       if (typeof result.lastInsertRowid === 'number') {
         queryResult.lastInsertId = result.lastInsertRowid;
@@ -172,7 +177,8 @@ const createDatabaseWrapper = (db: BetterSqlite3.Database): Database => {
     },
     async select<T>(sql: string, params?: unknown[]): Promise<T> {
       const stmt = db.prepare(sql);
-      return stmt.all(...normalizeParams(params)) as T;
+      const named = toNamedParams(params);
+      return (named ? stmt.all(named) : stmt.all()) as T;
     },
     async close(): Promise<void> {
       db.close();
