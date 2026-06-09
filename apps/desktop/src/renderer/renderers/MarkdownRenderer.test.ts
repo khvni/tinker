@@ -22,8 +22,7 @@ const answer = 42;
 `);
 
     expect(html).not.toContain('title: Demo');
-    // Checkbox state: marked renders [x] as list item text, not an <input checked>.
-    // The security boundary is that DOMPurify prevents any HTML injection.
+    expect(html).toContain('<input checked="" disabled="">');
     expect(html).toContain(' shipped');
     expect(html).toContain('next');
     expect(html).toContain('<del>deprecated</del>');

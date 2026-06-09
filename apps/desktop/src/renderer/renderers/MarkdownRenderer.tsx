@@ -64,7 +64,7 @@ type HighlightedCodeToken = Tokens.Code & {
 // that marked produces from broken markdown image syntax.
 // FORBID_TAGS removes the dangerous elements; FORBID_ATTR handles the attributes.
 const DOMPURIFY_CONFIG = {
-  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
+  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   ALLOWED_URI_REGEXP: /^(?:https?|mailto|file):|^\//i,
 };
