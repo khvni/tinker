@@ -112,4 +112,63 @@ describe('createHostClient', () => {
     await client.healthCheck();
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:51724/health.check', expect.any(Object));
   });
+
+  it('calls /run.list with auth and returns run list', async () => {
+    const fetchImpl = mockFetch(async () =>
+      jsonResponse(200, { runs: [] }),
+    );
+
+    const client = createHostClient({
+      baseUrl: 'http://127.0.0.1:51724',
+      secret: 'run-secret',
+      fetchImpl,
+    });
+
+    const result = await client.listRuns();
+    expect(result.runs).toEqual([]);
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://127.0.0.1:51724/run.list',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer run-secret' }),
+      }),
+    );
+  });
+
+  it('calls /workspace.current with auth and returns workspace info', async () => {
+    const fetchImpl = mockFetch(async () =>
+      jsonResponse(200, {
+        hostId: 'abcdef0123456789',
+        vaultRoot: '/vault',
+        activeRuns: 0,
+        uptimeMs: 5000,
+      }),
+    );
+
+    const client = createHostClient({
+      baseUrl: 'http://127.0.0.1:51724',
+      secret: 'ws-secret',
+      fetchImpl,
+    });
+
+    const result = await client.workspaceCurrent();
+    expect(result.hostId).toBe('abcdef0123456789');
+    expect(result.vaultRoot).toBe('/vault');
+    expect(result.activeRuns).toBe(0);
+    expect(result.uptimeMs).toBe(5000);
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://127.0.0.1:51724/workspace.current',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer ws-secret' }),
+      }),
+    );
+  });
+
+  it('rejects workspace.current with unexpected shape', async () => {
+    const fetchImpl = mockFetch(async () => jsonResponse(200, { wrong: true }));
+    const client = createHostClient({ baseUrl: 'http://127.0.0.1:51724', secret: 'x', fetchImpl });
+
+    await expect(client.workspaceCurrent()).rejects.toBeInstanceOf(HostRequestError);
+  });
 });

@@ -72,6 +72,15 @@ export type HostInfoResponse = {
   deviceCount: number;
 };
 
+export type RunStatus = 'running' | 'completed' | 'failed' | 'aborted';
+
+export type WorkspaceCurrentResponse = {
+  hostId: string;
+  vaultRoot: string | null;
+  activeRuns: number;
+  uptimeMs: number;
+};
+
 export type HostAppHandle = {
   /** Intrinsic host identity. Stable across restarts. */
   readonly hostId: string;
