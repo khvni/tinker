@@ -15,6 +15,7 @@ import {
   type User,
   type WorkspacePreferences,
 } from '@tinker/shared-types';
+import type { HostClient } from '@tinker/host-client';
 import type { OpencodeConnection } from '../../bindings.js';
 import { resolveWorkspaceFilePath } from '../file-links.js';
 import { BUILTIN_MCP_NAMES, type BuiltinMcpName, type MCPStatus } from '../integrations.js';
@@ -66,6 +67,7 @@ type WorkspaceProps = {
   microsoftAuthBusy: boolean;
   microsoftAuthMessage: string | null;
   opencode: OpencodeConnection;
+  hostClient: HostClient;
   sessions: SSOStatus;
   mcpStatus: Record<string, MCPStatus>;
   vaultPath: string | null;
@@ -140,6 +142,7 @@ export const Workspace = ({
   microsoftAuthBusy,
   microsoftAuthMessage,
   opencode,
+  hostClient,
   sessions,
   vaultPath,
   homeDirPath,
@@ -619,6 +622,7 @@ export const Workspace = ({
       currentUserId,
       modelConnected,
       opencode,
+      hostClient,
       getConnectionForPane,
       releaseConnectionForPane,
       sessionFolderPath: vaultPath,
@@ -664,6 +668,7 @@ export const Workspace = ({
       openFileInWorkspace,
       openNewChatPane,
       opencode,
+      hostClient,
       refreshStoredSessions,
       model,
       releaseConnectionForPane,

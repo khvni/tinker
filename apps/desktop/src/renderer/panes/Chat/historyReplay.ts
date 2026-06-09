@@ -1,53 +1,10 @@
-import type { Part } from '@opencode-ai/sdk/v2/client';
-import type { StoredChatEvent } from '@tinker/bridge';
-import { partToBlock, type Block } from './Block.js';
+import type { RunEvent, StoredRunEvent } from '@tinker/shared-types';
+import type { Block } from './Block.js';
 
 export type ChatMessageRecord = {
   id: string;
   role: 'user' | 'assistant' | 'system';
   blocks: Block[];
-};
-
-type ReplayMessageState = ChatMessageRecord & {
-  createdAt: number | null;
-  order: number;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null;
-};
-
-const readString = (value: Record<string, unknown>, key: string): string | null => {
-  const candidate = value[key];
-  return typeof candidate === 'string' ? candidate : null;
-};
-
-const readMessageRole = (value: unknown): ChatMessageRecord['role'] | null => {
-  return value === 'user' || value === 'assistant' || value === 'system' ? value : null;
-};
-
-const readCreatedAt = (value: unknown): number | null => {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const created = value.created;
-  return typeof created === 'number' && Number.isFinite(created) ? created : null;
-};
-
-const asMessagePart = (value: unknown): (Part & { messageID: string }) | null => {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const id = readString(value, 'id');
-  const type = readString(value, 'type');
-  const messageID = readString(value, 'messageID');
-  if (!id || !type || !messageID) {
-    return null;
-  }
-
-  return value as Part & { messageID: string };
 };
 
 const upsertBlock = (blocks: Block[], next: Block): Block[] => {
@@ -61,164 +18,120 @@ const upsertBlock = (blocks: Block[], next: Block): Block[] => {
   return copy;
 };
 
-const ensureMessage = (
-  messages: Map<string, ReplayMessageState>,
-  nextOrder: () => number,
-  id: string,
-  role?: ChatMessageRecord['role'],
-  createdAt?: number | null,
-): ReplayMessageState => {
-  const existing = messages.get(id);
-  if (existing) {
-    const nextRole = role ?? existing.role;
-    const nextCreatedAt = createdAt ?? existing.createdAt;
-    if (nextRole !== existing.role || nextCreatedAt !== existing.createdAt) {
-      const updated = { ...existing, role: nextRole, createdAt: nextCreatedAt };
-      messages.set(id, updated);
-      return updated;
+const applyEventToBlocks = (blocks: Block[], event: RunEvent): Block[] => {
+  if (event.type === 'token') {
+    const existing = blocks.find((b) => b.partID === event.partID);
+    if (existing && existing.kind === 'text') {
+      return upsertBlock(blocks, { ...existing, text: existing.text + event.text });
     }
-
-    return existing;
+    return upsertBlock(blocks, { kind: 'text', partID: event.partID, text: event.text });
   }
 
-  const created = {
-    id,
-    role: role ?? 'assistant',
-    blocks: [],
-    createdAt: createdAt ?? null,
-    order: nextOrder(),
-  } satisfies ReplayMessageState;
-  messages.set(id, created);
-  return created;
-};
+  if (event.type === 'reasoning') {
+    const existing = blocks.find((b) => b.partID === event.partID);
+    if (existing && existing.kind === 'reasoning') {
+      return upsertBlock(blocks, { ...existing, text: existing.text + event.text });
+    }
+    return upsertBlock(blocks, { kind: 'reasoning', partID: event.partID, text: event.text });
+  }
 
-const finalizeMessages = (messages: Map<string, ReplayMessageState>): ChatMessageRecord[] => {
-  return [...messages.values()]
-    .sort((left, right) => {
-      if (left.createdAt !== null && right.createdAt !== null && left.createdAt !== right.createdAt) {
-        return left.createdAt - right.createdAt;
-      }
-
-      return left.order - right.order;
-    })
-    .map(({ createdAt: _createdAt, order: _order, ...message }) => {
-      const hasText = message.blocks.some((block) => block.kind === 'text' && block.text.length > 0);
-      if (hasText || (message.role === 'assistant' && message.blocks.length > 0)) {
-        return message;
-      }
-
-      const placeholder =
-        message.role === 'assistant' ? 'Response contained only non-text output.' : 'Message sent.';
-
-      return {
-        ...message,
-        blocks: [
-          ...message.blocks,
-          {
-            kind: 'text',
-            partID: `placeholder-${message.id}`,
-            text: placeholder,
-          },
-        ],
-      };
+  if (event.type === 'tool_call') {
+    return upsertBlock(blocks, {
+      kind: 'tool',
+      partID: event.partID,
+      name: event.name,
+      input: event.input,
+      state: 'pending',
     });
+  }
+
+  if (event.type === 'tool_result') {
+    const existing = blocks.find((b) => b.partID === event.partID);
+    return upsertBlock(blocks, {
+      kind: 'tool',
+      partID: event.partID,
+      name: event.name,
+      input: existing?.kind === 'tool' ? existing.input : {},
+      state: 'completed',
+      output: event.output,
+    });
+  }
+
+  if (event.type === 'tool_error') {
+    const existing = blocks.find((b) => b.partID === event.partID);
+    return upsertBlock(blocks, {
+      kind: 'tool',
+      partID: event.partID,
+      name: event.name,
+      input: existing?.kind === 'tool' ? existing.input : {},
+      state: 'error',
+      error: event.message,
+    });
+  }
+
+  if (event.type === 'approval_request') {
+    return upsertBlock(blocks, {
+      kind: 'approval',
+      partID: event.partID,
+      tool: event.tool,
+      input: event.input,
+      description: event.description,
+    });
+  }
+
+  if (event.type === 'delegate') {
+    return upsertBlock(blocks, {
+      kind: 'delegate',
+      partID: event.partID,
+      agent: event.agent,
+      protocol: event.protocol,
+      description: event.description,
+    });
+  }
+
+  if (event.type === 'subagent') {
+    return upsertBlock(blocks, {
+      kind: 'subagent',
+      partID: event.partID,
+      agent: event.agent,
+      description: event.description,
+    });
+  }
+
+  return blocks;
 };
 
-export const replayChatHistory = (entries: readonly StoredChatEvent[]): ChatMessageRecord[] => {
-  const messages = new Map<string, ReplayMessageState>();
-  let order = 0;
-  const nextOrder = (): number => {
-    order += 1;
-    return order;
-  };
+export const replayRunEvents = (entries: readonly StoredRunEvent[]): ChatMessageRecord[] => {
+  const messages: ChatMessageRecord[] = [];
+  let assistantBlocks: Block[] = [];
+  let assistantId = 'assistant-replay';
 
   for (const entry of entries) {
-    if (!isRecord(entry.data)) {
-      continue;
-    }
+    const event = entry.event;
 
-    if (entry.event === 'message.updated') {
-      const info = isRecord(entry.data.info) ? entry.data.info : null;
-      const id = info ? readString(info, 'id') : null;
-      const role = info ? readMessageRole(info.role) : null;
-      if (!id || !role) {
-        continue;
+    if (
+      event.type === 'token'
+      || event.type === 'reasoning'
+      || event.type === 'tool_call'
+      || event.type === 'tool_result'
+      || event.type === 'tool_error'
+      || event.type === 'approval_request'
+      || event.type === 'delegate'
+      || event.type === 'subagent'
+    ) {
+      assistantBlocks = applyEventToBlocks(assistantBlocks, event);
+    } else if (event.type === 'done') {
+      if (assistantBlocks.length > 0) {
+        messages.push({ id: assistantId, role: 'assistant', blocks: assistantBlocks });
+        assistantBlocks = [];
+        assistantId = `assistant-replay-${messages.length}`;
       }
-
-      ensureMessage(messages, nextOrder, id, role, info ? readCreatedAt(info.time) : null);
-      continue;
-    }
-
-    if (entry.event === 'message.removed') {
-      const id =
-        readString(entry.data, 'messageID')
-        ?? (isRecord(entry.data.info) ? readString(entry.data.info, 'id') : null);
-      if (id) {
-        messages.delete(id);
-      }
-      continue;
-    }
-
-    if (entry.event === 'message.part.updated') {
-      const part = asMessagePart(entry.data.part);
-      if (!part) {
-        continue;
-      }
-
-      const message = ensureMessage(messages, nextOrder, part.messageID);
-      const block = partToBlock(part);
-      if (!block) {
-        continue;
-      }
-
-      const updated = { ...message, blocks: upsertBlock(message.blocks, block) };
-      messages.set(message.id, updated);
-      continue;
-    }
-
-    if (entry.event === 'message.part.delta') {
-      const messageID = readString(entry.data, 'messageID');
-      const partID = readString(entry.data, 'partID');
-      const field = readString(entry.data, 'field');
-      const delta = readString(entry.data, 'delta');
-      if (!messageID || !partID || field !== 'text' || delta === null) {
-        continue;
-      }
-
-      const message = ensureMessage(messages, nextOrder, messageID);
-      const existing = message.blocks.find((block) => block.partID === partID) ?? null;
-      let nextBlock: Block;
-
-      if (existing?.kind === 'reasoning') {
-        nextBlock = { ...existing, text: existing.text + delta };
-      } else if (existing?.kind === 'text') {
-        nextBlock = { ...existing, text: existing.text + delta };
-      } else {
-        nextBlock = { kind: 'text', partID, text: delta };
-      }
-
-      messages.set(message.id, { ...message, blocks: upsertBlock(message.blocks, nextBlock) });
-      continue;
-    }
-
-    if (entry.event === 'message.part.removed') {
-      const messageID = readString(entry.data, 'messageID');
-      const partID = readString(entry.data, 'partID');
-      if (!messageID || !partID) {
-        continue;
-      }
-
-      const message = messages.get(messageID);
-      if (!message) {
-        continue;
-      }
-
-      messages.set(message.id, {
-        ...message,
-        blocks: message.blocks.filter((block) => block.partID !== partID),
-      });
     }
   }
 
-  return finalizeMessages(messages);
+  if (assistantBlocks.length > 0) {
+    messages.push({ id: assistantId, role: 'assistant', blocks: assistantBlocks });
+  }
+
+  return messages;
 };

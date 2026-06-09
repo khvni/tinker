@@ -1,13 +1,13 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { RunConfig, RunEvent, RunSummary, RunStatus } from '@tinker/shared-types';
+import type { GooseRunConfig, GooseRunEvent, GooseRunStatus, GooseRunSummary } from './types.js';
 
 const RUN_FILE_SUFFIX = '.jsonl';
 const META_FILE_SUFFIX = '.meta.json';
 
 type RunMeta = {
   runId: string;
-  config: RunConfig;
+  config: GooseRunConfig;
   createdAt: string;
 };
 
@@ -22,7 +22,7 @@ const isRunMeta = (value: unknown): value is RunMeta => {
   );
 };
 
-const isRunEvent = (value: unknown): value is RunEvent => {
+const isGooseRunEvent = (value: unknown): value is GooseRunEvent => {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
@@ -33,11 +33,11 @@ const isRunEvent = (value: unknown): value is RunEvent => {
 };
 
 export type RunEventLog = {
-  init(runId: string, config: RunConfig): void;
-  append(runId: string, event: RunEvent): void;
-  replay(runId: string): RunEvent[];
-  summary(runId: string): RunSummary | null;
-  list(): RunSummary[];
+  init(runId: string, config: GooseRunConfig): void;
+  append(runId: string, event: GooseRunEvent): void;
+  replay(runId: string): GooseRunEvent[];
+  summary(runId: string): GooseRunSummary | null;
+  list(): GooseRunSummary[];
 };
 
 export const createRunEventLog = (runsDir: string): RunEventLog => {
@@ -57,15 +57,15 @@ export const createRunEventLog = (runsDir: string): RunEventLog => {
     }
   };
 
-  const readEvents = (runId: string): RunEvent[] => {
+  const readEvents = (runId: string): GooseRunEvent[] => {
     const p = eventsPath(runId);
     if (!existsSync(p)) return [];
     const lines = readFileSync(p, 'utf8').split('\n').filter((l) => l.length > 0);
-    const events: RunEvent[] = [];
+    const events: GooseRunEvent[] = [];
     for (const line of lines) {
       try {
         const parsed: unknown = JSON.parse(line);
-        if (isRunEvent(parsed)) {
+        if (isGooseRunEvent(parsed)) {
           events.push(parsed);
         }
       } catch {
@@ -75,7 +75,7 @@ export const createRunEventLog = (runsDir: string): RunEventLog => {
     return events;
   };
 
-  const deriveStatus = (events: RunEvent[]): RunStatus => {
+  const deriveStatus = (events: GooseRunEvent[]): GooseRunStatus => {
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
       if (event !== undefined && event.type === 'status') {
@@ -85,7 +85,7 @@ export const createRunEventLog = (runsDir: string): RunEventLog => {
     return 'queued';
   };
 
-  const deriveFinishedAt = (events: RunEvent[], status: RunStatus): string | null => {
+  const deriveFinishedAt = (events: GooseRunEvent[], status: GooseRunStatus): string | null => {
     if (status !== 'completed' && status !== 'failed' && status !== 'aborted') {
       return null;
     }
@@ -129,7 +129,7 @@ export const createRunEventLog = (runsDir: string): RunEventLog => {
       if (!existsSync(runsDir)) return [];
 
       const files = readdirSync(runsDir).filter((f) => f.endsWith(META_FILE_SUFFIX));
-      const summaries: RunSummary[] = [];
+      const summaries: GooseRunSummary[] = [];
 
       for (const file of files) {
         const runId = file.slice(0, -META_FILE_SUFFIX.length);

@@ -6,8 +6,14 @@ export {
   type GooseRuntimeAdapter,
   type CreateAdapterOptions,
   type RunEventLog,
+  type GooseRunConfig,
+  type GooseRunEvent,
+  type GooseRunEventListener,
+  type GooseRunStatus,
+  type GooseRunSummary,
 } from './goose/index.js';
 export { loadHostIdentity, type HostIdentity, type LoadHostIdentityOptions } from './identity.js';
+export { createRunManager, type RunEventListener, type RunManager, type StoredRunEvent } from './runs.js';
 export { resolveDataPaths, ensureDataPaths, type HostDataPaths, type ResolveDataPathsOptions } from './dataPaths.js';
 export {
   writeManifest,

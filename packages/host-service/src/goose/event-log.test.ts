@@ -2,16 +2,16 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { RunConfig, RunEvent } from '@tinker/shared-types';
+import type { GooseRunConfig, GooseRunEvent } from './types.js';
 import { createRunEventLog, type RunEventLog } from './event-log.js';
 
-const makeConfig = (): RunConfig => ({
+const makeConfig = (): GooseRunConfig => ({
   cwd: '/tmp/test-project',
   prompt: 'fix the tests',
   mode: null,
 });
 
-const makeTextEvent = (runId: string, content: string): RunEvent => ({
+const makeTextEvent = (runId: string, content: string): GooseRunEvent => ({
   type: 'text',
   runId,
   content,
@@ -19,7 +19,7 @@ const makeTextEvent = (runId: string, content: string): RunEvent => ({
   timestamp: new Date().toISOString(),
 });
 
-const makeStatusEvent = (runId: string, status: 'queued' | 'running' | 'completed' | 'failed' | 'aborted'): RunEvent => ({
+const makeStatusEvent = (runId: string, status: 'queued' | 'running' | 'completed' | 'failed' | 'aborted'): GooseRunEvent => ({
   type: 'status',
   runId,
   status,
@@ -111,7 +111,7 @@ describe('createRunEventLog', () => {
   });
 
   it('preserves config in summary', () => {
-    const config: RunConfig = { cwd: '/project', prompt: 'do stuff', mode: 'plan' };
+    const config: GooseRunConfig = { cwd: '/project', prompt: 'do stuff', mode: 'plan' };
     log.init('run-1', config);
 
     const summary = log.summary('run-1');

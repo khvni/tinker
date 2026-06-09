@@ -8,11 +8,12 @@
 
 import type {
   AbortRunRequest,
-  AbortRunResponse,
+  ApprovalResponse,
+  CreateRunRequest,
+  PromptRunRequest,
+  Run,
   RunEvent,
-  RunSummary,
-  StartRunRequest,
-  StartRunResponse,
+  StoredRunEvent,
 } from '@tinker/shared-types';
 
 export type HealthCheckResponse = {
@@ -30,13 +31,10 @@ export type HostInfoResponse = {
   deviceCount: number;
 };
 
-export type RunReplayResponse = {
-  runId: string;
-  events: RunEvent[];
-};
+export type RunEventCallback = (event: RunEvent) => void;
 
-export type RunListResponse = {
-  runs: RunSummary[];
+export type RunEventStream = {
+  close(): void;
 };
 
 export type WorkspaceCurrentResponse = {
@@ -49,16 +47,17 @@ export type WorkspaceCurrentResponse = {
 export type HostClient = {
   healthCheck(): Promise<HealthCheckResponse>;
   hostInfo(): Promise<HostInfoResponse>;
-  startRun(request: StartRunRequest): Promise<StartRunResponse>;
-  abortRun(request: AbortRunRequest): Promise<AbortRunResponse>;
-  replayRun(runId: string): Promise<RunReplayResponse>;
-  listRuns(): Promise<RunListResponse>;
+  runs: {
+    create(request: CreateRunRequest): Promise<Run>;
+    get(runId: string): Promise<Run>;
+    list(): Promise<Run[]>;
+    prompt(request: PromptRunRequest): Promise<void>;
+    abort(request: AbortRunRequest): Promise<void>;
+    approve(response: ApprovalResponse): Promise<void>;
+    subscribe(runId: string, callback: RunEventCallback): RunEventStream;
+    replay(runId: string): Promise<StoredRunEvent[]>;
+  };
   workspaceCurrent(): Promise<WorkspaceCurrentResponse>;
-  streamRunEvents(runId: string, onEvent: (event: RunEvent) => void): RunEventStream;
-};
-
-export type RunEventStream = {
-  close(): void;
 };
 
 export type CreateHostClientOptions = {
@@ -109,28 +108,32 @@ const isHostInfoResponse = (value: unknown): value is HostInfoResponse => {
   );
 };
 
-const isStartRunResponse = (value: unknown): value is StartRunResponse => {
+const isRun = (value: unknown): value is Run => {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as Record<string, unknown>;
-  return typeof candidate['runId'] === 'string';
+  return (
+    typeof candidate['id'] === 'string' &&
+    typeof candidate['status'] === 'string' &&
+    typeof candidate['createdAt'] === 'string'
+  );
 };
 
-const isAbortRunResponse = (value: unknown): value is AbortRunResponse => {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate['runId'] === 'string' && typeof candidate['aborted'] === 'boolean';
+const isRunArray = (value: unknown): value is Run[] => {
+  return Array.isArray(value) && value.every(isRun);
 };
 
-const isRunReplayResponse = (value: unknown): value is RunReplayResponse => {
-  if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate['runId'] === 'string' && Array.isArray(candidate['events']);
+const isStoredRunEventArray = (value: unknown): value is StoredRunEvent[] => {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => {
+    if (typeof item !== 'object' || item === null) return false;
+    const candidate = item as Record<string, unknown>;
+    return typeof candidate['ts'] === 'string' && typeof candidate['event'] === 'object';
+  });
 };
 
-const isRunListResponse = (value: unknown): value is RunListResponse => {
+const isOkResponse = (value: unknown): value is { ok: boolean } => {
   if (typeof value !== 'object' || value === null) return false;
-  const candidate = value as Record<string, unknown>;
-  return Array.isArray(candidate['runs']);
+  return (value as Record<string, unknown>)['ok'] === true;
 };
 
 const isWorkspaceCurrentResponse = (value: unknown): value is WorkspaceCurrentResponse => {
@@ -211,75 +214,49 @@ export const createHostClient = (options: CreateHostClientOptions): HostClient =
     return payload;
   };
 
-  const streamRunEvents = (runId: string, onEvent: (event: RunEvent) => void): RunEventStream => {
-    const controller = new AbortController();
+  const subscribeSSE = (path: string, callback: RunEventCallback): RunEventStream => {
+    const url = `${baseUrl}${path}`;
+    const eventSource = new EventSource(url);
+    let closed = false;
 
-    const connect = async (): Promise<void> => {
-      const url = `${baseUrl}/run.events?runId=${encodeURIComponent(runId)}`;
-      const headers: Record<string, string> = {
-        Accept: 'text/event-stream',
-        Authorization: `Bearer ${secret}`,
-      };
-
-      let response: Response;
+    eventSource.onmessage = (event: MessageEvent<string>) => {
+      if (closed) return;
       try {
-        response = await fetchImpl(url, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
+        const parsed = JSON.parse(event.data) as RunEvent;
+        callback(parsed);
       } catch {
-        return;
-      }
-
-      if (!response.ok || response.body === null) return;
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const event = JSON.parse(line.slice(6)) as RunEvent;
-                onEvent(event);
-              } catch {
-                // skip malformed SSE data
-              }
-            }
-          }
-        }
-      } catch {
-        // stream closed or aborted
+        // skip malformed events
       }
     };
 
-    void connect();
+    eventSource.onerror = () => {
+      if (closed) return;
+      // SSE auto-reconnects; no action needed
+    };
 
     return {
-      close() {
-        controller.abort();
+      close: () => {
+        closed = true;
+        eventSource.close();
       },
     };
+  };
+
+  const runs: HostClient['runs'] = {
+    create: (req) => post('/runs.create', req, isRun),
+    get: (runId) => get(`/runs.get/${runId}`, isRun, true),
+    list: () => get('/runs.list', isRunArray, true),
+    prompt: async (req) => { await post('/runs.prompt', req, isOkResponse); },
+    abort: async (req) => { await post('/runs.abort', req, isOkResponse); },
+    approve: async (req) => { await post('/runs.approve', req, isOkResponse); },
+    subscribe: (runId, callback) => subscribeSSE(`/runs.events/${runId}`, callback),
+    replay: (runId) => get(`/runs.replay/${runId}`, isStoredRunEventArray, true),
   };
 
   return {
     healthCheck: () => get('/health.check', isHealthCheckResponse, false),
     hostInfo: () => get('/host.info', isHostInfoResponse, true),
-    startRun: (request) => post('/run.start', request, isStartRunResponse),
-    abortRun: (request) => post('/run.abort', request, isAbortRunResponse),
-    replayRun: (runId) => get(`/run.replay?runId=${encodeURIComponent(runId)}`, isRunReplayResponse, true),
-    listRuns: () => get('/run.list', isRunListResponse, true),
+    runs,
     workspaceCurrent: () => get('/workspace.current', isWorkspaceCurrentResponse, true),
-    streamRunEvents,
   };
 };

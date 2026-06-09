@@ -1,4 +1,5 @@
 import { createContext, useContext, type ComponentProps } from 'react';
+import type { HostClient } from '@tinker/host-client';
 import type { Session, TinkerPaneData } from '@tinker/shared-types';
 import type { OpencodeConnection } from '../../bindings.js';
 import type { Chat } from '../panes/Chat/index.js';
@@ -18,6 +19,7 @@ export type ChatPaneRuntime = Omit<
     sessionId: Session['id'],
   ) => void;
   opencode: OpencodeConnection;
+  hostClient: HostClient;
   getConnectionForPane?: (paneData: Extract<TinkerPaneData, { readonly kind: 'chat' }>) => OpencodeConnection;
   releaseConnectionForPane?: (paneData: Extract<TinkerPaneData, { readonly kind: 'chat' }>) => void;
   onSelectSessionFolder: () => void | Promise<void>;

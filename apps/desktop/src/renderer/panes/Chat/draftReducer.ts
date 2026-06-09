@@ -1,9 +1,9 @@
-import type { TinkerStreamEvent } from '@tinker/bridge';
+import type { RunEvent } from '@tinker/shared-types';
 import type { Block } from './Block.js';
 
 export type DraftAction =
   | { type: 'reset' }
-  | { type: 'event'; event: TinkerStreamEvent };
+  | { type: 'event'; event: RunEvent };
 
 const upsertBlock = (
   state: Block[],
@@ -58,14 +58,31 @@ export const draftReducer = (state: Block[], action: DraftAction): Block[] => {
         : null,
     );
   }
-  if (e.type === 'delegated_agent') {
-    return upsertBlock(state, e.id, (prev) =>
-      !prev
-        ? { kind: 'delegated_agent', partID: e.id, agent: e.agent, title: e.title, status: e.status, content: e.content }
-        : prev.kind === 'delegated_agent'
-          ? { ...prev, status: e.status, title: e.title, content: e.content }
-          : null,
-    );
+  if (e.type === 'approval_request') {
+    return upsertBlock(state, e.partID, () => ({
+      kind: 'approval',
+      partID: e.partID,
+      tool: e.tool,
+      input: e.input,
+      description: e.description,
+    }));
+  }
+  if (e.type === 'delegate') {
+    return upsertBlock(state, e.partID, () => ({
+      kind: 'delegate',
+      partID: e.partID,
+      agent: e.agent,
+      protocol: e.protocol,
+      description: e.description,
+    }));
+  }
+  if (e.type === 'subagent') {
+    return upsertBlock(state, e.partID, () => ({
+      kind: 'subagent',
+      partID: e.partID,
+      agent: e.agent,
+      description: e.description,
+    }));
   }
 
   return state;

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { RunEvent } from '@tinker/shared-types';
+import type { GooseRunEvent } from './types.js';
 import { createGooseRuntimeAdapter, type GooseRuntimeAdapter } from './adapter.js';
 import { createRunEventLog, type RunEventLog } from './event-log.js';
 
@@ -31,8 +31,8 @@ describe('createGooseRuntimeAdapter', () => {
     return binPath;
   };
 
-  const collectEvents = (count: number, timeoutMs = 10_000): Promise<RunEvent[]> => {
-    const events: RunEvent[] = [];
+  const collectEvents = (count: number, timeoutMs = 10_000): Promise<GooseRunEvent[]> => {
+    const events: GooseRunEvent[] = [];
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         unsubscribe();
@@ -64,13 +64,13 @@ describe('createGooseRuntimeAdapter', () => {
     expect(types).toContain('status');
     expect(types).toContain('text');
 
-    const statusEvents = events.filter((e) => e.type === 'status') as Array<Extract<RunEvent, { type: 'status' }>>;
+    const statusEvents = events.filter((e) => e.type === 'status') as Array<Extract<GooseRunEvent, { type: 'status' }>>;
     const statuses = statusEvents.map((e) => e.status);
     expect(statuses).toContain('queued');
     expect(statuses).toContain('running');
     expect(statuses).toContain('completed');
 
-    const textEvents = events.filter((e) => e.type === 'text') as Array<Extract<RunEvent, { type: 'text' }>>;
+    const textEvents = events.filter((e) => e.type === 'text') as Array<Extract<GooseRunEvent, { type: 'text' }>>;
     expect(textEvents.some((e) => e.content.includes('hello from goose'))).toBe(true);
   });
 
@@ -82,7 +82,7 @@ describe('createGooseRuntimeAdapter', () => {
     adapter.startRun({ cwd: scratch, prompt: 'fail test', mode: null });
 
     const events = await eventsPromise;
-    const statusEvents = events.filter((e) => e.type === 'status') as Array<Extract<RunEvent, { type: 'status' }>>;
+    const statusEvents = events.filter((e) => e.type === 'status') as Array<Extract<GooseRunEvent, { type: 'status' }>>;
     const statuses = statusEvents.map((e) => e.status);
     expect(statuses).toContain('failed');
   });
@@ -92,7 +92,7 @@ describe('createGooseRuntimeAdapter', () => {
     mockBin = createMockBin('exec sleep 30');
     adapter = createGooseRuntimeAdapter({ eventLog, gooseBin: mockBin });
 
-    const allEvents: RunEvent[] = [];
+    const allEvents: GooseRunEvent[] = [];
     let unsubscribe: () => void;
     const abortedPromise = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -118,7 +118,7 @@ describe('createGooseRuntimeAdapter', () => {
     expect(aborted).toBe(true);
 
     await abortedPromise;
-    const statusEvents = allEvents.filter((e) => e.type === 'status') as Array<Extract<RunEvent, { type: 'status' }>>;
+    const statusEvents = allEvents.filter((e) => e.type === 'status') as Array<Extract<GooseRunEvent, { type: 'status' }>>;
     const statuses = statusEvents.map((e) => e.status);
     expect(statuses).toContain('aborted');
   });
@@ -135,12 +135,12 @@ describe('createGooseRuntimeAdapter', () => {
     adapter.startRun({ cwd: scratch, prompt: 'test', mode: null });
 
     const events = await eventsPromise;
-    const errorEvents = events.filter((e) => e.type === 'error') as Array<Extract<RunEvent, { type: 'error' }>>;
+    const errorEvents = events.filter((e) => e.type === 'error') as Array<Extract<GooseRunEvent, { type: 'error' }>>;
     expect(errorEvents.length).toBeGreaterThan(0);
     expect(errorEvents[0]?.message).toContain('Goose CLI not found');
     expect(errorEvents[0]?.recoverable).toBe(true);
 
-    const statusEvents = events.filter((e) => e.type === 'status') as Array<Extract<RunEvent, { type: 'status' }>>;
+    const statusEvents = events.filter((e) => e.type === 'status') as Array<Extract<GooseRunEvent, { type: 'status' }>>;
     expect(statusEvents.some((e) => e.status === 'failed')).toBe(true);
   });
 
@@ -170,7 +170,7 @@ describe('createGooseRuntimeAdapter', () => {
     adapter.startRun({ cwd: scratch, prompt: 'with mode', mode: 'plan' });
     const events = await eventsPromise;
 
-    const textEvents = events.filter((e) => e.type === 'text') as Array<Extract<RunEvent, { type: 'text' }>>;
+    const textEvents = events.filter((e) => e.type === 'text') as Array<Extract<GooseRunEvent, { type: 'text' }>>;
     const output = textEvents.map((e) => e.content).join('');
     expect(output).toContain('--profile');
     expect(output).toContain('plan');

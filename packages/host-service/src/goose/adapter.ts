@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import type { RunConfig, RunEvent } from '@tinker/shared-types';
-import type { ActiveRun, GooseSpawnConfig, RunEventListener } from './types.js';
+import type { ActiveRun, GooseRunConfig, GooseRunEvent, GooseRunEventListener, GooseRunStatus, GooseSpawnConfig } from './types.js';
 import type { RunEventLog } from './event-log.js';
 
 const DEFAULT_GOOSE_BIN = 'goose';
@@ -11,14 +10,14 @@ const SIGTERM_GRACE_MS = 5_000;
 
 const now = (): string => new Date().toISOString();
 
-const statusEvent = (runId: string, status: 'queued' | 'running' | 'completed' | 'failed' | 'aborted'): RunEvent => ({
+const statusEvent = (runId: string, status: GooseRunStatus): GooseRunEvent => ({
   type: 'status',
   runId,
   status,
   timestamp: now(),
 });
 
-const textEvent = (runId: string, content: string, stream: 'stdout' | 'stderr'): RunEvent => ({
+const textEvent = (runId: string, content: string, stream: 'stdout' | 'stderr'): GooseRunEvent => ({
   type: 'text',
   runId,
   content,
@@ -26,7 +25,7 @@ const textEvent = (runId: string, content: string, stream: 'stdout' | 'stderr'):
   timestamp: now(),
 });
 
-const errorEvent = (runId: string, message: string, recoverable: boolean): RunEvent => ({
+const errorEvent = (runId: string, message: string, recoverable: boolean): GooseRunEvent => ({
   type: 'error',
   runId,
   message,
@@ -35,11 +34,11 @@ const errorEvent = (runId: string, message: string, recoverable: boolean): RunEv
 });
 
 export type GooseRuntimeAdapter = {
-  startRun(config: RunConfig): string;
+  startRun(config: GooseRunConfig): string;
   abortRun(runId: string): boolean;
   getActiveRun(runId: string): ActiveRun | undefined;
   listActiveRuns(): ActiveRun[];
-  subscribe(listener: RunEventListener): () => void;
+  subscribe(listener: GooseRunEventListener): () => void;
   shutdown(): void;
 };
 
@@ -58,12 +57,12 @@ export const createGooseRuntimeAdapter = (options: CreateAdapterOptions): GooseR
   const activeRuns = new Map<string, ActiveRun>();
   const emitter = new EventEmitter();
 
-  const emit = (event: RunEvent): void => {
+  const emit = (event: GooseRunEvent): void => {
     eventLog.append(event.runId, event);
     emitter.emit('event', event);
   };
 
-  const startRun = (config: RunConfig): string => {
+  const startRun = (config: GooseRunConfig): string => {
     const runId = randomUUID();
     const spawnConfig: GooseSpawnConfig = {
       cwd: config.cwd,
@@ -163,7 +162,7 @@ export const createGooseRuntimeAdapter = (options: CreateAdapterOptions): GooseR
     return true;
   };
 
-  const subscribe = (listener: RunEventListener): (() => void) => {
+  const subscribe = (listener: GooseRunEventListener): (() => void) => {
     emitter.on('event', listener);
     return () => { emitter.off('event', listener); };
   };
