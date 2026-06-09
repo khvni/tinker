@@ -119,7 +119,7 @@ describe('createHostApp', () => {
     }
   });
 
-  it('returns run.list with empty array when authenticated', async () => {
+  it('returns runs.list with empty array when authenticated', async () => {
     const app = createHostApp({
       config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
@@ -128,18 +128,18 @@ describe('createHostApp', () => {
 
     const { port } = await app.start();
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/run.list`, {
+      const res = await fetch(`http://127.0.0.1:${port}/runs.list`, {
         headers: { Authorization: 'Bearer valid-secret' },
       });
       expect(res.status).toBe(200);
-      const body = (await res.json()) as Record<string, unknown>;
-      expect(body['runs']).toEqual([]);
+      const body = (await res.json()) as unknown;
+      expect(body).toEqual([]);
     } finally {
       await app.stop();
     }
   });
 
-  it('rejects run.list without auth', async () => {
+  it('rejects runs.list without auth', async () => {
     const app = createHostApp({
       config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
@@ -148,7 +148,7 @@ describe('createHostApp', () => {
 
     const { port } = await app.start();
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/run.list`);
+      const res = await fetch(`http://127.0.0.1:${port}/runs.list`);
       expect(res.status).toBe(401);
     } finally {
       await app.stop();
