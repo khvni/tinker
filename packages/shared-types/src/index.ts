@@ -1,3 +1,4 @@
+export * from './attention.js';
 export * from './memory.js';
 export * from './coach.js';
 export * from './layout.js';

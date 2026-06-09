@@ -1,6 +1,5 @@
 import { useCallback, type JSX } from 'react';
-import type { FlashReason } from '@tinker/attention';
-import type { TinkerPaneData } from '@tinker/shared-types';
+import type { FlashReason, TinkerPaneData } from '@tinker/shared-types';
 import { Chat } from '../../../panes/Chat/index.js';
 import { useChatPaneRuntime } from '../../chat-pane-runtime.js';
 

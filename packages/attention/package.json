@@ -16,6 +16,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@tinker/shared-types": "workspace:*",
     "zustand": "^5.0.2"
   },
   "peerDependencies": {

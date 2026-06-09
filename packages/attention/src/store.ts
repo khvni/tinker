@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
+import type { FlashReason } from '@tinker/shared-types';
 
-export type FlashReason =
-  | 'notification-arrival'
-  | 'notification-dismiss'
-  | 'manual-unread-dismiss'
-  | 'navigation'
-  | 'debug';
+export type { FlashReason };
 
 export type FlashAccent = 'notification-blue' | 'navigation-teal';
 
