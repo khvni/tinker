@@ -113,9 +113,9 @@ describe('createHostClient', () => {
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:51724/health.check', expect.any(Object));
   });
 
-  it('calls /run.list with auth and returns run list', async () => {
+  it('calls /runs.list with auth and returns run list', async () => {
     const fetchImpl = mockFetch(async () =>
-      jsonResponse(200, { runs: [] }),
+      jsonResponse(200, []),
     );
 
     const client = createHostClient({
@@ -124,11 +124,11 @@ describe('createHostClient', () => {
       fetchImpl,
     });
 
-    const result = await client.listRuns();
-    expect(result.runs).toEqual([]);
+    const result = await client.runs.list();
+    expect(result).toEqual([]);
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      'http://127.0.0.1:51724/run.list',
+      'http://127.0.0.1:51724/runs.list',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer run-secret' }),
       }),
