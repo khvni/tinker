@@ -5,9 +5,9 @@ import type { AcpConnectorState } from '@tinker/shared-types';
 
 describe('CodingAgentsSection', () => {
   const allNotInstalled: ReadonlyArray<AcpConnectorState> = [
-    { id: 'claude-code', status: 'not-installed', message: 'Claude Code binary not found.' },
-    { id: 'codex', status: 'not-installed', message: 'Codex binary not found.' },
-    { id: 'opencode', status: 'not-installed', message: 'OpenCode binary not found.' },
+    { id: 'claude-code', name: 'Claude Code', description: "Anthropic's headless coding agent via ACP.", version: '1.0.0', authors: ['Anthropic'], status: 'not-installed', message: 'Binary "claude" not found.', cmd: 'claude', args: ['acp'] },
+    { id: 'codex', name: 'Codex', description: "OpenAI's headless coding agent via ACP.", version: '1.0.0', authors: ['OpenAI'], status: 'not-installed', message: 'Binary "codex" not found.', cmd: 'codex', args: ['acp'] },
+    { id: 'opencode', name: 'OpenCode', description: 'Open-source coding agent by Anomaly.', version: '1.0.0', authors: ['Anomaly'], status: 'not-installed', message: 'Binary "opencode" not found.', cmd: 'opencode', args: ['acp'] },
   ];
 
   it('renders section heading and goose status', () => {
@@ -19,7 +19,7 @@ describe('CodingAgentsSection', () => {
       />,
     );
 
-    expect(markup).toContain('ACP connectors');
+    expect(markup).toContain('ACP Registry');
     expect(markup).toContain('Coding Agents');
     expect(markup).toContain('Goose installed but not running');
   });
@@ -34,14 +34,13 @@ describe('CodingAgentsSection', () => {
     );
 
     expect(markup).toContain('Goose not installed');
-    expect(markup).toContain('download_cli.sh');
   });
 
-  it('renders configured connector without install hint', () => {
+  it('renders configured connector', () => {
     const configured: ReadonlyArray<AcpConnectorState> = [
-      { id: 'claude-code', status: 'configured', message: null },
-      { id: 'codex', status: 'not-installed', message: 'Codex binary not found.' },
-      { id: 'opencode', status: 'detected', message: 'OpenCode is installed but not configured.' },
+      { id: 'claude-code', name: 'Claude Code', description: "Anthropic's headless coding agent via ACP.", version: '1.0.0', authors: ['Anthropic'], status: 'configured', message: null, cmd: 'claude', args: ['acp'] },
+      { id: 'codex', name: 'Codex', description: "OpenAI's headless coding agent.", version: '1.0.0', authors: ['OpenAI'], status: 'not-installed', message: 'Binary "codex" not found.', cmd: 'codex', args: ['acp'] },
+      { id: 'opencode', name: 'OpenCode', description: 'Open-source coding agent.', version: '1.0.0', authors: ['Anomaly'], status: 'detected', message: null, cmd: 'opencode', args: ['acp'] },
     ];
 
     const markup = renderToStaticMarkup(
@@ -61,9 +60,9 @@ describe('CodingAgentsSection', () => {
 
   it('shows errored status for a broken connector', () => {
     const errored: ReadonlyArray<AcpConnectorState> = [
-      { id: 'claude-code', status: 'errored', message: 'Provider crashed on startup.' },
-      { id: 'codex', status: 'configured', message: null },
-      { id: 'opencode', status: 'unavailable', message: 'Requires Goose.' },
+      { id: 'claude-code', name: 'Claude Code', description: 'Test', version: '1.0.0', authors: ['Anthropic'], status: 'errored', message: 'Provider crashed on startup.', cmd: 'claude', args: [] },
+      { id: 'codex', name: 'Codex', description: 'Test', version: '1.0.0', authors: ['OpenAI'], status: 'configured', message: null, cmd: 'codex', args: [] },
+      { id: 'opencode', name: 'OpenCode', description: 'Test', version: '1.0.0', authors: ['Anomaly'], status: 'unavailable', message: 'No binary configured.', cmd: null, args: [] },
     ];
 
     const markup = renderToStaticMarkup(
@@ -79,7 +78,7 @@ describe('CodingAgentsSection', () => {
     expect(markup).toContain('Unavailable');
   });
 
-  it('shows all three connectors from ACP_CONNECTOR_META', () => {
+  it('renders all agents dynamically from connectorStates', () => {
     const markup = renderToStaticMarkup(
       <CodingAgentsSection
         gooseInstalled
@@ -93,7 +92,7 @@ describe('CodingAgentsSection', () => {
     expect(markup).toContain('OpenCode');
   });
 
-  it('shows install hint for not-installed connectors', () => {
+  it('shows binary name for not-installed connectors', () => {
     const markup = renderToStaticMarkup(
       <CodingAgentsSection
         gooseInstalled
@@ -102,8 +101,51 @@ describe('CodingAgentsSection', () => {
       />,
     );
 
-    expect(markup).toContain('npm install -g @anthropic-ai/claude-code');
-    expect(markup).toContain('npm install -g @openai/codex');
-    expect(markup).toContain('npm install -g opencode');
+    expect(markup).toContain('claude');
+    expect(markup).toContain('codex');
+    expect(markup).toContain('opencode');
+  });
+
+  it('renders a custom agent from registry', () => {
+    const customAgents: ReadonlyArray<AcpConnectorState> = [
+      { id: 'my-custom-agent', name: 'My Custom Agent', description: 'Does cool stuff', version: '3.0.0', authors: ['Custom Corp'], status: 'detected', message: null, cmd: '/opt/custom/agent', args: ['--acp'] },
+    ];
+
+    const markup = renderToStaticMarkup(
+      <CodingAgentsSection
+        gooseInstalled
+        gooseConnection={null}
+        connectorStates={customAgents}
+      />,
+    );
+
+    expect(markup).toContain('My Custom Agent');
+    expect(markup).toContain('Does cool stuff');
+    expect(markup).toContain('Detected');
+  });
+
+  it('shows registry path when provided', () => {
+    const markup = renderToStaticMarkup(
+      <CodingAgentsSection
+        gooseInstalled
+        gooseConnection={null}
+        connectorStates={[]}
+        registryPath="/home/user/.tinker/acp/registry.json"
+      />,
+    );
+
+    expect(markup).toContain('/home/user/.tinker/acp/registry.json');
+  });
+
+  it('shows empty state message when no agents registered', () => {
+    const markup = renderToStaticMarkup(
+      <CodingAgentsSection
+        gooseInstalled
+        gooseConnection={null}
+        connectorStates={[]}
+      />,
+    );
+
+    expect(markup).toContain('No agents registered');
   });
 });
