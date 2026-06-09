@@ -10,6 +10,7 @@ import type {
   HostConfig,
   HostInfoResponse,
   HostProviders,
+  WorkspaceCurrentResponse,
 } from './types.js';
 import { HOST_SERVICE_VERSION } from './version.js';
 
@@ -270,6 +271,19 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
     }
 
     if (handleRunRoutes(req, res, cors)) return;
+
+    if (matchPath(req, 'GET', '/workspace.current')) {
+      if (!requireAuth(req, res, cors)) return;
+
+      const body: WorkspaceCurrentResponse = {
+        hostId: identity.hostId,
+        vaultRoot: config.vaultRoot,
+        activeRuns: runManager.list().filter(s => s.status === 'running').length,
+        uptimeMs: Date.now() - startedAtMs,
+      };
+      writeJson(res, 200, body, cors);
+      return;
+    }
 
     writeError(res, 404, `Unknown route: ${req.method ?? 'UNKNOWN'} ${req.url ?? ''}`);
   };

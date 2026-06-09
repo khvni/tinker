@@ -7,4 +7,5 @@ export {
   type HostInfoResponse,
   type RunEventCallback,
   type RunEventStream,
+  type WorkspaceCurrentResponse,
 } from './createHostClient.js';

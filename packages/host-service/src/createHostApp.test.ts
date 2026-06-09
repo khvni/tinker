@@ -119,6 +119,81 @@ describe('createHostApp', () => {
     }
   });
 
+  it('returns run.list with empty array when authenticated', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/run.list`, {
+        headers: { Authorization: 'Bearer valid-secret' },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body['runs']).toEqual([]);
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it('rejects run.list without auth', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/run.list`);
+      expect(res.status).toBe(401);
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it('returns workspace.current with host metadata when authenticated', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch, { vaultRoot: '/my/vault' }),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port, hostId } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/workspace.current`, {
+        headers: { Authorization: 'Bearer valid-secret' },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body['hostId']).toBe(hostId);
+      expect(body['vaultRoot']).toBe('/my/vault');
+      expect(body['activeRuns']).toBe(0);
+      expect(typeof body['uptimeMs']).toBe('number');
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it('rejects workspace.current without auth', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/workspace.current`);
+      expect(res.status).toBe(401);
+    } finally {
+      await app.stop();
+    }
+  });
+
   it('returns 404 for unknown routes', async () => {
     const app = createHostApp({
       config: buildConfig(scratch),
@@ -128,7 +203,7 @@ describe('createHostApp', () => {
 
     const { port } = await app.start();
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/workspace.list`);
+      const res = await fetch(`http://127.0.0.1:${port}/unknown.route`);
       expect(res.status).toBe(404);
     } finally {
       await app.stop();

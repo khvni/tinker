@@ -37,6 +37,13 @@ export type RunEventStream = {
   close(): void;
 };
 
+export type WorkspaceCurrentResponse = {
+  hostId: string;
+  vaultRoot: string | null;
+  activeRuns: number;
+  uptimeMs: number;
+};
+
 export type HostClient = {
   healthCheck(): Promise<HealthCheckResponse>;
   hostInfo(): Promise<HostInfoResponse>;
@@ -50,6 +57,7 @@ export type HostClient = {
     subscribe(runId: string, callback: RunEventCallback): RunEventStream;
     replay(runId: string): Promise<StoredRunEvent[]>;
   };
+  workspaceCurrent(): Promise<WorkspaceCurrentResponse>;
 };
 
 export type CreateHostClientOptions = {
@@ -126,6 +134,17 @@ const isStoredRunEventArray = (value: unknown): value is StoredRunEvent[] => {
 const isOkResponse = (value: unknown): value is { ok: boolean } => {
   if (typeof value !== 'object' || value === null) return false;
   return (value as Record<string, unknown>)['ok'] === true;
+};
+
+const isWorkspaceCurrentResponse = (value: unknown): value is WorkspaceCurrentResponse => {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate['hostId'] === 'string' &&
+    (typeof candidate['vaultRoot'] === 'string' || candidate['vaultRoot'] === null) &&
+    typeof candidate['activeRuns'] === 'number' &&
+    typeof candidate['uptimeMs'] === 'number'
+  );
 };
 
 export const createHostClient = (options: CreateHostClientOptions): HostClient => {
@@ -238,5 +257,6 @@ export const createHostClient = (options: CreateHostClientOptions): HostClient =
     healthCheck: () => get('/health.check', isHealthCheckResponse, false),
     hostInfo: () => get('/host.info', isHostInfoResponse, true),
     runs,
+    workspaceCurrent: () => get('/workspace.current', isWorkspaceCurrentResponse, true),
   };
 };
