@@ -69,3 +69,19 @@ export function restoreAuthSession(provider: RefreshTokenProvider, userId: strin
 export function stopOpencode(pid: number): Promise<void> {
   return invoke<void>('stop_opencode', { pid });
 }
+
+export function readAuthStatus(): Promise<SSOStatus> {
+  return invoke<SSOStatus>('auth_status');
+}
+
+export function startOpencode(folderPath: string, userId: string, memorySubdir: string): Promise<OpencodeConnection> {
+  return invoke<OpencodeConnection>('start_opencode', { folderPath, userId, memorySubdir });
+}
+
+export function authSignIn(provider: AuthProvider): Promise<SSOSession> {
+  return invoke<SSOSession>('auth_sign_in', { provider });
+}
+
+export function authSignOut(provider: AuthProvider): Promise<void> {
+  return invoke('auth_sign_out', { provider });
+}
