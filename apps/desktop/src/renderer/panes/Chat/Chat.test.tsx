@@ -121,6 +121,7 @@ const noopHostClient = {
     subscribe: () => ({ close: () => undefined }),
     replay: () => Promise.resolve([]),
   },
+  workspaceCurrent: () => Promise.resolve({ hostId: 'test', vaultRoot: null, activeRuns: 0, uptimeMs: 0 }),
 };
 
 const baseProps = {
