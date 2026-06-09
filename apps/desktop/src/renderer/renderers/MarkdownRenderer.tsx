@@ -72,7 +72,7 @@ const DOMPURIFY_CONFIG = {
   FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   ALLOWED_URI_REGEXP: /^(?:https?|mailto|file):|^\//i,
-} as const;
+};
 
 export const renderMarkdown = async (text: string): Promise<string> => {
   const { body } = parseFrontmatter(text);
