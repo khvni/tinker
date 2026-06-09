@@ -1,5 +1,5 @@
-import { dataDir, join } from '@tauri-apps/api/path';
-import { copyFile, exists, mkdir, readDir, remove, writeTextFile } from '@tauri-apps/plugin-fs';
+import { copyFile, exists, mkdir, readDir, remove, writeTextFile } from './node-fs.js';
+import { dataDir, join } from './path-utils.js';
 import { emitMemoryPathChanged } from './events.js';
 import { MEMORY_FOLDER_ORDER } from './memory-categories.js';
 import { DEMO_MEMORY_NOTES } from './memory-seed.js';
@@ -44,7 +44,7 @@ let activeMemoryPathState: ActiveMemoryPathState | null = null;
 const ensureMemoryCategoryFolders = async (activeMemoryPath: string): Promise<void> => {
   await Promise.all(
     MEMORY_FOLDER_ORDER.map(async (folderName) => {
-      await mkdir(await join(activeMemoryPath, folderName), { recursive: true });
+      await mkdir(join(activeMemoryPath, folderName), { recursive: true });
     }),
   );
 };
@@ -86,7 +86,7 @@ const isPathNestedUnder = (candidate: string, ancestor: string): boolean => {
 };
 
 const listMemoryTree = async (rootPath: string, relativeDirectory = ''): Promise<RelativeMemoryTree> => {
-  const absoluteDirectory = relativeDirectory.length === 0 ? rootPath : await join(rootPath, relativeDirectory);
+  const absoluteDirectory = relativeDirectory.length === 0 ? rootPath : join(rootPath, relativeDirectory);
   const entries = await readDir(absoluteDirectory);
   const directories: string[] = [];
   const files: string[] = [];
@@ -116,7 +116,7 @@ const removeDirectoryContents = async (rootPath: string): Promise<void> => {
   }
 
   const entries = await readDir(rootPath);
-  await Promise.all(entries.map(async (entry) => remove(await join(rootPath, entry.name), { recursive: true })));
+  await Promise.all(entries.map(async (entry) => remove(join(rootPath, entry.name), { recursive: true })));
 };
 
 const seedMemoryScaffoldIfRootEmpty = async (
@@ -136,11 +136,11 @@ const seedMemoryScaffoldIfRootEmpty = async (
   for (const note of DEMO_MEMORY_NOTES) {
     const relativeDirectory = note.relativePath.split('/').slice(0, -1).join('/');
     if (relativeDirectory.length > 0 && !createdDirectories.has(relativeDirectory)) {
-      await mkdir(await join(activeMemoryPath, relativeDirectory), { recursive: true });
+      await mkdir(join(activeMemoryPath, relativeDirectory), { recursive: true });
       createdDirectories.add(relativeDirectory);
     }
 
-    await writeTextFile(await join(activeMemoryPath, note.relativePath), note.text);
+    await writeTextFile(join(activeMemoryPath, note.relativePath), note.text);
   }
 
   await ensureMemoryCategoryFolders(activeMemoryPath);
@@ -191,7 +191,7 @@ export const defaultMemoryRootSegments = (
 export const resolveDefaultMemoryRoot = async (
   runtimePlatform: string | undefined = globalThis.process?.platform,
 ): Promise<string> => {
-  const baseDataDirectory = await dataDir();
+  const baseDataDirectory = dataDir();
   const [applicationDirectory, memoryDirectory] = defaultMemoryRootSegments(baseDataDirectory, runtimePlatform);
 
   return join(baseDataDirectory, applicationDirectory, memoryDirectory);
@@ -236,7 +236,7 @@ export const getActiveMemoryPath = async (
   }
 
   const memoryRoot = await getMemoryRoot(runtimePlatform);
-  const activeMemoryPath = await join(memoryRoot, normalizedUserId);
+  const activeMemoryPath = join(memoryRoot, normalizedUserId);
   await seedMemoryScaffoldIfRootEmpty(memoryRoot, activeMemoryPath);
   return activeMemoryPath;
 };
@@ -254,7 +254,7 @@ export const syncActiveMemoryPath = async (
   }
 
   const memoryRoot = await getMemoryRoot(options?.runtimePlatform);
-  const activeMemoryPath = await join(memoryRoot, normalizedUserId);
+  const activeMemoryPath = join(memoryRoot, normalizedUserId);
   await seedMemoryScaffoldIfRootEmpty(memoryRoot, activeMemoryPath);
 
   const previousState = activeMemoryPathState;
@@ -295,7 +295,7 @@ export const validateMemoryRootWritable = async (memoryRoot: string): Promise<vo
 
   await mkdir(normalizedRoot, { recursive: true });
 
-  const probePath = await join(
+  const probePath = join(
     normalizedRoot,
     `${MEMORY_ROOT_PROBE_FILE_PREFIX}-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`,
   );
@@ -351,11 +351,11 @@ export const moveMemoryRoot = async (
 
   try {
     for (const directory of tree.directories) {
-      await mkdir(await join(normalizedNextRoot, directory), { recursive: true });
+      await mkdir(join(normalizedNextRoot, directory), { recursive: true });
     }
 
     for (const relativeFile of tree.files) {
-      await copyFile(await join(currentRoot, relativeFile), await join(normalizedNextRoot, relativeFile));
+      await copyFile(join(currentRoot, relativeFile), join(normalizedNextRoot, relativeFile));
       copiedFiles += 1;
       options?.onProgress?.({ copiedFiles, totalFiles, currentPath: relativeFile });
     }
@@ -380,7 +380,7 @@ export const moveMemoryRoot = async (
 
   const previousState = activeMemoryPathState;
   if (previousState) {
-    const nextActivePath = await join(normalizedNextRoot, previousState.userId);
+    const nextActivePath = join(normalizedNextRoot, previousState.userId);
     activeMemoryPathState = {
       root: normalizedNextRoot,
       path: nextActivePath,

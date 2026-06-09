@@ -1,19 +1,3 @@
-type TauriRuntimeWindow = Window &
-  typeof globalThis & {
-    __TAURI_INTERNALS__?: {
-      invoke?: unknown;
-    };
-  };
-
-export const isTauriRuntime = (): boolean => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const candidate = (window as TauriRuntimeWindow).__TAURI_INTERNALS__;
-  return typeof candidate?.invoke === 'function';
-};
-
 export const isElectronRuntime = (): boolean => {
   if (typeof window === 'undefined') {
     return false;
@@ -22,5 +6,4 @@ export const isElectronRuntime = (): boolean => {
   return typeof window.tinker !== 'undefined';
 };
 
-export const isDesktopRuntime = (): boolean =>
-  isTauriRuntime() || isElectronRuntime();
+export const isDesktopRuntime = (): boolean => isElectronRuntime();

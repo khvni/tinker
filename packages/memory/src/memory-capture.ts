@@ -1,5 +1,5 @@
-import { join } from '@tauri-apps/api/path';
-import { mkdir, writeTextFile } from '@tauri-apps/plugin-fs';
+import nodePath from 'node:path';
+import { mkdir, writeTextFile } from './node-fs.js';
 import { getMemoryAutoAppendEnabled } from './memory-settings.js';
 
 type MemoryCaptureLogger = (message: string, error: unknown) => void;
@@ -60,8 +60,8 @@ export const buildMemoryCapturePath = async (
   sessionCreatedAt: string,
   sessionId: string,
 ): Promise<string> => {
-  const sessionsDirectory = await join(memoryDirectory, 'sessions');
-  return join(sessionsDirectory, `${formatMemoryCaptureFileStamp(sessionCreatedAt)}-${sessionId}.md`);
+  const sessionsDirectory = nodePath.join(memoryDirectory, 'sessions');
+  return nodePath.join(sessionsDirectory, `${formatMemoryCaptureFileStamp(sessionCreatedAt)}-${sessionId}.md`);
 };
 
 export const appendMemoryCapture = async ({
@@ -78,7 +78,7 @@ export const appendMemoryCapture = async ({
       return false;
     }
 
-    const sessionsDirectory = await join(memoryDirectory, 'sessions');
+    const sessionsDirectory = nodePath.join(memoryDirectory, 'sessions');
     const path = await buildMemoryCapturePath(memoryDirectory, sessionCreatedAt, sessionId);
     await mkdir(sessionsDirectory, { recursive: true });
     await writeTextFile(

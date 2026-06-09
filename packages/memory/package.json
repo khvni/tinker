@@ -12,14 +12,12 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/plugin-fs": "^2.5.0",
-    "@tauri-apps/plugin-shell": "^2.3.5",
-    "@tauri-apps/plugin-sql": "^2.4.0",
     "@tinker/shared-types": "workspace:*",
+    "better-sqlite3": "11.7.0",
     "js-yaml": "^4.1.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
     "@types/js-yaml": "^4.0.9",
     "typescript": "^5.6.3",
     "vitest": "^2.1.0"

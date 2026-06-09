@@ -2,32 +2,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Event } from '@opencode-ai/sdk/v2/client';
 
 const {
-  mockExists,
   mockMkdir,
   mockReadDir,
   mockReadTextFile,
   mockStat,
-  mockWriteTextFile,
+  mockAppendFile,
 } = vi.hoisted(() => ({
-  mockExists: vi.fn<(path: string) => Promise<boolean>>(),
   mockMkdir: vi.fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>(),
   mockReadDir: vi.fn<
-    (path: string) => Promise<Array<{ name?: string; isDirectory: boolean; isFile: boolean; isSymlink: boolean }>>
+    (path: string, options?: unknown) => Promise<Array<{ name: string; isFile: () => boolean; isDirectory: () => boolean }>>
   >(),
-  mockReadTextFile: vi.fn<(path: string) => Promise<string>>(),
-  mockStat: vi.fn<(path: string) => Promise<{ mtime?: Date }>>(),
-  mockWriteTextFile: vi.fn<
-    (path: string, contents: string, options?: { append?: boolean; create?: boolean }) => Promise<void>
-  >(),
+  mockReadTextFile: vi.fn<(path: string, encoding?: string) => Promise<string>>(),
+  mockStat: vi.fn<(path: string) => Promise<{ mtime: Date; size: number }>>(),
+  mockAppendFile: vi.fn<(path: string, contents: string, encoding?: string) => Promise<void>>(),
 }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
-  exists: mockExists,
+vi.mock('node:fs/promises', () => ({
+  default: {
+    mkdir: mockMkdir,
+    readdir: mockReadDir,
+    readFile: mockReadTextFile,
+    stat: mockStat,
+    appendFile: mockAppendFile,
+  },
   mkdir: mockMkdir,
-  readDir: mockReadDir,
-  readTextFile: mockReadTextFile,
+  readdir: mockReadDir,
+  readFile: mockReadTextFile,
   stat: mockStat,
-  writeTextFile: mockWriteTextFile,
+  appendFile: mockAppendFile,
 }));
 
 import {
@@ -64,12 +66,11 @@ describe('parseChatHistoryText', () => {
 
 describe('readChatHistory', () => {
   beforeEach(() => {
-    mockExists.mockReset();
     mockReadTextFile.mockReset();
   });
 
   it('returns an empty list when the file is absent', async () => {
-    mockExists.mockResolvedValue(false);
+    mockReadTextFile.mockRejectedValue(new Error('ENOENT'));
 
     await expect(
       readChatHistory({
@@ -81,7 +82,6 @@ describe('readChatHistory', () => {
   });
 
   it('reads and parses stored JSONL when the file exists', async () => {
-    mockExists.mockResolvedValue(true);
     mockReadTextFile.mockResolvedValue(`${JSON.stringify(makeRecord())}\n`);
 
     await expect(
@@ -97,9 +97,9 @@ describe('readChatHistory', () => {
 describe('createChatHistoryWriter', () => {
   beforeEach(() => {
     mockMkdir.mockReset();
-    mockWriteTextFile.mockReset();
+    mockAppendFile.mockReset();
     mockMkdir.mockResolvedValue(undefined);
-    mockWriteTextFile.mockResolvedValue(undefined);
+    mockAppendFile.mockResolvedValue(undefined);
   });
 
   it('creates parent directories once and appends one JSON line per event', async () => {
@@ -117,8 +117,8 @@ describe('createChatHistoryWriter', () => {
 
     expect(mockMkdir).toHaveBeenCalledTimes(1);
     expect(mockMkdir).toHaveBeenCalledWith('/vault/project/.tinker/chats/user-1', { recursive: true });
-    expect(mockWriteTextFile).toHaveBeenCalledTimes(2);
-    expect(mockWriteTextFile).toHaveBeenNthCalledWith(
+    expect(mockAppendFile).toHaveBeenCalledTimes(2);
+    expect(mockAppendFile).toHaveBeenNthCalledWith(
       1,
       buildChatHistoryPath({
         folderPath: '/vault/project',
@@ -130,7 +130,7 @@ describe('createChatHistoryWriter', () => {
         event: 'message.part.delta',
         data: { sessionID: 'session-1', partID: 'part-1', delta: 'hi' },
       })}\n`,
-      { append: true, create: true },
+      'utf-8',
     );
   });
 
@@ -141,7 +141,7 @@ describe('createChatHistoryWriter', () => {
       releaseFirstWritePromise = resolve;
     });
 
-    mockWriteTextFile
+    mockAppendFile
       .mockImplementationOnce(
         async () => {
           steps.push('first-start');
@@ -177,7 +177,7 @@ describe('createChatHistoryWriter', () => {
   it("logs write failures without stalling later writes", async () => {
     const logger = vi.fn<(message: string, error: unknown) => void>();
 
-    mockWriteTextFile
+    mockAppendFile
       .mockRejectedValueOnce(new Error('disk full'))
       .mockResolvedValueOnce(undefined);
 
@@ -194,26 +194,25 @@ describe('createChatHistoryWriter', () => {
     await writer.flush();
 
     expect(logger).toHaveBeenCalledTimes(1);
-    expect(mockWriteTextFile).toHaveBeenCalledTimes(2);
+    expect(mockAppendFile).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('findLatestChatHistorySessionId', () => {
   beforeEach(() => {
-    mockExists.mockReset();
     mockReadDir.mockReset();
     mockStat.mockReset();
   });
 
   it('returns newest jsonl session id in the user history directory', async () => {
-    mockExists.mockResolvedValue(true);
     mockReadDir.mockResolvedValue([
-      { name: 'session-old.jsonl', isDirectory: false, isFile: true, isSymlink: false },
-      { name: 'session-new.jsonl', isDirectory: false, isFile: true, isSymlink: false },
-      { name: 'notes.md', isDirectory: false, isFile: true, isSymlink: false },
+      { name: 'session-old.jsonl', isFile: () => true, isDirectory: () => false },
+      { name: 'session-new.jsonl', isFile: () => true, isDirectory: () => false },
+      { name: 'notes.md', isFile: () => true, isDirectory: () => false },
     ]);
-    mockStat.mockImplementation(async (path) => ({
+    mockStat.mockImplementation(async (path: string) => ({
       mtime: path.endsWith('session-new.jsonl') ? new Date('2026-04-22T08:00:00.000Z') : new Date('2026-04-22T07:00:00.000Z'),
+      size: 100,
     }));
 
     await expect(

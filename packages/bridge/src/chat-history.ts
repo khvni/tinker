@@ -1,5 +1,5 @@
 import type { Event } from '@opencode-ai/sdk/v2/client';
-import { exists, mkdir, readDir, readTextFile, stat, writeTextFile } from '@tauri-apps/plugin-fs';
+import fs from 'node:fs/promises';
 
 export type StoredChatEvent = {
   ts: string;
@@ -127,35 +127,33 @@ export const readChatHistory = async (
   location: ChatHistoryLocation,
   logger: ChatHistoryLogger = defaultLogger,
 ): Promise<StoredChatEvent[]> => {
-  const path = buildChatHistoryPath(location);
-  if (!(await exists(path))) {
+  const filePath = buildChatHistoryPath(location);
+  try {
+    const text = await fs.readFile(filePath, 'utf-8');
+    return parseChatHistoryText(text, logger);
+  } catch {
     return [];
   }
-
-  const text = await readTextFile(path);
-  return parseChatHistoryText(text, logger);
 };
 
 export const findLatestChatHistorySessionId = async (
   location: ChatHistoryDirectoryLocation,
 ): Promise<string | null> => {
   const directoryPath = buildChatHistoryDirectory(location);
-  if (!(await exists(directoryPath))) {
+  let dirEntries: import('node:fs').Dirent[];
+  try {
+    dirEntries = await fs.readdir(directoryPath, { withFileTypes: true });
+  } catch {
     return null;
   }
 
-  const entries = await readDir(directoryPath);
   const candidates = await Promise.all(
-    entries
-      .filter((entry) => entry.isFile && typeof entry.name === 'string' && entry.name.endsWith('.jsonl'))
+    dirEntries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
       .map(async (entry) => {
         const name = entry.name;
-        if (!name) {
-          return null;
-        }
-
         const absolutePath = joinPath(directoryPath, name);
-        const info = await stat(absolutePath);
+        const info = await fs.stat(absolutePath);
 
         return {
           sessionId: name.slice(0, -'.jsonl'.length),
@@ -193,14 +191,11 @@ export const createChatHistoryWriter = ({
 
   const writeRecord = async (record: StoredChatEvent): Promise<void> => {
     if (!directoryReady) {
-      await mkdir(dirname(path), { recursive: true });
+      await fs.mkdir(dirname(path), { recursive: true });
       directoryReady = true;
     }
 
-    await writeTextFile(path, `${JSON.stringify(record)}\n`, {
-      append: true,
-      create: true,
-    });
+    await fs.appendFile(path, `${JSON.stringify(record)}\n`, 'utf-8');
   };
 
   const appendRecord = (record: StoredChatEvent): void => {

@@ -1,4 +1,4 @@
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile } from './node-fs.js';
 import type { Entity, EntitySource, MemorySearchResult, MemoryStore, Relationship } from '@tinker/shared-types';
 import type { VaultConfig } from '@tinker/shared-types/vault';
 import { getDatabase } from './database.js';

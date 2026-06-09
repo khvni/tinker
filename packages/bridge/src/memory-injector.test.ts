@@ -6,15 +6,20 @@ const {
   mockStat,
 } = vi.hoisted(() => ({
   mockReadDir: vi.fn<
-    (path: string) => Promise<Array<{ name?: string; isDirectory: boolean; isFile: boolean; isSymlink: boolean }>>
+    (path: string, options?: unknown) => Promise<Array<{ name: string; isFile: () => boolean; isDirectory: () => boolean }>>
   >(),
-  mockReadTextFile: vi.fn<(path: string) => Promise<string>>(),
-  mockStat: vi.fn<(path: string) => Promise<{ mtime?: Date; size?: number }>>(),
+  mockReadTextFile: vi.fn<(path: string, encoding?: string) => Promise<string>>(),
+  mockStat: vi.fn<(path: string) => Promise<{ mtime: Date; size: number }>>(),
 }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
-  readDir: mockReadDir,
-  readTextFile: mockReadTextFile,
+vi.mock('node:fs/promises', () => ({
+  default: {
+    readdir: mockReadDir,
+    readFile: mockReadTextFile,
+    stat: mockStat,
+  },
+  readdir: mockReadDir,
+  readFile: mockReadTextFile,
   stat: mockStat,
 }));
 
@@ -22,9 +27,8 @@ import { buildMemoryContext, injectMemoryContext, readRecentMemoryFiles } from '
 
 const createFileEntry = (name: string) => ({
   name,
-  isDirectory: false,
-  isFile: true,
-  isSymlink: false,
+  isDirectory: () => false,
+  isFile: () => true,
 });
 
 describe('buildMemoryContext', () => {

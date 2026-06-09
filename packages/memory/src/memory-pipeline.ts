@@ -1,4 +1,4 @@
-import { exists, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readTextFile, writeTextFile } from './node-fs.js';
 import type { EntityKind, EntitySource } from '@tinker/shared-types';
 import type { VaultConfig } from '@tinker/shared-types/vault';
 import { getDatabase } from './database.js';

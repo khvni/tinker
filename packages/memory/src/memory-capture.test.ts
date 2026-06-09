@@ -1,22 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  mockJoin,
   mockMkdir,
   mockWriteTextFile,
 } = vi.hoisted(() => ({
-  mockJoin: vi.fn<(first: string, ...segments: string[]) => Promise<string>>(),
   mockMkdir: vi.fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>(),
   mockWriteTextFile: vi.fn<
     (path: string, contents: string, options?: { append?: boolean; create?: boolean }) => Promise<void>
   >(),
 }));
 
-vi.mock('@tauri-apps/api/path', () => ({
-  join: mockJoin,
-}));
-
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('./node-fs.js', () => ({
   mkdir: mockMkdir,
   writeTextFile: mockWriteTextFile,
 }));
@@ -38,12 +32,10 @@ import {
 
 describe('memory capture helpers', () => {
   beforeEach(() => {
-    mockJoin.mockReset();
     mockMkdir.mockReset();
     mockWriteTextFile.mockReset();
     mockGetMemoryAutoAppendEnabled.mockReset();
 
-    mockJoin.mockImplementation(async (first, ...segments) => [first, ...segments].join('/'));
     mockMkdir.mockResolvedValue(undefined);
     mockWriteTextFile.mockResolvedValue(undefined);
     mockGetMemoryAutoAppendEnabled.mockResolvedValue(true);

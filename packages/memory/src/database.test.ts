@@ -1,5 +1,3 @@
-import type Database from '@tauri-apps/plugin-sql';
-import type { QueryResult } from '@tauri-apps/plugin-sql';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DATABASE_SCHEMA,
@@ -7,7 +5,21 @@ import {
   ensureJobTableColumns,
   ensureRelationshipTableColumns,
   ensureSessionTableColumns,
+  type Database,
+  type QueryResult,
 } from './database.js';
+
+vi.mock('better-sqlite3', () => ({
+  default: class {
+    pragma() { return undefined; }
+    prepare() { return { run: () => ({ changes: 0 }), all: () => [] }; }
+    close() {}
+  },
+}));
+
+vi.mock('electron', () => ({
+  app: { getPath: () => '/tmp' },
+}));
 
 describe('DATABASE_SCHEMA', () => {
   it('creates the users table with the shared-user columns', () => {

@@ -101,8 +101,7 @@ vi.mock('./memory-commands.js', () => ({
 }));
 
 vi.mock('../../runtime.js', () => ({
-  isTauriRuntime: () => true,
-  isElectronRuntime: () => false,
+  isElectronRuntime: () => true,
   isDesktopRuntime: () => true,
 }));
 

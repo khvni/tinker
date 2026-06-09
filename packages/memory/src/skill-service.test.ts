@@ -21,7 +21,7 @@ const {
   mockWriteTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(),
 }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('./node-fs.js', () => ({
   copyFile: mockCopyFile,
   exists: mockExists,
   mkdir: mockMkdir,

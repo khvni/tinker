@@ -1,9 +1,6 @@
 /**
- * Shim for `@tauri-apps/plugin-fs` that dispatches to `window.tinker`
- * when running in Electron, or falls back to the real Tauri plugin.
+ * Electron-only FS layer. Delegates to `window.tinker` (Electron preload).
  */
-
-import { isElectronRuntime } from './runtime.js';
 
 const api = (): NonNullable<typeof window.tinker> => {
   const tinker = window.tinker;
@@ -14,34 +11,18 @@ const api = (): NonNullable<typeof window.tinker> => {
 };
 
 export const readFile = async (path: string): Promise<Uint8Array<ArrayBuffer>> => {
-  if (isElectronRuntime()) {
-    const raw = await api().readFile(path);
-    return new Uint8Array(raw);
-  }
-  const m = await import('@tauri-apps/plugin-fs');
-  return m.readFile(path);
+  const raw = await api().readFile(path);
+  return new Uint8Array(raw);
 };
 
 export const readTextFile = async (path: string): Promise<string> => {
-  if (isElectronRuntime()) {
-    return api().readTextFile(path);
-  }
-  const m = await import('@tauri-apps/plugin-fs');
-  return m.readTextFile(path);
+  return api().readTextFile(path);
 };
 
 export const writeTextFile = async (path: string, content: string): Promise<void> => {
-  if (isElectronRuntime()) {
-    return api().writeTextFile(path, content);
-  }
-  const m = await import('@tauri-apps/plugin-fs');
-  return m.writeTextFile(path, content);
+  return api().writeTextFile(path, content);
 };
 
 export const exists = async (path: string): Promise<boolean> => {
-  if (isElectronRuntime()) {
-    return api().exists(path);
-  }
-  const m = await import('@tauri-apps/plugin-fs');
-  return m.exists(path);
+  return api().exists(path);
 };

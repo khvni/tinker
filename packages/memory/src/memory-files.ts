@@ -1,4 +1,4 @@
-import { readTextFile, stat } from '@tauri-apps/plugin-fs';
+import { readTextFile, stat } from './node-fs.js';
 import {
   bucketForFrontmatter,
   bucketForRelativePath,
