@@ -24,4 +24,3 @@ export const isElectronRuntime = (): boolean => {
 
 export const isDesktopRuntime = (): boolean =>
   isTauriRuntime() || isElectronRuntime();
-

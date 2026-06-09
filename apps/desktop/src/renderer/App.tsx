@@ -170,7 +170,7 @@ const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSO
   };
 };
 
-const readAuthStatus = async (): Promise<SSOStatus> => {
+const readAuthStatusWrapped = async (): Promise<SSOStatus> => {
   return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
 };
 
@@ -423,7 +423,7 @@ export const App = (): JSX.Element => {
       const conn = state.opencodes[key];
       if (!conn) return;
 
-      await invoke('stop_opencode', { pid: conn.pid });
+      if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
       setState((current) => {
         if (current.status !== 'ready') return current;
         const { [key]: _, ...rest } = current.opencodes;
@@ -440,7 +440,7 @@ export const App = (): JSX.Element => {
       if (!conn) return;
 
       refcountsRef.current[key] = 0;
-      await invoke('stop_opencode', { pid: conn.pid });
+      if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
       setState((current) => {
         if (current.status !== 'ready') return current;
         const { [key]: _, ...rest } = current.opencodes;
@@ -518,7 +518,7 @@ export const App = (): JSX.Element => {
       } catch (error) {
         for (const conn of Object.values(nextOpencodes)) {
           try {
-            await invoke('stop_opencode', { pid: conn.pid });
+            if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
           } catch (stopError) {
             console.warn('Failed to stop a partially refreshed OpenCode sidecar.', stopError);
           }
@@ -529,7 +529,7 @@ export const App = (): JSX.Element => {
       await Promise.all(
         Object.values(previousState.opencodes).map(async (conn) => {
           try {
-            await invoke('stop_opencode', { pid: conn.pid });
+            if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
           } catch (error) {
             console.warn('Failed to stop a replaced OpenCode sidecar.', error);
           }
@@ -628,7 +628,7 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const sessions = await readAuthStatus();
+        const sessions = await readAuthStatusWrapped();
         await migrateLocalUserIdentity('local-user', GUEST_USER_ID);
         await syncStoredUsers(sessions);
         await syncCurrentUserMemoryPath(sessions, { emit: false });
