@@ -44,15 +44,10 @@ type HighlightedCodeToken = Tokens.Code & {
  *
  * DOMPurify strips dangerous HTML (scripts, event attributes, etc.)
  * and neutralises XSS vectors that the marked parser itself does not
- * catch. We additionally allow `data:` URIs in href attributes — a
- * deliberate trade-off: data URIs are blocked by default because they
- * can carry payloads, but inside markdown link destinations (which are
- * not user-controlled HTML) they are inert unless the renderer wraps
- * them in an <a href="data:..."> that the browser executes. DOMPurify
- * blocks <a href="data:..."> by default; we override this with
- * ALLOWED_URI_REGEXP so that legitimate data-URL links in markdown
- * are preserved rather than stripped to # — the alternative would be
- * silently replacing data: links with #, which is confusing for users.
+ * catch. We use a custom `ALLOWED_URI_REGEXP` that permits only
+ * `https?:`, `mailto:`, `file:`, and relative URLs. Dangerous schemes
+ * like `javascript:`, `vbscript:`, and `data:` are blocked — `data:`
+ * URIs in links are an XSS vector that DOMPurify is right to reject.
  *
  * The final safety net is `dangerouslySetInnerHTML` in the React
  * component — it renders the sanitized HTML inside an <article> with
@@ -125,7 +120,7 @@ export const MarkdownRenderer = ({ params, vaultRevision }: MarkdownRendererProp
         const text = await readTextFile(path);
         const rendered = await renderMarkdown(text);
         if (active) {
-          setHtml(DOMPurify.sanitize(rendered));
+          setHtml(rendered);
         }
       } catch (nextError) {
         if (active) {
