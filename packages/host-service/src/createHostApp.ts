@@ -278,7 +278,7 @@ export const createHostApp = (args: CreateHostAppArgs): HostAppHandle => {
       const body: WorkspaceCurrentResponse = {
         hostId: identity.hostId,
         vaultRoot: config.vaultRoot,
-        activeRuns: runManager.list().filter(s => s.status === 'running').length,
+        activeRuns: runManager.list().filter(s => s.status === 'active').length,
         uptimeMs: Date.now() - startedAtMs,
       };
       writeJson(res, 200, body, cors);
