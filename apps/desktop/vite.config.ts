@@ -2,10 +2,30 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
+const nativeStub = resolve(__dirname, 'src/renderer/native-stub.ts');
+
+const isTest = process.env['VITEST'] === 'true';
+
+const browserAliases = isTest
+  ? {}
+  : {
+      'better-sqlite3': nativeStub,
+      electron: nativeStub,
+      'node:fs/promises': nativeStub,
+      'node:fs': nativeStub,
+      'node:path': nativeStub,
+      'node:os': nativeStub,
+      'node:child_process': nativeStub,
+      'node:util': nativeStub,
+    };
+
 export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
   clearScreen: false,
   plugins: [react()],
+  resolve: {
+    alias: browserAliases,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

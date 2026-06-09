@@ -272,11 +272,25 @@ const ensureLayoutTableShape = async (database: Database): Promise<void> => {
 const resolveDbPath = async (dbName = DEFAULT_DB_NAME): Promise<string> => {
   try {
     const moduleName = 'electron';
-    const electron = await (import(moduleName) as Promise<{ app: { getPath: (name: string) => string } }>);
+    const electron = await (import(/* @vite-ignore */ moduleName) as Promise<{ app: { getPath: (name: string) => string } }>);
     const userData = electron.app.getPath('userData');
     return path.join(userData, dbName);
-  } catch {
-    return path.join(process.cwd(), dbName);
+  } catch (error: unknown) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as Record<string, unknown>)['code'] === 'MODULE_NOT_FOUND'
+    ) {
+      return path.join(process.cwd(), dbName);
+    }
+    if (
+      error instanceof Error &&
+      (error.message.includes('Cannot find module') || error.message.includes('is not defined'))
+    ) {
+      return path.join(process.cwd(), dbName);
+    }
+    throw error;
   }
 };
 
@@ -304,4 +318,8 @@ export const getDatabase = async (dbPath?: string): Promise<Database> => {
   }
 
   return databasePromise;
+};
+
+export const resetDatabase = (): void => {
+  databasePromise = null;
 };

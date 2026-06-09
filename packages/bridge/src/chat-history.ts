@@ -1,4 +1,5 @@
 import type { Event } from '@opencode-ai/sdk/v2/client';
+import type { Dirent } from 'node:fs';
 import fs from 'node:fs/promises';
 
 export type StoredChatEvent = {
@@ -140,7 +141,7 @@ export const findLatestChatHistorySessionId = async (
   location: ChatHistoryDirectoryLocation,
 ): Promise<string | null> => {
   const directoryPath = buildChatHistoryDirectory(location);
-  let dirEntries: import('node:fs').Dirent[];
+  let dirEntries: Dirent[];
   try {
     dirEntries = await fs.readdir(directoryPath, { withFileTypes: true });
   } catch {

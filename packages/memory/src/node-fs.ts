@@ -45,6 +45,9 @@ export const writeTextFile = async (
   content: string,
   options?: WriteTextFileOptions,
 ): Promise<void> => {
+  if (options?.create === false) {
+    await fs.access(filePath);
+  }
   if (options?.append) {
     await fs.appendFile(filePath, content, 'utf-8');
   } else {

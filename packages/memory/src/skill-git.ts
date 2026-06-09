@@ -16,17 +16,27 @@ type GitResult = {
   stderr: string;
 };
 
+const isExecError = (error: unknown): error is { code: number; stdout: string; stderr: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  typeof (error as Record<string, unknown>)['code'] === 'number' &&
+  'stdout' in error &&
+  'stderr' in error;
+
 const runGit = async (args: string[], cwd: string): Promise<GitResult> => {
   try {
     const { stdout, stderr } = await execFileAsync('git', args, { cwd });
     return { code: 0, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (error: unknown) {
-    const execError = error as { code?: number; stdout?: string; stderr?: string };
-    return {
-      code: execError.code ?? 1,
-      stdout: (execError.stdout ?? '').trim(),
-      stderr: (execError.stderr ?? '').trim(),
-    };
+    if (isExecError(error)) {
+      return {
+        code: error.code,
+        stdout: error.stdout.trim(),
+        stderr: error.stderr.trim(),
+      };
+    }
+    return { code: 1, stdout: '', stderr: String(error) };
   }
 };
 
