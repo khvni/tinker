@@ -39,4 +39,21 @@ describe('sanitizeHtml', () => {
     const withAttrs = '<a href="https://example.com" target="_blank">Link</a>';
     expect(sanitizeHtml(withAttrs)).toContain('href=');
   });
+
+  it('strips <link> tags that could load external stylesheets', () => {
+    const dirty = '<link rel="stylesheet" href="https://evil.com/exfil.css"><p>Content</p>';
+    expect(sanitizeHtml(dirty)).not.toContain('<link');
+    expect(sanitizeHtml(dirty)).toContain('<p>Content</p>');
+  });
+
+  it('strips script tags (DOMPurify default regression guard)', () => {
+    const dirty = '<script>alert("xss")</script><p>Safe</p>';
+    expect(sanitizeHtml(dirty)).not.toContain('<script');
+    expect(sanitizeHtml(dirty)).toContain('<p>Safe</p>');
+  });
+
+  it('strips inline event handlers', () => {
+    const dirty = '<img src="x" onerror="fetch(\'https://evil.com\')">';
+    expect(sanitizeHtml(dirty)).not.toContain('onerror');
+  });
 });
