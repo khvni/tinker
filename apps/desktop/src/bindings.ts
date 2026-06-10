@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './renderer/electron-shims.js';
 import type { SSOProvider, SSOSession, SSOStatus } from '@tinker/shared-types';
 
 export const GOOGLE_SCOPES = [

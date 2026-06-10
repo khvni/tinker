@@ -79,7 +79,7 @@ describe('<Titlebar>', () => {
     expect(withTrailing).toContain('>baz<');
   });
 
-  it('marks the root with data-tauri-drag-region', () => {
+  it('marks the root with the draggable class for CSS-based window drag', () => {
     const markup = renderToStaticMarkup(
       <Titlebar
         sessionFolderPath={null}
@@ -89,10 +89,10 @@ describe('<Titlebar>', () => {
         onToggleRightInspector={() => undefined}
       />,
     );
-    expect(markup).toMatch(/<header[^>]*class="tinker-titlebar"[^>]*data-tauri-drag-region/);
+    expect(markup).toMatch(/<header[^>]*class="tinker-titlebar tinker-titlebar--draggable"/);
   });
 
-  it('marks the actions cluster with data-tauri-drag-region="false"', () => {
+  it('renders the actions cluster without drag region', () => {
     const markup = renderToStaticMarkup(
       <Titlebar
         sessionFolderPath={null}
@@ -102,9 +102,7 @@ describe('<Titlebar>', () => {
         onToggleRightInspector={() => undefined}
       />,
     );
-    expect(markup).toMatch(
-      /<div[^>]*class="tinker-titlebar__actions"[^>]*data-tauri-drag-region="false"/,
-    );
+    expect(markup).toMatch(/<div[^>]*class="tinker-titlebar__actions"/);
   });
 
   it('reflects rail visibility via aria-pressed on each toggle', () => {
@@ -156,9 +154,7 @@ describe('<Titlebar>', () => {
       />,
     );
     expect(markup).toMatch(/<div[^>]*class="tinker-titlebar__spacer"[^>]*>/);
-    expect(markup).not.toMatch(
-      /<div[^>]*class="tinker-titlebar__spacer"[^>]*data-tauri-drag-region="false"/,
-    );
+    expect(markup).toMatch(/<div[^>]*class="tinker-titlebar__spacer"/);
   });
 
   describe('click handlers', () => {

@@ -100,6 +100,30 @@ const noopSkillStore: SkillStore = {
   setGitConfig: () => Promise.resolve(),
 };
 
+const noopHostClient = {
+  healthCheck: () => Promise.resolve({ status: 'ok' as const, hostId: 'test', version: '0.0.0' }),
+  hostInfo: () =>
+    Promise.resolve({
+      hostId: 'test',
+      hostName: 'test',
+      platform: 'linux' as NodeJS.Platform,
+      version: '0.0.0',
+      uptimeMs: 0,
+      deviceCount: 0,
+    }),
+  runs: {
+    create: () => Promise.resolve({ id: 'r1', title: '', status: 'active' as const, projectPath: null, createdAt: '', updatedAt: '', modelID: null, providerID: null }),
+    get: () => Promise.resolve({ id: 'r1', title: '', status: 'active' as const, projectPath: null, createdAt: '', updatedAt: '', modelID: null, providerID: null }),
+    list: () => Promise.resolve([]),
+    prompt: () => Promise.resolve(),
+    abort: () => Promise.resolve(),
+    approve: () => Promise.resolve(),
+    subscribe: () => ({ close: () => undefined }),
+    replay: () => Promise.resolve([]),
+  },
+  workspaceCurrent: () => Promise.resolve({ hostId: 'test', vaultRoot: null, activeRuns: 0, uptimeMs: 0 }),
+};
+
 const baseProps = {
   skillStore: noopSkillStore,
   currentUserId: 'test-user',
@@ -109,6 +133,7 @@ const baseProps = {
     username: 'test',
     password: 'test',
   },
+  hostClient: noopHostClient,
   sessionFolderPath: null,
   vaultPath: null,
   skillsRootPath: null,

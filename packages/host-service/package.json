@@ -5,11 +5,18 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "bin": {
+    "tinker-host": "./src/bin.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@tinker/shared-types": "workspace:*",
+    "tsx": "^4.19.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",

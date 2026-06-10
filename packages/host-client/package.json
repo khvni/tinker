@@ -11,6 +11,9 @@
     "lint": "eslint src",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@tinker/shared-types": "workspace:*"
+  },
   "devDependencies": {
     "@tinker/host-service": "workspace:*",
     "@types/node": "^20.11.30",

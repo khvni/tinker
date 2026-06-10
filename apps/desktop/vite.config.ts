@@ -16,11 +16,11 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true,
-    target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
-    sourcemap: Boolean(process.env.TAURI_ENV_DEBUG),
+    target: 'chrome130',
+    sourcemap: true,
   },
   server: {
-    host: process.env.TAURI_DEV_HOST ?? '127.0.0.1',
+    host: '127.0.0.1',
     port: 1420,
     strictPort: true,
   },

@@ -34,7 +34,19 @@ const getBlockSignature = (block: Block): string => {
     return `${block.partID}:${block.kind}:${block.text}`;
   }
 
-  return `${block.partID}:${block.kind}:${block.state}:${block.output ?? ''}:${block.error ?? ''}`;
+  if (block.kind === 'tool') {
+    return `${block.partID}:${block.kind}:${block.state}:${block.output ?? ''}:${block.error ?? ''}`;
+  }
+
+  if (block.kind === 'approval') {
+    return `${block.partID}:${block.kind}:${block.tool}`;
+  }
+
+  if (block.kind === 'delegate') {
+    return `${block.partID}:${block.kind}:${block.agent}`;
+  }
+
+  return `${block.partID}:${block.kind}:${block.agent}`;
 };
 
 const resolveUsageModel = (

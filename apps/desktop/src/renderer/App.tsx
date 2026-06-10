@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { homeDir, join } from '@tauri-apps/api/path';
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
-import { open as openExternal } from '@tauri-apps/plugin-shell';
+import { invoke, homeDir, join, isPermissionGranted, requestPermission, sendNotification, openExternal } from './electron-shims.js';
 import {
   createLayoutStore,
   createMemoryStore,
@@ -34,8 +31,9 @@ import {
   EXA_MCP_NAME,
   type MCPStatus,
 } from './integrations.js';
+import { createHostClient } from '@tinker/host-client';
 import { createWorkspaceClient, getOpencodeDirectory, pickFirstOauthProvider } from './opencode.js';
-import { isTauriRuntime } from './runtime.js';
+import { isDesktopRuntime } from './runtime.js';
 import {
   buildStoredUserId,
   toStoredUser,
@@ -109,6 +107,9 @@ const WEB_PREVIEW_CONNECTION: OpencodeConnection = {
   password: 'preview',
 };
 
+const HOST_SERVICE_DEFAULT_PORT = 51724;
+const DEFAULT_HOST_SECRET = 'tinker-dev';
+
 const providerDisplayName = (provider: AuthProvider): string => {
   switch (provider) {
     case 'google':
@@ -173,7 +174,7 @@ const withDefaultSessions = (status: Partial<SSOStatus> | null | undefined): SSO
   };
 };
 
-const readAuthStatus = async (): Promise<SSOStatus> => {
+const readAuthStatusWrapped = async (): Promise<SSOStatus> => {
   return withDefaultSessions(await invoke<AuthStatus>('auth_status'));
 };
 
@@ -326,7 +327,7 @@ const disconnectModelProvider = async (connection: OpencodeConnection, vaultPath
 };
 
 export const App = (): JSX.Element => {
-  const nativeRuntime = useMemo(() => isTauriRuntime(), []);
+  const nativeRuntime = useMemo(() => isDesktopRuntime(), []);
   const memoryStore = useMemo(() => createMemoryStore(), []);
   const layoutStore = useMemo(() => createLayoutStore(), []);
   const schedulerStore = useMemo(() => createScheduledJobStore(), []);
@@ -426,7 +427,7 @@ export const App = (): JSX.Element => {
       const conn = state.opencodes[key];
       if (!conn) return;
 
-      await invoke('stop_opencode', { pid: conn.pid });
+      if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
       setState((current) => {
         if (current.status !== 'ready') return current;
         const { [key]: _, ...rest } = current.opencodes;
@@ -443,7 +444,7 @@ export const App = (): JSX.Element => {
       if (!conn) return;
 
       refcountsRef.current[key] = 0;
-      await invoke('stop_opencode', { pid: conn.pid });
+      if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
       setState((current) => {
         if (current.status !== 'ready') return current;
         const { [key]: _, ...rest } = current.opencodes;
@@ -521,7 +522,7 @@ export const App = (): JSX.Element => {
       } catch (error) {
         for (const conn of Object.values(nextOpencodes)) {
           try {
-            await invoke('stop_opencode', { pid: conn.pid });
+            if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
           } catch (stopError) {
             console.warn('Failed to stop a partially refreshed OpenCode sidecar.', stopError);
           }
@@ -532,7 +533,7 @@ export const App = (): JSX.Element => {
       await Promise.all(
         Object.values(previousState.opencodes).map(async (conn) => {
           try {
-            await invoke('stop_opencode', { pid: conn.pid });
+            if (conn.pid != null) await invoke<void>('stop_opencode', { pid: conn.pid });
           } catch (error) {
             console.warn('Failed to stop a replaced OpenCode sidecar.', error);
           }
@@ -631,7 +632,7 @@ export const App = (): JSX.Element => {
           return;
         }
 
-        const sessions = await readAuthStatus();
+        const sessions = await readAuthStatusWrapped();
         await migrateLocalUserIdentity('local-user', GUEST_USER_ID);
         await syncStoredUsers(sessions);
         await syncCurrentUserMemoryPath(sessions, { emit: false });
@@ -1054,6 +1055,15 @@ export const App = (): JSX.Element => {
     await bindSessionFolder(defaultPath, true);
   }, [bindSessionFolder, nativeRuntime]);
 
+  const hostClient = useMemo(
+    () =>
+      createHostClient({
+        baseUrl: `http://127.0.0.1:${HOST_SERVICE_DEFAULT_PORT}`,
+        secret: DEFAULT_HOST_SECRET,
+      }),
+    [],
+  );
+
   if (state.status === 'loading' || currentUserState.status === 'loading') {
     return (
       <div className="tinker-app">
@@ -1300,6 +1310,7 @@ export const App = (): JSX.Element => {
         microsoftAuthBusy={providerBusy.microsoft}
         microsoftAuthMessage={providerMessages.microsoft}
         opencode={defaultConnection(state)}
+        hostClient={hostClient}
         sessions={currentSessions}
         mcpStatus={state.mcpStatus}
         vaultPath={state.vaultPath}

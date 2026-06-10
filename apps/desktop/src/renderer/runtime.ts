@@ -14,3 +14,13 @@ export const isTauriRuntime = (): boolean => {
   return typeof candidate?.invoke === 'function';
 };
 
+export const isElectronRuntime = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return typeof window.tinker !== 'undefined';
+};
+
+export const isDesktopRuntime = (): boolean =>
+  isTauriRuntime() || isElectronRuntime();

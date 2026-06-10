@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './electron-shims.js';
 import { listUsersByLastSeen, upsertUser } from '@tinker/memory';
 import type { SSOSession, SSOStatus, User } from '@tinker/shared-types';
 import { DEFAULT_USER_ID, restoreAuthSession, type AuthProvider, type AuthStatus } from '../bindings.js';

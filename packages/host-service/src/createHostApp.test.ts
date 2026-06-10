@@ -20,13 +20,15 @@ const stubSecretsWriter: IntegrationCredentialWriter = {
   delete: async () => undefined,
 };
 
-const buildConfig = (overrides: Partial<HostConfig> = {}): HostConfig => ({
+const buildConfig = (scratch: string, overrides: Partial<HostConfig> = {}): HostConfig => ({
   dbPath: '/tmp/tinker-host-test.sqlite',
   vaultRoot: null,
   migrationsPath: '/tmp/tinker-host-test-migrations',
+  runsDir: join(scratch, 'runs'),
   allowedOrigins: [],
   listenHost: '127.0.0.1',
   listenPort: 0,
+  gooseBin: null,
   ...overrides,
 });
 
@@ -51,7 +53,7 @@ describe('createHostApp', () => {
 
   it('binds a free port and exposes hostId via /health.check without auth', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('test-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -72,7 +74,7 @@ describe('createHostApp', () => {
 
   it('rejects /host.info without a valid PSK', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -93,7 +95,7 @@ describe('createHostApp', () => {
 
   it('returns full host.info payload when authenticated', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -117,16 +119,91 @@ describe('createHostApp', () => {
     }
   });
 
-  it('returns 404 for unknown routes', async () => {
+  it('returns runs.list with empty array when authenticated', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
 
     const { port } = await app.start();
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/workspace.list`);
+      const res = await fetch(`http://127.0.0.1:${port}/runs.list`, {
+        headers: { Authorization: 'Bearer valid-secret' },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as unknown;
+      expect(body).toEqual([]);
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it('rejects runs.list without auth', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/runs.list`);
+      expect(res.status).toBe(401);
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it('returns workspace.current with host metadata when authenticated', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch, { vaultRoot: '/my/vault' }),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port, hostId } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/workspace.current`, {
+        headers: { Authorization: 'Bearer valid-secret' },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body['hostId']).toBe(hostId);
+      expect(body['vaultRoot']).toBe('/my/vault');
+      expect(body['activeRuns']).toBe(0);
+      expect(typeof body['uptimeMs']).toBe('number');
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it('rejects workspace.current without auth', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/workspace.current`);
+      expect(res.status).toBe(401);
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it('returns 404 for unknown routes', async () => {
+    const app = createHostApp({
+      config: buildConfig(scratch),
+      providers: buildProviders('valid-secret'),
+      identityOptions: { identityDir: scratch },
+    });
+
+    const { port } = await app.start();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/unknown.route`);
       expect(res.status).toBe(404);
     } finally {
       await app.stop();
@@ -135,7 +212,7 @@ describe('createHostApp', () => {
 
   it('honors the CORS allowlist on preflight requests', async () => {
     const app = createHostApp({
-      config: buildConfig({ allowedOrigins: ['https://allowed.example'] }),
+      config: buildConfig(scratch, { allowedOrigins: ['https://allowed.example'] }),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -162,7 +239,7 @@ describe('createHostApp', () => {
 
   it('throws when start is called twice without stop', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });
@@ -177,7 +254,7 @@ describe('createHostApp', () => {
 
   it('treats stop as idempotent before and after start', async () => {
     const app = createHostApp({
-      config: buildConfig(),
+      config: buildConfig(scratch),
       providers: buildProviders('valid-secret'),
       identityOptions: { identityDir: scratch },
     });

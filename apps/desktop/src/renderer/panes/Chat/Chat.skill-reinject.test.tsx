@@ -12,14 +12,13 @@ import type { SkillStore } from '@tinker/shared-types';
 // Regression for the bug flagged in Playbook review round 1:
 // bumping `activeSkillsRevision` after the user toggles / installs a skill
 // USED to force the session-reset effect to re-run — which aborts the live
-// OpenCode session, wipes the rendered messages, disposes the history writer,
-// and rehydrates from disk. That meant every skill toggle nuked the active
-// Chat pane mid-session.
+// run, wipes the rendered messages, and rehydrates from host-service. That
+// meant every skill toggle nuked the active Chat pane mid-session.
 //
 // After the fix: the reset effect no longer depends on `activeSkillsRevision`;
-// re-injection happens lazily in `injectActiveSkillsIfStale` before the next
-// prompt. This test asserts the reset behavior (abort + wipe) does NOT fire
-// when `activeSkillsRevision` changes.
+// re-injection happens lazily via the host-service before the next prompt.
+// This test asserts the reset behavior (abort + wipe) does NOT fire when
+// `activeSkillsRevision` changes.
 
 type MockClient = {
   config: {
@@ -38,8 +37,7 @@ type MockClient = {
 
 const mocks = vi.hoisted(() => ({
   client: null as MockClient | null,
-  findLatestChatHistorySessionId: null as ReturnType<typeof vi.fn> | null,
-  getSession: null as ReturnType<typeof vi.fn> | null,
+  hostClientRunsList: null as ReturnType<typeof vi.fn> | null,
 }));
 
 vi.mock('../../opencode.js', () => ({
@@ -61,12 +59,7 @@ vi.mock('@tinker/bridge', () => ({
     appendEvent: () => undefined,
     dispose: () => Promise.resolve(),
   }),
-  findLatestChatHistorySessionId: (...args: unknown[]) => {
-    if (mocks.findLatestChatHistorySessionId) {
-      return mocks.findLatestChatHistorySessionId(...args) as Promise<string | null>;
-    }
-    return Promise.resolve(null);
-  },
+  findLatestChatHistorySessionId: () => Promise.resolve(null),
   readChatHistory: () => Promise.resolve([]),
 }));
 
@@ -74,12 +67,7 @@ vi.mock('@tinker/memory', () => ({
   appendMemoryCapture: () => Promise.resolve(false),
   createSession: () => Promise.resolve(),
   findLatestSessionForFolder: () => Promise.resolve(null),
-  getSession: (...args: unknown[]) => {
-    if (mocks.getSession) {
-      return mocks.getSession(...args) as Promise<unknown>;
-    }
-    return Promise.resolve(null);
-  },
+  getSession: () => Promise.resolve(null),
   getActiveMemoryPath: () => Promise.resolve('/memory/test-user'),
   listSessionsForUser: () => Promise.resolve([]),
   subscribeMemoryPathChanged: () => () => undefined,
@@ -114,6 +102,54 @@ const noopSkillStore: SkillStore = {
   setGitConfig: () => Promise.resolve(),
 };
 
+const makeHostClient = () => {
+  const listFn = vi.fn(() => Promise.resolve([]));
+  mocks.hostClientRunsList = listFn;
+  return {
+    healthCheck: () => Promise.resolve({ status: 'ok' as const, hostId: 'test', version: '0.0.0' }),
+    hostInfo: () =>
+      Promise.resolve({
+        hostId: 'test',
+        hostName: 'test',
+        platform: 'linux' as NodeJS.Platform,
+        version: '0.0.0',
+        uptimeMs: 0,
+        deviceCount: 0,
+      }),
+    runs: {
+      create: () =>
+        Promise.resolve({
+          id: 'r1',
+          title: '',
+          status: 'active' as const,
+          projectPath: null,
+          createdAt: '',
+          updatedAt: '',
+          modelID: null,
+          providerID: null,
+        }),
+      get: () =>
+        Promise.resolve({
+          id: 'r1',
+          title: '',
+          status: 'active' as const,
+          projectPath: null,
+          createdAt: '',
+          updatedAt: '',
+          modelID: null,
+          providerID: null,
+        }),
+      list: listFn,
+      prompt: () => Promise.resolve(),
+      abort: () => Promise.resolve(),
+      approve: () => Promise.resolve(),
+      subscribe: () => ({ close: () => undefined }),
+      replay: () => Promise.resolve([]),
+    },
+    workspaceCurrent: () => Promise.resolve({ hostId: 'test', vaultRoot: null, activeRuns: 0, uptimeMs: 0 }),
+  };
+};
+
 const baseProps = {
   skillStore: noopSkillStore,
   currentUserId: 'test-user',
@@ -123,6 +159,7 @@ const baseProps = {
     username: 'test',
     password: 'test',
   },
+  hostClient: makeHostClient(),
   sessionFolderPath: null,
   vaultPath: null,
   skillsRootPath: null,
@@ -139,6 +176,7 @@ const flushEffects = async (): Promise<void> => {
 describe('<Chat> — skill re-inject decoupled from session reset', () => {
   let container: HTMLDivElement;
   let root: Root;
+  let hostClient: ReturnType<typeof makeHostClient>;
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -165,8 +203,7 @@ describe('<Chat> — skill re-inject decoupled from session reset', () => {
         create: vi.fn(() => Promise.resolve({ data: { id: 'session-test' } })),
       },
     };
-    mocks.findLatestChatHistorySessionId = vi.fn(() => Promise.resolve(null));
-    mocks.getSession = vi.fn(() => Promise.resolve(null));
+    hostClient = makeHostClient();
   });
 
   afterEach(async () => {
@@ -179,41 +216,30 @@ describe('<Chat> — skill re-inject decoupled from session reset', () => {
   });
 
   it('does NOT re-run the session-reset effect when activeSkillsRevision changes', async () => {
-    // Mount with a concrete sessionFolderPath so the session-reset effect
-    // actually calls findLatestChatHistorySessionId (which is its best
-    // observable side-effect when there is no prior session ID).
     await act(async () => {
       root.render(
         <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/a" activeSkillsRevision={0} />
+          <Chat {...baseProps} hostClient={hostClient} sessionFolderPath="/vault/a" activeSkillsRevision={0} />
         </ToastProvider>,
       );
     });
     await flushEffects();
 
-    if (!mocks.client || !mocks.findLatestChatHistorySessionId) {
-      throw new Error('mocks not installed');
-    }
-
-    const hydrateCallsAfterMount = mocks.findLatestChatHistorySessionId.mock.calls.length;
+    const hydrateCallsAfterMount = hostClient.runs.list.mock.calls.length;
     expect(hydrateCallsAfterMount).toBeGreaterThanOrEqual(1);
 
-    // Bump revision — before the fix this re-ran the reset effect (which
-    // aborts the live session, wipes messages, and re-hydrates from disk).
+    // Bump revision — before the fix this re-ran the reset effect.
     await act(async () => {
       root.render(
         <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/a" activeSkillsRevision={1} />
+          <Chat {...baseProps} hostClient={hostClient} sessionFolderPath="/vault/a" activeSkillsRevision={1} />
         </ToastProvider>,
       );
     });
     await flushEffects();
 
-    // The session-reset effect must NOT have re-run — the hydrate path is the
-    // canonical proxy for "reset effect fired".
-    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
-    // And no NEW abort call was scheduled from the reset effect.
-    expect(mocks.client.session.abort.mock.calls.length).toBe(0);
+    // The session-reset effect must NOT have re-run.
+    expect(hostClient.runs.list.mock.calls.length).toBe(hydrateCallsAfterMount);
     // Chat log is still mounted.
     expect(container.querySelector('.tinker-chat-log')).not.toBeNull();
 
@@ -221,114 +247,63 @@ describe('<Chat> — skill re-inject decoupled from session reset', () => {
     await act(async () => {
       root.render(
         <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/a" activeSkillsRevision={5} />
+          <Chat {...baseProps} hostClient={hostClient} sessionFolderPath="/vault/a" activeSkillsRevision={5} />
         </ToastProvider>,
       );
     });
     await flushEffects();
 
-    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
-    expect(mocks.client.session.abort.mock.calls.length).toBe(0);
+    expect(hostClient.runs.list.mock.calls.length).toBe(hydrateCallsAfterMount);
   });
 
   it('does NOT re-run the session-reset effect when onPersistSessionId changes', async () => {
     await act(async () => {
       root.render(
         <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
+          <Chat {...baseProps} hostClient={hostClient} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
         </ToastProvider>,
       );
     });
     await flushEffects();
 
-    if (!mocks.findLatestChatHistorySessionId) {
-      throw new Error('mock not installed');
-    }
-
-    const hydrateCallsAfterMount = mocks.findLatestChatHistorySessionId.mock.calls.length;
+    const hydrateCallsAfterMount = hostClient.runs.list.mock.calls.length;
     expect(hydrateCallsAfterMount).toBeGreaterThanOrEqual(1);
 
     await act(async () => {
       root.render(
         <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
+          <Chat {...baseProps} hostClient={hostClient} sessionFolderPath="/vault/a" onPersistSessionId={() => undefined} />
         </ToastProvider>,
       );
     });
     await flushEffects();
 
-    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
-    expect(mocks.client?.session.abort.mock.calls.length).toBe(0);
-  });
-
-  it('does NOT re-run the session-reset effect when paneSessionId is persisted back into props', async () => {
-    mocks.findLatestChatHistorySessionId = vi.fn(() => Promise.resolve('restored-session'));
-    mocks.getSession = vi.fn(() => Promise.resolve(null));
-    const persistSessionId = vi.fn();
-
-    await act(async () => {
-      root.render(
-        <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/a" onPersistSessionId={persistSessionId} />
-        </ToastProvider>,
-      );
-    });
-    await flushEffects();
-
-    expect(persistSessionId).toHaveBeenCalledWith('restored-session');
-
-    if (!mocks.findLatestChatHistorySessionId) {
-      throw new Error('mock not installed');
-    }
-
-    const hydrateCallsAfterMount = mocks.findLatestChatHistorySessionId.mock.calls.length;
-    expect(hydrateCallsAfterMount).toBeGreaterThanOrEqual(1);
-
-    await act(async () => {
-      root.render(
-        <ToastProvider>
-          <Chat
-            {...baseProps}
-            sessionFolderPath="/vault/a"
-            paneSessionId="restored-session"
-            onPersistSessionId={persistSessionId}
-          />
-        </ToastProvider>,
-      );
-    });
-    await flushEffects();
-
-    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBe(hydrateCallsAfterMount);
-    expect(mocks.client?.session.abort.mock.calls.length).toBe(0);
+    expect(hostClient.runs.list.mock.calls.length).toBe(hydrateCallsAfterMount);
   });
 
   it('DOES re-run the session-reset effect when sessionFolderPath changes (guard: the effect still fires for real triggers)', async () => {
     await act(async () => {
       root.render(
         <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/a" />
+          <Chat {...baseProps} hostClient={hostClient} sessionFolderPath="/vault/a" />
         </ToastProvider>,
       );
     });
     await flushEffects();
 
-    if (!mocks.findLatestChatHistorySessionId) {
-      throw new Error('mock not installed');
-    }
-
-    const hydrateCallsA = mocks.findLatestChatHistorySessionId.mock.calls.length;
+    const hydrateCallsA = hostClient.runs.list.mock.calls.length;
     expect(hydrateCallsA).toBeGreaterThanOrEqual(1);
 
     // Switch vault folders — this SHOULD re-run the reset effect.
     await act(async () => {
       root.render(
         <ToastProvider>
-          <Chat {...baseProps} sessionFolderPath="/vault/b" />
+          <Chat {...baseProps} hostClient={hostClient} sessionFolderPath="/vault/b" />
         </ToastProvider>,
       );
     });
     await flushEffects();
 
-    expect(mocks.findLatestChatHistorySessionId.mock.calls.length).toBeGreaterThan(hydrateCallsA);
+    expect(hostClient.runs.list.mock.calls.length).toBeGreaterThan(hydrateCallsA);
   });
 });

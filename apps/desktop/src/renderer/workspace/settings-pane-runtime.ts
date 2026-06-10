@@ -1,6 +1,8 @@
 import { createContext, useContext } from 'react';
 import type { MemoryRunState } from '@tinker/memory';
 import type {
+  AcpConnectorState,
+  GooseConnection,
   ScheduledJobRun,
   ScheduledJobStore,
   SSOSession,
@@ -43,6 +45,9 @@ export type SettingsPaneRuntime = {
   readonly memorySweepCanRun: boolean;
   readonly memorySweepRevision: number;
   readonly schedulerStore: ScheduledJobStore;
+  readonly gooseInstalled: boolean;
+  readonly gooseConnection: GooseConnection | null;
+  readonly acpConnectorStates: ReadonlyArray<AcpConnectorState>;
   onRunMemorySweep(): Promise<void>;
   // One-shot navigation hint. When set, SettingsPane seeds SettingsShell with this
   // section id on its next render, then calls `onPendingSectionConsumed` so the hint

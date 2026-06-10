@@ -10,7 +10,6 @@ import {
   type KeyboardEvent,
   type UIEventHandler,
 } from 'react';
-import type { Message, Part } from '@opencode-ai/sdk/v2/client';
 import {
   Badge,
   Button,
@@ -25,26 +24,8 @@ import {
   StatusDot,
   type MenuItem,
 } from '@tinker/design';
-import {
-  createChatHistoryWriter,
-  findLatestChatHistorySessionId,
-  injectActiveSkills,
-  injectMemoryContext,
-  readChatHistory,
-  streamSessionEvents,
-  type ChatHistoryWriter,
-} from '@tinker/bridge';
-import {
-  appendMemoryCapture,
-  createSession,
-  findLatestSessionForFolder,
-  getSession,
-  getActiveMemoryPath,
-  listSessionsForUser,
-  subscribeMemoryPathChanged,
-  updateLastActive,
-  updateSession,
-} from '@tinker/memory';
+import type { HostClient, RunEventStream } from '@tinker/host-client';
+import type { RunEvent } from '@tinker/shared-types';
 import {
   DEFAULT_REASONING_LEVEL,
   DEFAULT_SESSION_MODE,
@@ -66,13 +47,13 @@ import { SaveAsSkillModal, buildSkillTranscript } from './components/SaveAsSkill
 import { ChatMessage } from '../ChatMessage/index.js';
 import { FolderPill } from './components/FolderPill/index.js';
 import { McpConnectionGate } from './components/McpConnectionGate/index.js';
-import { resolvePreferredStoredModelId, resolveSelectedModelId } from './modelSelection.js';
+import { resolveSelectedModelId } from './modelSelection.js';
 import {
   shouldAbortComposerKey,
   shouldSubmitComposerKey,
 } from '../chat-composer.js';
 import { useSessionHistoryWindow } from '../useSessionHistoryWindow.js';
-import { messageTextFromBlocks, MessageBlock, partToBlock, type Block } from './Block.js';
+import { messageTextFromBlocks, MessageBlock, type Block } from './Block.js';
 import {
   CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD,
   getChatTailSignature,
@@ -83,7 +64,7 @@ import {
   type ResolvedContextUsage,
 } from './chatState.js';
 import { draftReducer } from './draftReducer.js';
-import { replayChatHistory, type ChatMessageRecord } from './historyReplay.js';
+import { replayRunEvents, type ChatMessageRecord } from './historyReplay.js';
 import { useMcpConnectionGate } from './useMcpConnectionGate.js';
 
 type ChatProps = {
@@ -91,6 +72,7 @@ type ChatProps = {
   currentUserId: string;
   modelConnected: boolean;
   opencode: OpencodeConnection;
+  hostClient: HostClient;
   sessionFolderPath: string | null;
   vaultPath: string | null;
   /**
@@ -155,117 +137,24 @@ const THINKING_LABELS: Record<ReasoningLevel, string> = {
   xhigh: 'X-High',
 };
 
-const formatMessages = (messages: Array<{ info: Message; parts: Part[] }>): ChatMessageRecord[] => {
-  return messages.map(({ info, parts }) => {
-    const blocks: Block[] = [];
-    for (const part of parts) {
-      const block = partToBlock(part);
-      if (block) {
-        blocks.push(block);
-      }
-    }
 
-    const hasText = blocks.some((block) => block.kind === 'text' && block.text.length > 0);
-    if (!hasText && (info.role !== 'assistant' || blocks.length === 0)) {
-      const placeholder = info.role === 'assistant' ? 'Response contained only non-text output.' : 'Message sent.';
-      blocks.push({ kind: 'text', partID: `placeholder-${info.id}`, text: placeholder });
-    }
-
-    return {
-      id: info.id,
-      role: info.role,
-      blocks,
-    };
-  });
-};
-
-const mergeHistoryMessages = (olderMessages: readonly ChatMessageRecord[], newerMessages: readonly ChatMessageRecord[]): ChatMessageRecord[] => {
-  const merged = new Map<string, ChatMessageRecord>();
-
-  for (const message of olderMessages) {
-    merged.set(message.id, message);
-  }
-
-  for (const message of newerMessages) {
-    merged.set(message.id, message);
-  }
-
-  return [...merged.values()].sort((left, right) => left.id.localeCompare(right.id));
-};
-
-const readContextUsageTokens = (value: unknown): ContextUsageSnapshot['tokens'] | null => {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  const usage = value as {
-    total?: unknown;
-    input?: unknown;
-    output?: unknown;
-    reasoning?: unknown;
-  };
-
-  if (
-    typeof usage.input !== 'number'
-    || typeof usage.output !== 'number'
-    || typeof usage.reasoning !== 'number'
-  ) {
-    return null;
-  }
-
-  return {
-    ...(typeof usage.total === 'number' ? { total: usage.total } : {}),
-    input: usage.input,
-    output: usage.output,
-    reasoning: usage.reasoning,
-  };
-};
-
-const extractAssistantContextUsage = (
-  messages: readonly { info: Message; parts: Part[] }[],
-): ContextUsageSnapshot | null => {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const info = messages[index]?.info as {
-      role?: unknown;
-      providerID?: unknown;
-      modelID?: unknown;
-      tokens?: unknown;
-    };
-
-    if (info.role !== 'assistant') {
-      continue;
-    }
-
-    const tokens = readContextUsageTokens(info.tokens);
-    if (!tokens) {
-      continue;
-    }
-
-    return {
-      providerID: typeof info.providerID === 'string' ? info.providerID : null,
-      modelID: typeof info.modelID === 'string' ? info.modelID : null,
-      tokens,
-    };
-  }
-
-  return null;
-};
 
 export const Chat = ({
   skillStore,
   currentUserId,
   modelConnected,
   opencode,
+  hostClient,
   sessionFolderPath,
   vaultPath,
   skillsRootPath,
-  activeSkillsRevision,
+  activeSkillsRevision: _activeSkillsRevision,
   sessionFolderBusy = false,
   onSelectSessionFolder,
   onFileWritten,
   onOpenFileLink,
   onOpenNewChat,
-  onMemoryCommitted,
+  onMemoryCommitted: _onMemoryCommitted,
   onActiveSkillsChanged,
   onDuplicatePane,
   onClosePane,
@@ -281,7 +170,7 @@ export const Chat = ({
   const readyStatus = awaitingFolder
     ? 'Pick a folder to start a session.'
     : modelConnected
-      ? 'OpenCode is ready.'
+      ? 'Ready.'
       : 'Connect an AI model in Settings to start chatting.';
   const client = useMemo(
     () => createWorkspaceClient(opencode, getOpencodeDirectory(vaultPath)),
@@ -301,20 +190,19 @@ export const Chat = ({
   const [contextUsage, setContextUsage] = useState<ResolvedContextUsage | null>(null);
   const [showNewMessagesPill, setShowNewMessagesPill] = useState(false);
   const [requiresMcpConnectionGate, setRequiresMcpConnectionGate] = useState(false);
-  const [memoryRefreshPaused, setMemoryRefreshPaused] = useState(false);
   // Global default applied where no per-disclosure override exists. ⌥T flips this and clears overrides.
   const [defaultDisclosureOpen, setDefaultDisclosureOpen] = useState(false);
   const [disclosureOverrides, setDisclosureOverrides] = useState<Record<string, boolean>>({});
   const [saveAsSkillOpen, setSaveAsSkillOpen] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [_activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<SessionMode>(DEFAULT_SESSION_MODE);
   const [thinkingLevel, setThinkingLevel] = useState<ReasoningLevel>(DEFAULT_REASONING_LEVEL);
   const mountedRef = useRef(true);
   const busyRef = useRef(busy);
+  const runIdRef = useRef<string | null>(null);
+  const runStreamRef = useRef<RunEventStream | null>(null);
   const sessionIDRef = useRef<string | null>(null);
   const sessionCreatedAtRef = useRef<string | null>(null);
-  const historyWriterRef = useRef<ChatHistoryWriter | null>(null);
-  const memoryPathRef = useRef<string | null>(null);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const abortRequestedRef = useRef(false);
   const contextUsageSnapshotRef = useRef<ContextUsageSnapshot | null>(null);
@@ -323,17 +211,13 @@ export const Chat = ({
   const attentionRaisedForDraftRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
   const lastTailSignatureRef = useRef('empty');
-  // Tracks which (sessionID, activeSkillsRevision) pair we last injected
-  // skill context for, so toggling / installing a skill triggers a fresh
-  // inject on the next prompt without wiping the live session.
-  const injectedSkillsSignatureRef = useRef<string | null>(null);
   const selectedModel = useMemo(() => findModelOptionById(modelOptions, selectedModelId), [modelOptions, selectedModelId]);
   const loadMcpStatus = useCallback(() => client.mcp.status(), [client]);
   const mcpConnectionGate = useMcpConnectionGate({
     enabled: !hydratingHistory && !awaitingFolder && requiresMcpConnectionGate,
     loadStatus: loadMcpStatus,
   });
-  const composerBlocked = busy || hydratingHistory || awaitingFolder || !modelConnected || mcpConnectionGate.blocked || memoryRefreshPaused;
+  const composerBlocked = busy || hydratingHistory || awaitingFolder || !modelConnected || mcpConnectionGate.blocked;
 
   const saveAsSkillDefaultBody = useMemo(() => {
     return saveAsSkillOpen ? buildSkillTranscript(messages) : '';
@@ -350,27 +234,25 @@ export const Chat = ({
 
     return () => {
       mountedRef.current = false;
-      const writer = historyWriterRef.current;
-      historyWriterRef.current = null;
-      if (writer) {
-        void writer.dispose();
-      }
-      const activeSessionID = sessionIDRef.current;
+      const stream = runStreamRef.current;
+      runStreamRef.current = null;
+      stream?.close();
+      const activeRunId = runIdRef.current;
+      runIdRef.current = null;
       sessionIDRef.current = null;
       sessionCreatedAtRef.current = null;
-      memoryPathRef.current = null;
-      if (activeSessionID) {
-        void client.session.abort({ sessionID: activeSessionID });
+      if (activeRunId) {
+        void hostClient.runs.abort({ runId: activeRunId });
       }
       releaseRef.current?.();
     };
-  }, [client]);
+  }, [hostClient]);
 
   useEffect(() => {
-    if (!hydratingHistory && !busy && !memoryRefreshPaused) {
+    if (!hydratingHistory && !busy) {
       setStatus(readyStatus);
     }
-  }, [busy, hydratingHistory, memoryRefreshPaused, readyStatus]);
+  }, [busy, hydratingHistory, readyStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -379,18 +261,13 @@ export const Chat = ({
 
     void (async () => {
       try {
-        const [response, folderSession, priorSessions] = await Promise.all([
-          client.config.providers(),
-          sessionFolderPath ? findLatestSessionForFolder(currentUserId, sessionFolderPath) : Promise.resolve(null),
-          sessionFolderPath ? listSessionsForUser(currentUserId) : Promise.resolve([]),
-        ]);
+        const response = await client.config.providers();
         if (cancelled) {
           return;
         }
 
         const providers = response.data?.providers ?? [];
         const nextOptions = buildModelPickerItems(providers);
-        const preferredStoredModelId = resolvePreferredStoredModelId(folderSession, priorSessions);
         const defaultSelectedId =
           pickDefaultModelOptionId(providers, response.data?.default ?? {}) ?? nextOptions[0]?.id;
 
@@ -399,13 +276,13 @@ export const Chat = ({
           resolveSelectedModelId({
             options: nextOptions,
             currentSelectedId: current,
-            preserveCurrent: sessionIDRef.current !== null,
-            preferredStoredModelId,
+            preserveCurrent: runIdRef.current !== null,
+            preferredStoredModelId: undefined,
             defaultSelectedId,
           }),
         );
       } catch (error) {
-        console.warn('Failed to load model picker options from OpenCode.', error);
+        console.warn('Failed to load model picker options.', error);
         if (cancelled) {
           return;
         }
@@ -429,68 +306,30 @@ export const Chat = ({
       sessionIDRef.current = sessionID;
       sessionCreatedAtRef.current = sessionCreatedAt;
       setActiveSessionId(sessionID);
-
-      const previousWriter = historyWriterRef.current;
-      historyWriterRef.current = sessionFolderPath
-        ? createChatHistoryWriter({
-            folderPath: sessionFolderPath,
-            userId: currentUserId,
-            sessionId: sessionID,
-          })
-        : null;
-
-      if (previousWriter) {
-        void previousWriter.dispose();
-      }
     },
-    [currentUserId, sessionFolderPath],
+    [],
   );
-
-  useEffect(() => {
-    memoryPathRef.current = null;
-  }, [currentUserId]);
 
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
 
   useEffect(() => {
-    return subscribeMemoryPathChanged((detail) => {
-      memoryPathRef.current = null;
-      if (busyRef.current) {
-        setMemoryRefreshPaused(true);
-        setStatus(`Paused for memory refresh (${detail.reason === 'root-changed' ? 'path changed' : 'user switched'}).`);
-      }
-    });
-  }, []);
-
-  const resolveMemoryPath = useCallback(async (): Promise<string> => {
-    if (!memoryPathRef.current) {
-      memoryPathRef.current = await getActiveMemoryPath(currentUserId);
-    }
-
-    return memoryPathRef.current;
-  }, [currentUserId]);
-
-  useEffect(() => {
     let cancelled = false;
 
-    const existing = sessionIDRef.current;
+    const existingStream = runStreamRef.current;
+    runStreamRef.current = null;
+    existingStream?.close();
+    const existingRunId = runIdRef.current;
+    runIdRef.current = null;
     sessionIDRef.current = null;
     sessionCreatedAtRef.current = null;
     setActiveSessionId(null);
     abortRequestedRef.current = false;
     shouldStickToBottomRef.current = true;
     lastTailSignatureRef.current = 'empty';
-    injectedSkillsSignatureRef.current = null;
-    if (existing) {
-      void client.session.abort({ sessionID: existing });
-    }
-
-    const previousWriter = historyWriterRef.current;
-    historyWriterRef.current = null;
-    if (previousWriter) {
-      void previousWriter.dispose();
+    if (existingRunId) {
+      void hostClient.runs.abort({ runId: existingRunId });
     }
 
     setMessages([]);
@@ -514,70 +353,33 @@ export const Chat = ({
     }
 
     setHydratingHistory(true);
-    setStatus('Hydrating chat history…');
+    setStatus('Restoring run history\u2026');
 
     void (async () => {
       try {
-        const existingSession = createFreshSession ? null : await findLatestSessionForFolder(currentUserId, sessionFolderPath);
-        const pinnedSessionId = paneSessionIdRef.current;
-        const loadedPinnedSession = pinnedSessionId ? await getSession(pinnedSessionId) : null;
-        const pinnedSession =
-          loadedPinnedSession?.userId === currentUserId && loadedPinnedSession.folderPath === sessionFolderPath
-            ? loadedPinnedSession
-            : null;
-        const restoredSessionID =
-          pinnedSession?.id
-          ?? existingSession?.id
-          ?? (createFreshSession
-            ? null
-            : await findLatestChatHistorySessionId({
-              folderPath: sessionFolderPath,
-              userId: currentUserId,
-            }));
+        const runs = await hostClient.runs.list();
+        if (cancelled || !mountedRef.current) return;
 
-        if (!restoredSessionID || cancelled || !mountedRef.current) {
-          if (!cancelled && mountedRef.current) {
-            setRequiresMcpConnectionGate(true);
-          }
+        const latestRun = runs
+          .filter((r) => r.projectPath === sessionFolderPath)
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+
+        if (!latestRun || createFreshSession) {
+          setRequiresMcpConnectionGate(true);
           return;
         }
 
-        const restoredCreatedAt = pinnedSession?.createdAt ?? existingSession?.createdAt ?? new Date().toISOString();
+        runIdRef.current = latestRun.id;
+        activateSession(latestRun.id, latestRun.createdAt);
+        persistSessionIdRef.current?.(latestRun.id);
         setRequiresMcpConnectionGate(false);
-        activateSession(restoredSessionID, restoredCreatedAt);
-        persistSessionIdRef.current?.(restoredSessionID);
 
-        if (!pinnedSession && !existingSession) {
-          try {
-            await createSession({
-              id: restoredSessionID,
-              userId: currentUserId,
-              folderPath: sessionFolderPath,
-              createdAt: restoredCreatedAt,
-              lastActiveAt: restoredCreatedAt,
-              mode: DEFAULT_SESSION_MODE,
-              ...(selectedModelRef.current ? { modelId: selectedModelRef.current.storedId } : {}),
-            });
-          } catch (error) {
-            console.warn('Failed to restore the session row from chat history.', error);
-          }
-        }
+        const storedEvents = await hostClient.runs.replay(latestRun.id);
+        if (cancelled || !mountedRef.current || runIdRef.current !== latestRun.id) return;
 
-        const records = await readChatHistory({
-          folderPath: sessionFolderPath,
-          userId: currentUserId,
-          sessionId: restoredSessionID,
-        });
-        if (cancelled || !mountedRef.current || sessionIDRef.current !== restoredSessionID) {
-          return;
-        }
-
-        setMessages(replayChatHistory(records));
-        void updateLastActive(restoredSessionID, new Date().toISOString()).catch((error) => {
-          console.warn('Failed to refresh the restored session timestamp.', error);
-        });
+        setMessages(replayRunEvents(storedEvents));
       } catch (error) {
-        console.warn('Failed to hydrate chat history from disk.', error);
+        console.warn('Failed to hydrate run history.', error);
         if (!cancelled && mountedRef.current) {
           setRequiresMcpConnectionGate(true);
         }
@@ -592,21 +394,7 @@ export const Chat = ({
     return () => {
       cancelled = true;
     };
-    // NOTE: intentionally NOT depending on `activeSkillsRevision`. Toggling or
-    // installing a skill used to force this effect — which aborts the live
-    // OpenCode session, wipes messages, and rehydrates from disk. Re-injection
-    // now happens lazily in `injectActiveSkillsIfStale` before each prompt.
-  }, [activateSession, client, createFreshSession, currentUserId, readyStatus, sessionFolderPath]);
-
-  useEffect(() => {
-    if (!activeSessionId || !selectedModel) {
-      return;
-    }
-
-    void updateSession(activeSessionId, { modelId: selectedModel.storedId }).catch((error) => {
-      console.warn('Failed to persist the selected model for the active chat session.', error);
-    });
-  }, [activeSessionId, selectedModel]);
+  }, [activateSession, hostClient, createFreshSession, currentUserId, readyStatus, sessionFolderPath]);
 
   useEffect(() => {
     draftBlocksRef.current = draftBlocks;
@@ -684,20 +472,13 @@ export const Chat = ({
     setDisclosureOverrides((current) => ({ ...current, [partID]: next }));
   }, []);
 
-  const loadHistoryPage = async (
-    sessionID: string,
-    before?: string,
-  ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null; contextUsage: ContextUsageSnapshot | null }> => {
-    const history = await client.session.messages({
-      sessionID,
-      limit: 100,
-      ...(before ? { before } : {}),
-    });
-
+  const loadRunHistory = async (
+    runId: string,
+  ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null }> => {
+    const storedEvents = await hostClient.runs.replay(runId);
     return {
-      messages: formatMessages(history.data ?? []),
-      cursor: history.response.headers.get('x-next-cursor') ?? null,
-      contextUsage: extractAssistantContextUsage(history.data ?? []),
+      messages: replayRunEvents(storedEvents),
+      cursor: null,
     };
   };
 
@@ -729,44 +510,22 @@ export const Chat = ({
 
   const refreshHistory = useCallback(
     async (
-      sessionID: string,
-    ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null; contextUsage: ContextUsageSnapshot | null } | null> => {
-      const page = await loadHistoryPage(sessionID);
-      if (!mountedRef.current || sessionIDRef.current !== sessionID) {
+      activeRunId: string,
+    ): Promise<{ messages: ChatMessageRecord[]; cursor: string | null } | null> => {
+      const page = await loadRunHistory(activeRunId);
+      if (!mountedRef.current || runIdRef.current !== activeRunId) {
         return null;
       }
 
       setMessages(page.messages);
       setHistoryCursor(page.cursor);
-      if (page.contextUsage) {
-        applyContextUsageSnapshot(page.contextUsage);
-      }
       return page;
     },
-    [applyContextUsageSnapshot],
+    [],
   );
 
-  const loadOlderHistory = async (before: string): Promise<void> => {
-    const activeSessionID = sessionIDRef.current;
-    if (!activeSessionID || historyLoading) {
-      return;
-    }
-
-    setHistoryLoading(true);
-
-    try {
-      const page = await loadHistoryPage(activeSessionID, before);
-      if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
-        return;
-      }
-
-      setMessages((current) => mergeHistoryMessages(page.messages, current));
-      setHistoryCursor(page.cursor);
-    } finally {
-      if (mountedRef.current && sessionIDRef.current === activeSessionID) {
-        setHistoryLoading(false);
-      }
-    }
+  const loadOlderHistory = async (_before: string): Promise<void> => {
+    // Run replay returns the full event log; cursor-based pagination is not needed.
   };
 
   const historyWindow = useSessionHistoryWindow({
@@ -844,24 +603,22 @@ export const Chat = ({
     [historyWindow],
   );
 
-  const ensureSession = async (): Promise<string> => {
-    if (sessionIDRef.current) {
-      if (!historyWriterRef.current && sessionFolderPath) {
-        activateSession(sessionIDRef.current, sessionCreatedAtRef.current ?? new Date().toISOString());
-      }
-
-      return sessionIDRef.current;
+  const ensureRun = async (): Promise<string> => {
+    if (runIdRef.current) {
+      return runIdRef.current;
     }
 
-    const response = await client.session.create({ title: 'Tinker Chat' });
-    const session = response.data;
-    if (!session) {
-      throw new Error('OpenCode did not return a session.');
-    }
+    const run = await hostClient.runs.create({
+      title: 'Tinker Chat',
+      projectPath: sessionFolderPath ?? undefined,
+      ...(selectedModel
+        ? { providerID: selectedModel.providerId, modelID: selectedModel.modelId }
+        : {}),
+    });
 
-    const timestamp = new Date().toISOString();
-    activateSession(session.id, timestamp);
-    persistSessionIdRef.current?.(session.id);
+    runIdRef.current = run.id;
+    activateSession(run.id, run.createdAt);
+    persistSessionIdRef.current?.(run.id);
     setRequiresMcpConnectionGate(false);
 
     if (selectedModel) {
@@ -876,44 +633,7 @@ export const Chat = ({
       });
     }
 
-    if (sessionFolderPath) {
-      try {
-        await createSession({
-          id: session.id,
-          userId: currentUserId,
-          folderPath: sessionFolderPath,
-          createdAt: timestamp,
-          lastActiveAt: timestamp,
-          mode: DEFAULT_SESSION_MODE,
-          ...(selectedModel ? { modelId: selectedModel.storedId } : {}),
-        });
-      } catch (error) {
-        console.warn('Failed to persist the active chat session.', error);
-      }
-    }
-
-    return session.id;
-  };
-
-  // Injects active skills into the session if we haven't already injected
-  // this (sessionID, activeSkillsRevision) combination. This runs before each
-  // prompt so toggling / installing a skill mid-session takes effect on the
-  // next user message without tearing down the live session.
-  const injectActiveSkillsIfStale = async (sessionID: string): Promise<void> => {
-    const signature = `${sessionID}:${activeSkillsRevision}`;
-    if (injectedSkillsSignatureRef.current === signature) {
-      return;
-    }
-
-    try {
-      const activeSkills = await skillStore.getActive();
-      if (activeSkills.length > 0) {
-        await injectActiveSkills(client, sessionID, activeSkills);
-      }
-      injectedSkillsSignatureRef.current = signature;
-    } catch (error) {
-      console.warn('Failed to inject active skills into the session.', error);
-    }
+    return run.id;
   };
 
   const abortActiveStream = async (): Promise<void> => {
@@ -922,15 +642,19 @@ export const Chat = ({
     }
 
     abortRequestedRef.current = true;
-    setStatus('Stopping…');
+    setStatus('Stopping\u2026');
 
-    const activeSessionID = sessionIDRef.current;
-    if (!activeSessionID) {
+    const activeRunId = runIdRef.current;
+    if (!activeRunId) {
       return;
     }
 
+    const stream = runStreamRef.current;
+    runStreamRef.current = null;
+    stream?.close();
+
     try {
-      await client.session.abort({ sessionID: activeSessionID });
+      await hostClient.runs.abort({ runId: activeRunId });
     } catch (error) {
       abortRequestedRef.current = false;
 
@@ -938,17 +662,21 @@ export const Chat = ({
         return;
       }
 
-      console.warn('Failed to abort the active OpenCode session.', error);
+      console.warn('Failed to abort the active run.', error);
       setStatus('Unable to stop current response.');
     }
   };
 
   const handleClearChat = useCallback((): void => {
-    const activeSessionID = sessionIDRef.current;
-    if (activeSessionID) {
-      void client.session.abort({ sessionID: activeSessionID });
+    const activeRunId = runIdRef.current;
+    const stream = runStreamRef.current;
+    runStreamRef.current = null;
+    stream?.close();
+    if (activeRunId) {
+      void hostClient.runs.abort({ runId: activeRunId });
     }
     abortRequestedRef.current = false;
+    runIdRef.current = null;
     sessionIDRef.current = null;
     sessionCreatedAtRef.current = null;
     setActiveSessionId(null);
@@ -961,7 +689,7 @@ export const Chat = ({
     setDisclosureOverrides({});
     setDefaultDisclosureOpen(false);
     setStatus(readyStatus);
-  }, [client, readyStatus]);
+  }, [hostClient, readyStatus]);
 
   useEffect(() => {
     if (!busy || typeof window === 'undefined') {
@@ -985,13 +713,13 @@ export const Chat = ({
   }, [busy, client]);
   const sendMessage = async (): Promise<void> => {
     const text = input.trim();
-    if (!text || busy || hydratingHistory || memoryRefreshPaused || !modelConnected || mcpConnectionGate.blocked) {
+    if (!text || busy || hydratingHistory || !modelConnected || mcpConnectionGate.blocked) {
       return;
     }
 
     abortRequestedRef.current = false;
     setBusy(true);
-    setStatus('Waiting for OpenCode…');
+    setStatus('Waiting for host\u2026');
     setMessages((current) => [
       ...current,
       {
@@ -1004,44 +732,16 @@ export const Chat = ({
     dispatchDraft({ type: 'reset' });
 
     try {
-      setMemoryRefreshPaused(false);
-      const activeSessionID = await ensureSession();
+      const activeRunId = await ensureRun();
       if (abortRequestedRef.current) {
         setStatus(readyStatus);
         return;
       }
 
-      await injectActiveSkillsIfStale(activeSessionID);
-      if (abortRequestedRef.current) {
-        setStatus(readyStatus);
-        return;
-      }
-
-      const memoryPath = await resolveMemoryPath();
-      if (abortRequestedRef.current) {
-        setStatus(readyStatus);
-        return;
-      }
-
-      await injectMemoryContext(client, activeSessionID, {
-        memoryDirectory: memoryPath,
-      });
-      if (abortRequestedRef.current) {
-        setStatus(readyStatus);
-        return;
-      }
-
-      const historyWriter = historyWriterRef.current;
-      const stream = streamSessionEvents(client, activeSessionID, {
-        onEvent: (event) => {
-          historyWriter?.appendEvent(event);
-        },
-      });
-      const consumeStream = (async () => {
-        for await (const event of stream) {
-          if (!mountedRef.current) {
-            return;
-          }
+      // Subscribe to SSE before prompting so no events are lost.
+      const streamDone = new Promise<void>((resolve) => {
+        const eventStream = hostClient.runs.subscribe(activeRunId, (event: RunEvent) => {
+          if (!mountedRef.current) return;
 
           if (
             event.type === 'token'
@@ -1049,27 +749,31 @@ export const Chat = ({
             || event.type === 'tool_call'
             || event.type === 'tool_result'
             || event.type === 'tool_error'
+            || event.type === 'approval_request'
+            || event.type === 'delegate'
+            || event.type === 'subagent'
           ) {
             dispatchDraft({ type: 'event', event });
-          } else if (event.type === 'context_usage') {
-            applyContextUsageSnapshot({
-              providerID: event.providerID,
-              modelID: event.modelID,
-              tokens: event.tokens,
-            });
-          } else if (event.type === 'file_written') {
+          } else if (event.type === 'artifact') {
             onFileWritten?.(event.path);
           } else if (event.type === 'error') {
             setStatus(abortRequestedRef.current ? readyStatus : event.message);
+          } else if (event.type === 'status_changed') {
+            if (event.status === 'completed' || event.status === 'failed' || event.status === 'aborted') {
+              setStatus(readyStatus);
+            }
           } else if (event.type === 'done') {
             setStatus(readyStatus);
+            resolve();
           }
-        }
-      })();
+        });
 
-      await client.session.prompt({
-        sessionID: activeSessionID,
-        parts: [{ type: 'text', text }],
+        runStreamRef.current = eventStream;
+      });
+
+      await hostClient.runs.prompt({
+        runId: activeRunId,
+        text,
         agent: composerMode,
         ...(thinkingLevel === 'default' ? {} : { variant: thinkingLevel }),
         ...(selectedModel
@@ -1081,21 +785,16 @@ export const Chat = ({
             }
           : {}),
       });
-      await consumeStream;
-      if (mountedRef.current) {
-        setMemoryRefreshPaused(false);
-      }
+
+      await streamDone;
 
       const aborted = abortRequestedRef.current;
       const partialBlocks = draftBlocksRef.current;
       const partialText = messageTextFromBlocks(partialBlocks).trim();
-      const historyPage = await refreshHistory(activeSessionID);
-      if (!mountedRef.current || sessionIDRef.current !== activeSessionID) {
+      const historyPage = await refreshHistory(activeRunId);
+      if (!mountedRef.current || runIdRef.current !== activeRunId) {
         return;
       }
-      void updateLastActive(activeSessionID, new Date().toISOString()).catch((error) => {
-        console.warn('Failed to refresh the active session timestamp.', error);
-      });
 
       if (aborted && partialText.length > 0) {
         const historyAlreadyHasPartial = historyPage?.messages.some(
@@ -1117,26 +816,6 @@ export const Chat = ({
       }
 
       dispatchDraft({ type: 'reset' });
-
-      const assistantMessageRecord = historyPage?.messages
-        .filter((message) => message.role === 'assistant')
-        .at(-1);
-      const assistantMessage = assistantMessageRecord
-        ? messageTextFromBlocks(assistantMessageRecord.blocks)
-        : undefined;
-      if (!aborted && assistantMessage) {
-        const wroteMemory = await appendMemoryCapture({
-          memoryDirectory: memoryPath,
-          sessionCreatedAt: sessionCreatedAtRef.current ?? new Date().toISOString(),
-          sessionId: activeSessionID,
-          userPrompt: text,
-          assistantMessage,
-        });
-
-        if (wroteMemory) {
-          onMemoryCommitted?.();
-        }
-      }
     } catch (error) {
       if (!mountedRef.current) {
         return;
@@ -1160,7 +839,6 @@ export const Chat = ({
     } finally {
       abortRequestedRef.current = false;
       if (mountedRef.current) {
-        setMemoryRefreshPaused(false);
         setBusy(false);
       }
     }
@@ -1283,9 +961,9 @@ export const Chat = ({
                 }
                 description={
                   hydratingHistory
-                    ? 'Loading prior messages from the session folder before OpenCode resumes streaming.'
+                    ? 'Loading prior messages from the last run.'
                     : modelConnected
-                      ? 'Ask Tinker a question. Messages stream from OpenCode over HTTP + SSE.'
+                      ? 'Ask Tinker a question. Messages stream from the host over SSE.'
                       : 'Connect an AI model in Settings before sending a message.'
                 }
                 icon={
@@ -1436,7 +1114,7 @@ export const Chat = ({
                 onSelect={setSelectedModelId}
                 loading={modelOptionsLoading}
                 disabled={busy || hydratingHistory}
-                emptyLabel="No models available in OpenCode."
+                emptyLabel="No models available."
                 variant="dock"
               />
               <Menu

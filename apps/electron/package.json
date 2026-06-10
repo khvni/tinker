@@ -1,0 +1,23 @@
+{
+  "name": "@tinker/electron",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/main.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tinker/host-client": "workspace:*",
+    "@tinker/host-service": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "electron": "^33.0.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0"
+  }
+}
