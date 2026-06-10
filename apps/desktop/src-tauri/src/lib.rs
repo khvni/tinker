@@ -146,7 +146,11 @@ pub fn run() {
             commands::memory::memory_dismiss,
             commands::memory::memory_diff,
             commands::opencode::start_opencode,
-            commands::opencode::stop_opencode
+            commands::opencode::stop_opencode,
+            commands::acp_agent::spawn_acp_agent,
+            commands::acp_agent::write_acp_stdin,
+            commands::acp_agent::stop_acp_agent,
+            commands::acp_agent::list_acp_agents
         ])
         .setup(|app| {
             tauri::async_runtime::block_on(async {
@@ -171,6 +175,11 @@ pub fn run() {
                 tauri::async_runtime::block_on(commands::opencode::stop_all_opencodes(&handle))
             {
                 eprintln!("[opencode] stop-all cleanup failed: {error}");
+            }
+            if let Err(error) =
+                tauri::async_runtime::block_on(commands::acp_agent::stop_all_acp_agents())
+            {
+                eprintln!("[acp] stop-all cleanup failed: {error}");
             }
         }
     });

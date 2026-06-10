@@ -1,3 +1,4 @@
+export * from './acp-stream-adapter.js';
 export * from './chat-history.js';
 export * from './goose-client.js';
 export * from './memory-extractor.js';

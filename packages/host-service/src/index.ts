@@ -12,6 +12,20 @@ export {
   type GooseRunStatus,
   type GooseRunSummary,
 } from './goose/index.js';
+export {
+  createStdioTransport,
+  type AcpStdioTransport,
+  type CreateStdioTransportOptions,
+  type StdioTransportEvents,
+} from './acp-stdio-transport.js';
+export {
+  createAgentSideConnection,
+  type AgentSideConnection,
+  type AgentConnectionEvents,
+  type AgentConnectionState,
+  type CreateAgentConnectionOptions,
+  type PromptResult,
+} from './acp-agent-connection.js';
 export { loadHostIdentity, type HostIdentity, type LoadHostIdentityOptions } from './identity.js';
 export { createRunManager, type RunEventListener, type RunManager, type StoredRunEvent } from './runs.js';
 export { resolveDataPaths, ensureDataPaths, type HostDataPaths, type ResolveDataPathsOptions } from './dataPaths.js';
