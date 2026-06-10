@@ -29,7 +29,6 @@
     "@tauri-apps/plugin-notification": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-sql": "^2.4.0",
-    "@tinker/attention": "workspace:*",
     "@tinker/bridge": "workspace:*",
     "@tinker/design": "workspace:*",
     "@tinker/host-client": "workspace:*",
