@@ -25,8 +25,15 @@ import type {
 // Types
 // ---------------------------------------------------------------------------
 
+export type AgentRequest = {
+  id: number;
+  method: string;
+  params?: Record<string, unknown>;
+};
+
 export type StdioTransportEvents = {
   notification: [AcpJsonRpcNotification];
+  agent_request: [AgentRequest];
   error: [Error];
   close: [];
   stderr: [string];
@@ -44,9 +51,14 @@ type PendingRequest = {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
+export type SendOptions = {
+  timeoutMs?: number;
+};
+
 export type AcpStdioTransport = {
-  send(method: string, params?: Record<string, unknown>): Promise<AcpJsonRpcResponse>;
+  send(method: string, params?: Record<string, unknown>, options?: SendOptions): Promise<AcpJsonRpcResponse>;
   notify(method: string, params?: Record<string, unknown>): void;
+  respond(id: number, result?: unknown, error?: { code: number; message: string; data?: unknown }): void;
   on<K extends keyof StdioTransportEvents>(event: K, listener: (...args: StdioTransportEvents[K]) => void): void;
   off<K extends keyof StdioTransportEvents>(event: K, listener: (...args: StdioTransportEvents[K]) => void): void;
   close(): void;
@@ -91,6 +103,15 @@ export const createStdioTransport = (
         clearTimeout(entry.timer);
         pending.delete(msg.id);
         entry.resolve(msg as AcpJsonRpcResponse);
+        return;
+      }
+      // Agent-initiated request (has both id and method, e.g. session/request_permission)
+      if ('method' in msg && typeof (msg as Record<string, unknown>).method === 'string') {
+        emitter.emit('agent_request', {
+          id: msg.id,
+          method: (msg as Record<string, unknown>).method as string,
+          params: (msg as Record<string, unknown>).params as Record<string, unknown> | undefined,
+        });
       }
       return;
     }
@@ -128,7 +149,7 @@ export const createStdioTransport = (
     child.stdin.write(JSON.stringify(msg) + '\n');
   };
 
-  const send = (method: string, params?: Record<string, unknown>): Promise<AcpJsonRpcResponse> => {
+  const send = (method: string, params?: Record<string, unknown>, options?: SendOptions): Promise<AcpJsonRpcResponse> => {
     return new Promise<AcpJsonRpcResponse>((resolve, reject) => {
       const id = ++nextId;
       const request: AcpJsonRpcRequest = {
@@ -138,10 +159,11 @@ export const createStdioTransport = (
         ...(params !== undefined ? { params } : {}),
       };
 
+      const effectiveTimeout = options?.timeoutMs ?? timeoutMs;
       const timer = setTimeout(() => {
         pending.delete(id);
-        reject(new Error(`ACP RPC "${method}" timed out after ${String(timeoutMs)}ms.`));
-      }, timeoutMs);
+        reject(new Error(`ACP RPC "${method}" timed out after ${String(effectiveTimeout)}ms.`));
+      }, effectiveTimeout);
 
       pending.set(id, { resolve, reject, timer });
 
@@ -153,6 +175,18 @@ export const createStdioTransport = (
         reject(err instanceof Error ? err : new Error(String(err)));
       }
     });
+  };
+
+  const respond = (id: number, result?: unknown, error?: { code: number; message: string; data?: unknown }): void => {
+    const response: AcpJsonRpcResponse = {
+      jsonrpc: '2.0',
+      id,
+      ...(error !== undefined ? { error } : { result: result ?? null }),
+    };
+    if (closed || !child.stdin?.writable) {
+      throw new Error('ACP stdio transport is closed.');
+    }
+    child.stdin.write(JSON.stringify(response) + '\n');
   };
 
   const notify = (method: string, params?: Record<string, unknown>): void => {
@@ -175,18 +209,20 @@ export const createStdioTransport = (
     }
 
     child.kill('SIGTERM');
-    setTimeout(() => {
+    const killTimer = setTimeout(() => {
       try {
         child.kill('SIGKILL');
       } catch {
         // already exited
       }
     }, 5_000);
+    killTimer.unref();
   };
 
   return {
     send,
     notify,
+    respond,
     on: emitter.on.bind(emitter) as AcpStdioTransport['on'],
     off: emitter.off.bind(emitter) as AcpStdioTransport['off'],
     close,

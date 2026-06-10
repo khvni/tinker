@@ -58,6 +58,8 @@ export type AcpStreamAdapter = {
    * more `TinkerStreamEvent`s for the renderer.
    */
   map(update: AcpSessionUpdate): TinkerStreamEvent[];
+  /** Advance partID counters between assistant turns. */
+  advanceTurn(): void;
   /** Reset internal tracking state between sessions. */
   reset(): void;
 };
@@ -69,6 +71,8 @@ export const createAcpStreamAdapter = (): AcpStreamAdapter => {
   >();
 
   const toolCallNames = new Map<string, string>();
+  let msgPartCounter = 0;
+  let thoughtPartCounter = 0;
 
   const mapToolCallStatus = (
     status: AcpToolCallStatus,
@@ -97,11 +101,11 @@ export const createAcpStreamAdapter = (): AcpStreamAdapter => {
   const map = (update: AcpSessionUpdate): TinkerStreamEvent[] => {
     switch (update.sessionUpdate) {
       case 'agent_message_chunk': {
-        return [{ type: 'token', partID: 'acp-msg', text: update.content.text }];
+        return [{ type: 'token', partID: `acp-msg-${String(msgPartCounter)}`, text: update.content.text }];
       }
 
       case 'agent_thought_chunk': {
-        return [{ type: 'reasoning', partID: 'acp-thought', text: update.content.text }];
+        return [{ type: 'reasoning', partID: `acp-thought-${String(thoughtPartCounter)}`, text: update.content.text }];
       }
 
       case 'tool_call': {
@@ -209,10 +213,17 @@ export const createAcpStreamAdapter = (): AcpStreamAdapter => {
     }
   };
 
+  const advanceTurn = (): void => {
+    msgPartCounter++;
+    thoughtPartCounter++;
+  };
+
   const reset = (): void => {
     delegationCalls.clear();
     toolCallNames.clear();
+    msgPartCounter = 0;
+    thoughtPartCounter = 0;
   };
 
-  return { map, reset };
+  return { map, reset, advanceTurn };
 };

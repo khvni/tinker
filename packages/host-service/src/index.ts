@@ -14,8 +14,10 @@ export {
 } from './goose/index.js';
 export {
   createStdioTransport,
+  type AgentRequest,
   type AcpStdioTransport,
   type CreateStdioTransportOptions,
+  type SendOptions,
   type StdioTransportEvents,
 } from './acp-stdio-transport.js';
 export {

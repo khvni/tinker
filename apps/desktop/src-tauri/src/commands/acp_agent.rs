@@ -111,22 +111,37 @@ pub async fn spawn_acp_agent(
 
   let pid = child.id();
 
-  // Drain stderr in a background task to prevent pipe-buffer deadlocks.
-  // Per ACP spec, stderr is for agent logging only — not protocol messages.
-  let stderr = child
-    .stderr
-    .take()
-    .ok_or_else(|| "failed to capture agent stderr".to_string());
+  // Drain stdout in a background thread to prevent pipe-buffer deadlocks.
+  // The TypeScript host-service reads stdout via its own transport; this
+  // Rust-side drain is a safety valve for the Tauri IPC spawner path where
+  // stdout is not consumed by Node.js directly.
+  let agent_id_for_stdout = agent_id.clone();
+  if let Some(stdout_stream) = child.stdout.take() {
+    std::thread::spawn(move || {
+      use std::io::{BufRead, BufReader};
+      let reader = BufReader::new(stdout_stream);
+      for line in reader.lines() {
+        match line {
+          Ok(text) => {
+            eprintln!("[acp:{agent_id_for_stdout}:{pid}:stdout] {text}");
+          }
+          Err(_) => break,
+        }
+      }
+    });
+  }
 
-  let agent_id_for_drain = agent_id.clone();
-  if let Ok(stderr_stream) = stderr {
+  // Drain stderr in a background thread to prevent pipe-buffer deadlocks.
+  // Per ACP spec, stderr is for agent logging only — not protocol messages.
+  let agent_id_for_stderr = agent_id.clone();
+  if let Some(stderr_stream) = child.stderr.take() {
     std::thread::spawn(move || {
       use std::io::{BufRead, BufReader};
       let reader = BufReader::new(stderr_stream);
       for line in reader.lines() {
         match line {
           Ok(text) => {
-            eprintln!("[acp:{agent_id_for_drain}:{pid}:stderr] {text}");
+            eprintln!("[acp:{agent_id_for_stderr}:{pid}:stderr] {text}");
           }
           Err(_) => break,
         }

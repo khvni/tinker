@@ -29,6 +29,7 @@ import type {
 } from '@tinker/shared-types';
 import {
   createStdioTransport,
+  type AgentRequest,
   type AcpStdioTransport,
   type CreateStdioTransportOptions,
 } from './acp-stdio-transport.js';
@@ -70,9 +71,12 @@ export type AgentSideConnection = {
   off<K extends keyof AgentConnectionEvents>(event: K, listener: (...args: AgentConnectionEvents[K]) => void): void;
 };
 
+const PROMPT_TIMEOUT_MS = 10 * 60 * 1_000; // 10 minutes for long-running prompts
+
 export type CreateAgentConnectionOptions = CreateStdioTransportOptions & {
   clientName?: string;
   clientVersion?: string;
+  promptTimeoutMs?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -90,6 +94,7 @@ export const createAgentSideConnection = (
 
   const clientName = options.clientName ?? 'tinker';
   const clientVersion = options.clientVersion ?? '0.1.0';
+  const promptTimeout = options.promptTimeoutMs ?? PROMPT_TIMEOUT_MS;
 
   // Route notifications from the transport
   transport.on('notification', (notification: AcpJsonRpcNotification) => {
@@ -101,14 +106,11 @@ export const createAgentSideConnection = (
       return;
     }
 
+    // Notification-style permission request (no id — fire-and-forget from agent).
     if (notification.method === 'session/request_permission') {
       const params = notification.params as AcpPermissionRequest | undefined;
       if (params) {
         const respond = (outcome: AcpPermissionOutcome): void => {
-          // session/request_permission is a JSON-RPC *request* from agent,
-          // but in practice agents send it as a notification that expects
-          // a response. We handle it via a paired request ID if present.
-          // For notification-style, we send a notification back.
           transport.notify('session/permission_response', {
             sessionId: params.sessionId,
             outcome,
@@ -117,6 +119,21 @@ export const createAgentSideConnection = (
         emitter.emit('permission_request', params, respond);
       }
       return;
+    }
+  });
+
+  // Route agent-initiated JSON-RPC requests (with id + method).
+  // Per spec, session/request_permission is a proper request that expects
+  // a JSON-RPC response with the matching id.
+  transport.on('agent_request', (request: AgentRequest) => {
+    if (request.method === 'session/request_permission') {
+      const params = request.params as AcpPermissionRequest | undefined;
+      if (params) {
+        const respond = (outcome: AcpPermissionOutcome): void => {
+          transport.respond(request.id, { outcome });
+        };
+        emitter.emit('permission_request', params, respond);
+      }
     }
   });
 
@@ -186,7 +203,7 @@ export const createAgentSideConnection = (
     const response = await transport.send('session/prompt', {
       sessionId,
       prompt: [{ type: 'text', text }],
-    });
+    }, { timeoutMs: promptTimeout });
 
     if (response.error) {
       throw new Error(
