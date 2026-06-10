@@ -196,6 +196,11 @@ async fn find_live_matching(
   user: &str,
   memory: &str,
 ) -> Result<Option<OpencodeManifest>, String> {
+  // Canonicalize the caller's folder path so that `~/vault`, `/home/user/vault`,
+  // and the realpath-resolved path all compare equal. This prevents a manifest
+  // stored with a resolved path from being missed when the renderer passes a
+  // relative or symlink-resolved variant.
+  let folder = canonical_folder_path(folder);
   for (_, manifest) in list_manifests(manifests_dir)? {
     if manifest.folder_path != folder
       || manifest.user_id != user
