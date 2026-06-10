@@ -101,6 +101,167 @@ export type GooseConnection = {
 };
 
 // ---------------------------------------------------------------------------
+// ACP stdio connection types (Phase 2–4)
+// ---------------------------------------------------------------------------
+
+/**
+ * ACP JSON-RPC message primitives.
+ * Per spec: messages are newline-delimited JSON-RPC 2.0 over stdin/stdout.
+ */
+export type AcpJsonRpcRequest = {
+  readonly jsonrpc: '2.0';
+  readonly method: string;
+  readonly id: number;
+  readonly params?: Record<string, unknown>;
+};
+
+export type AcpJsonRpcResponse = {
+  readonly jsonrpc: '2.0';
+  readonly id: number;
+  readonly result?: unknown;
+  readonly error?: { readonly code: number; readonly message: string; readonly data?: unknown };
+};
+
+export type AcpJsonRpcNotification = {
+  readonly jsonrpc: '2.0';
+  readonly method: string;
+  readonly params?: Record<string, unknown>;
+};
+
+export type AcpJsonRpcMessage = AcpJsonRpcRequest | AcpJsonRpcResponse | AcpJsonRpcNotification;
+
+/** Capabilities the client advertises during `initialize`. */
+export type AcpClientCapabilities = {
+  readonly fs?: {
+    readonly readTextFile?: boolean;
+    readonly writeTextFile?: boolean;
+  };
+  readonly terminal?: boolean;
+};
+
+/** Capabilities the agent advertises in `initialize` response. */
+export type AcpAgentCapabilities = {
+  readonly loadSession?: boolean;
+  readonly promptCapabilities?: {
+    readonly image?: boolean;
+    readonly audio?: boolean;
+    readonly embeddedContext?: boolean;
+  };
+  readonly mcpCapabilities?: {
+    readonly http?: boolean;
+    readonly sse?: boolean;
+  };
+  readonly sessionCapabilities?: Record<string, unknown>;
+  readonly auth?: Record<string, unknown>;
+};
+
+export type AcpInitializeResult = {
+  readonly protocolVersion: number;
+  readonly agentCapabilities?: AcpAgentCapabilities;
+  readonly agentInfo?: { readonly name: string; readonly title?: string; readonly version: string };
+  readonly authMethods?: ReadonlyArray<{ readonly id: string; readonly type: string }>;
+};
+
+/** Result from `session/new`. */
+export type AcpSessionNewResult = {
+  readonly sessionId: string;
+};
+
+/** ACP tool-call status lifecycle. */
+export const ACP_TOOL_CALL_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'error',
+  'cancelled',
+] as const;
+
+export type AcpToolCallStatus = (typeof ACP_TOOL_CALL_STATUSES)[number];
+
+/** ACP tool-call kind per spec. */
+export type AcpToolCallKind =
+  | 'read'
+  | 'edit'
+  | 'delete'
+  | 'move'
+  | 'search'
+  | 'execute'
+  | 'think'
+  | 'fetch'
+  | 'other';
+
+/** Tool-call notification from `session/update`. */
+export type AcpToolCall = {
+  readonly toolCallId: string;
+  readonly title: string;
+  readonly kind?: AcpToolCallKind;
+  readonly status: AcpToolCallStatus;
+  readonly content?: ReadonlyArray<AcpToolCallContent>;
+  readonly locations?: ReadonlyArray<{ readonly path: string; readonly line?: number }>;
+  readonly input?: unknown;
+  readonly output?: unknown;
+};
+
+/** Tool-call update notification fields. */
+export type AcpToolCallUpdate = {
+  readonly toolCallId: string;
+  readonly status?: AcpToolCallStatus;
+  readonly title?: string;
+  readonly content?: ReadonlyArray<AcpToolCallContent>;
+  readonly locations?: ReadonlyArray<{ readonly path: string; readonly line?: number }>;
+  readonly input?: unknown;
+  readonly output?: unknown;
+};
+
+export type AcpToolCallContent = {
+  readonly type: 'content';
+  readonly content: { readonly type: string; readonly text: string };
+};
+
+/** Permission request from agent → client (`session/request_permission`). */
+export type AcpPermissionRequest = {
+  readonly sessionId: string;
+  readonly toolCall: { readonly toolCallId: string };
+  readonly options: ReadonlyArray<AcpPermissionOption>;
+};
+
+export type AcpPermissionOption = {
+  readonly optionId: string;
+  readonly name: string;
+  readonly kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always';
+};
+
+export type AcpPermissionOutcome =
+  | { readonly outcome: 'cancelled' }
+  | { readonly outcome: 'selected'; readonly optionId: string };
+
+/** Session update notification union from `session/update`. */
+export type AcpSessionUpdate =
+  | { readonly sessionUpdate: 'agent_message_chunk'; readonly content: { readonly type: string; readonly text: string } }
+  | { readonly sessionUpdate: 'agent_thought_chunk'; readonly content: { readonly type: string; readonly text: string } }
+  | ({ readonly sessionUpdate: 'tool_call' } & Omit<AcpToolCall, never>)
+  | ({ readonly sessionUpdate: 'tool_call_update' } & Omit<AcpToolCallUpdate, never>)
+  | { readonly sessionUpdate: 'plan'; readonly plan: unknown };
+
+/** Stop reason in `session/prompt` response. */
+export type AcpStopReason = 'end_turn' | 'cancelled' | 'tool_use' | 'max_tokens' | 'error';
+
+/** stdio spawn configuration used by the Rust coordinator. */
+export type AcpStdioSpawnConfig = {
+  readonly cmd: string;
+  readonly args: ReadonlyArray<string>;
+  readonly cwd?: string;
+  readonly env?: Record<string, string>;
+};
+
+/** Handle returned after spawning an ACP agent via stdio. */
+export type AcpStdioHandle = {
+  readonly pid: number;
+  readonly agentId: string;
+  readonly agentName: string;
+};
+
+// ---------------------------------------------------------------------------
 // Delegated-agent event (bridge → UI)
 // ---------------------------------------------------------------------------
 
