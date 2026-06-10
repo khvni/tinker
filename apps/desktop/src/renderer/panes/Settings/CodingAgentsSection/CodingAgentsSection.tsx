@@ -1,9 +1,8 @@
 import { type JSX } from 'react';
 import { StatusDot, type StatusDotState } from '@tinker/design';
-import {
-  ACP_CONNECTOR_META,
-  type AcpConnectorState,
-  type GooseConnection,
+import type {
+  AcpConnectorState,
+  GooseConnection,
 } from '@tinker/shared-types';
 import './CodingAgentsSection.css';
 
@@ -12,8 +11,10 @@ type CodingAgentsSectionProps = {
   readonly gooseInstalled: boolean;
   /** Connection info for the running Goose process (null when not running). */
   readonly gooseConnection: GooseConnection | null;
-  /** Current state of each ACP coding-agent connector. */
+  /** Current state of each ACP agent from registry discovery. */
   readonly connectorStates: ReadonlyArray<AcpConnectorState>;
+  /** Path to the registry.json file (shown in UI for user reference). */
+  readonly registryPath?: string;
 };
 
 const statusToDotState = (status: AcpConnectorState['status']): StatusDotState => {
@@ -50,6 +51,7 @@ export const CodingAgentsSection = ({
   gooseInstalled,
   gooseConnection,
   connectorStates,
+  registryPath,
 }: CodingAgentsSectionProps): JSX.Element => {
   const gooseDot: StatusDotState =
     gooseConnection !== null ? 'constructive' : gooseInstalled ? 'warning' : 'danger';
@@ -68,11 +70,16 @@ export const CodingAgentsSection = ({
       <header className="tinker-coding-agents-section__header">
         <div>
           <p className="tinker-eyebrow">Coding Agents</p>
-          <h3 id="tinker-coding-agents-heading">ACP connectors</h3>
+          <h3 id="tinker-coding-agents-heading">ACP Registry</h3>
         </div>
         <p className="tinker-muted tinker-coding-agents-section__blurb">
-          Goose can delegate coding tasks to these agents via ACP. Install and
-          configure them to unlock agent-assisted coding.
+          Agents are discovered from your local ACP registry. Any binary that
+          speaks JSON-RPC over stdio can be added.
+          {registryPath ? (
+            <span className="tinker-coding-agents-section__registry-path">
+              {' '}Registry: <code>{registryPath}</code>
+            </span>
+          ) : null}
         </p>
       </header>
 
@@ -82,33 +89,30 @@ export const CodingAgentsSection = ({
         <span>{gooseLabel}</span>
       </div>
 
-      {/* Connector rows */}
+      {/* Agent rows — dynamically populated from registry */}
       <ul className="tinker-coding-agents-section__rows" role="list">
-        {ACP_CONNECTOR_META.map((meta) => {
-          const state = connectorStates.find((s) => s.id === meta.id);
-          const status = state?.status ?? 'unavailable';
-          const dotState = statusToDotState(status);
-          const label = statusToLabel(status);
+        {connectorStates.map((state) => {
+          const dotState = statusToDotState(state.status);
+          const label = statusToLabel(state.status);
           const subtitle =
-            status === 'configured'
-              ? meta.description
-              : (state?.message ?? meta.description);
-          const showHint = status === 'not-installed';
+            state.status === 'configured'
+              ? state.description
+              : (state.message ?? state.description);
 
           return (
-            <li key={meta.id} className="tinker-coding-agents-section__row">
+            <li key={state.id} className="tinker-coding-agents-section__row">
               <div className="tinker-coding-agents-section__row-identity">
                 <StatusDot state={dotState} label={label} />
                 <div className="tinker-coding-agents-section__row-text">
                   <p className="tinker-coding-agents-section__row-title">
-                    {meta.label}
+                    {state.name}
                   </p>
                   <p className="tinker-coding-agents-section__row-subtitle tinker-muted">
                     {subtitle}
                   </p>
-                  {showHint ? (
+                  {state.status === 'not-installed' && state.cmd ? (
                     <p className="tinker-coding-agents-section__hint">
-                      {meta.installHint}
+                      Binary: <code>{state.cmd}</code>
                     </p>
                   ) : null}
                 </div>
@@ -121,9 +125,9 @@ export const CodingAgentsSection = ({
         })}
       </ul>
 
-      {!gooseInstalled ? (
+      {connectorStates.length === 0 ? (
         <p className="tinker-coding-agents-section__hint">
-          curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash
+          No agents registered. Add entries to your registry.json to get started.
         </p>
       ) : null}
     </section>

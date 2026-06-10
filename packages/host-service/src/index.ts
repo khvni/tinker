@@ -27,12 +27,23 @@ export {
 export { HOST_SERVICE_VERSION } from './version.js';
 export {
   discoverAcpConnectors,
-  type AcpConnectorId,
   type AcpConnectorState,
   type AcpConnectorStatus,
   type AcpDiscoveryResult,
-  type GooseStatus,
+  type DiscoverAcpConnectorsOptions,
 } from './acp-discovery.js';
+export {
+  createRegistryManager,
+  type AcpBinaryDistribution,
+  type AcpAgentDistribution,
+  type AcpAgentEnv,
+  type AcpAuthDelegation,
+  type AcpPlatformKey,
+  type AcpRegistry,
+  type AcpRegistryAgent,
+  type RegistryManager,
+  type RegistryManagerOptions,
+} from './registry-manager.js';
 export type {
   GitCredentialProvider,
   HealthCheckResponse,

@@ -1,26 +1,13 @@
 /**
- * ACP (Agent Client Protocol) connector types for coding-agent
- * integration through Goose.
+ * ACP (Agent Client Protocol) types for agent-agnostic spawning.
  *
- * Tinker talks to Goose as the primary chat runtime via ACP-over-HTTP.
- * Goose can optionally delegate tasks to external coding agents
- * (Claude Code, Codex, OpenCode, etc.) that speak ACP over stdio.
- * These types model the connector discovery, status, and configuration
- * surface that the Settings UI and host-service use.
+ * Tinker uses a registry-based discovery model (mirroring Devin Desktop's
+ * `~/.windsurf/acp/registry.json`). Any binary that speaks JSON-RPC over
+ * stdio can be registered in `~/.tinker/acp/registry.json`.
+ *
+ * There are no hardcoded agent lists — the registry is the single source
+ * of truth. These types model the discovery results and UI contract.
  */
-
-// ---------------------------------------------------------------------------
-// Connector identity
-// ---------------------------------------------------------------------------
-
-/** Well-known ACP coding-agent connector identifiers. */
-export const ACP_CONNECTOR_IDS = [
-  'claude-code',
-  'codex',
-  'opencode',
-] as const;
-
-export type AcpConnectorId = (typeof ACP_CONNECTOR_IDS)[number];
 
 // ---------------------------------------------------------------------------
 // Connector status
@@ -30,10 +17,10 @@ export type AcpConnectorId = (typeof ACP_CONNECTOR_IDS)[number];
  * Lifecycle states a connector can be in.
  *
  * - `not-installed`: binary not found on the system.
- * - `detected`:      binary found but not yet configured in Goose.
- * - `configured`:    connector is wired into Goose and ready to use.
- * - `unavailable`:   Goose itself is not installed or not running.
- * - `errored`:       connector was configured but failed at runtime.
+ * - `detected`:      binary found and accessible.
+ * - `configured`:    agent is wired and ready to use.
+ * - `unavailable`:   no platform binary configured or unsupported platform.
+ * - `errored`:       agent was configured but failed at runtime.
  */
 export const ACP_CONNECTOR_STATUSES = [
   'not-installed',
@@ -46,58 +33,58 @@ export const ACP_CONNECTOR_STATUSES = [
 export type AcpConnectorStatus = (typeof ACP_CONNECTOR_STATUSES)[number];
 
 // ---------------------------------------------------------------------------
-// Connector metadata
+// Connector state (runtime) — populated dynamically from registry
 // ---------------------------------------------------------------------------
 
-/** Human-readable metadata for a connector, used in Settings UI. */
-export type AcpConnectorMeta = {
-  readonly id: AcpConnectorId;
-  readonly label: string;
-  readonly description: string;
-  /** Shell command or package name a user would install. */
-  readonly installHint: string;
-  /** Documentation URL for setup instructions. */
-  readonly docsUrl: string;
-};
-
-export const ACP_CONNECTOR_META: ReadonlyArray<AcpConnectorMeta> = [
-  {
-    id: 'claude-code',
-    label: 'Claude Code',
-    description: "Anthropic's headless coding agent via ACP.",
-    installHint: 'npm install -g @anthropic-ai/claude-code',
-    docsUrl: 'https://docs.anthropic.com/en/docs/claude-code',
-  },
-  {
-    id: 'codex',
-    label: 'Codex',
-    description: "OpenAI's headless coding agent via ACP.",
-    installHint: 'npm install -g @openai/codex',
-    docsUrl: 'https://github.com/openai/codex',
-  },
-  {
-    id: 'opencode',
-    label: 'OpenCode',
-    description: "Open-source coding agent, formerly Tinker's primary runtime.",
-    installHint: 'npm install -g opencode',
-    docsUrl: 'https://opencode.ai/docs',
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Connector state (runtime)
-// ---------------------------------------------------------------------------
-
-/** Runtime state for a single ACP connector. */
+/** Runtime state for a single ACP agent, populated from registry discovery. */
 export type AcpConnectorState = {
-  readonly id: AcpConnectorId;
+  /** Agent identifier from registry.json. */
+  readonly id: string;
+  /** Human-readable agent name from registry.json. */
+  readonly name: string;
+  /** Short description from registry.json. */
+  readonly description: string;
+  /** Current discovery status. */
   readonly status: AcpConnectorStatus;
   /** Human-readable error or recovery hint shown in Settings. */
   readonly message: string | null;
+  /** Agent version from registry.json. */
+  readonly version: string;
+  /** Agent authors from registry.json. */
+  readonly authors: ReadonlyArray<string>;
+  /** Icon URL (optional). */
+  readonly icon?: string;
+  /** Resolved command for current platform (null if unavailable). */
+  readonly cmd: string | null;
+  /** Resolved args for current platform. */
+  readonly args: ReadonlyArray<string>;
 };
 
 // ---------------------------------------------------------------------------
-// Goose connection
+// Discovery result
+// ---------------------------------------------------------------------------
+
+/** Platform key from the registry spec (os-arch). */
+export type AcpPlatformKey =
+  | 'darwin-aarch64'
+  | 'darwin-x86_64'
+  | 'linux-aarch64'
+  | 'linux-x86_64'
+  | 'windows-aarch64'
+  | 'windows-x86_64';
+
+/** Full discovery result returned by host-service. */
+export type AcpDiscoveryResult = {
+  /** Discovered agents with their current status. */
+  readonly agents: ReadonlyArray<AcpConnectorState>;
+  /** Current platform key (null if unsupported). */
+  readonly platformKey: AcpPlatformKey | null;
+  /** Path to the registry.json file. */
+  readonly registryPath: string;
+};
+
+// ---------------------------------------------------------------------------
+// Goose connection (preserved for backward compat with host-service)
 // ---------------------------------------------------------------------------
 
 /**

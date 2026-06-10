@@ -1,24 +1,29 @@
 /**
- * ACP coding-agent connector discovery.
+ * ACP coding-agent discovery — registry-based.
  *
- * Detects whether Goose is installed and which ACP coding agents
- * (Claude Code, Codex, OpenCode) are available on the host machine.
+ * Replaces the former hardcoded CONNECTOR_BINARIES list with dynamic
+ * lookup from `~/.tinker/acp/registry.json`. Any binary that speaks
+ * JSON-RPC over stdio (ACP) can be registered; discovery enumerates
+ * what's in the registry and validates binary accessibility.
  *
- * The host-service exposes this via the health/status API so the
- * Settings UI can render connector rows with status dots.
+ * The registry format mirrors Devin Desktop's ACP registry spec
+ * (`~/.windsurf/acp/registry.json`).
  */
 
 import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import {
+  createRegistryManager,
+  type AcpPlatformKey,
+  type AcpRegistryAgent,
+  type RegistryManager,
+  type RegistryManagerOptions,
+} from './registry-manager.js';
 
 // ---------------------------------------------------------------------------
-// Types (mirror the shapes from @tinker/shared-types/acp without
-// importing the workspace package — host-service is a standalone Node
-// service that must not take browser-oriented deps).
+// Types
 // ---------------------------------------------------------------------------
-
-export type AcpConnectorId = 'claude-code' | 'codex' | 'opencode';
 
 export type AcpConnectorStatus =
   | 'not-installed'
@@ -28,35 +33,27 @@ export type AcpConnectorStatus =
   | 'errored';
 
 export type AcpConnectorState = {
-  readonly id: AcpConnectorId;
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
   readonly status: AcpConnectorStatus;
   readonly message: string | null;
-};
-
-export type GooseStatus = {
-  readonly installed: boolean;
-  readonly version: string | null;
-  readonly message: string | null;
+  readonly version: string;
+  readonly authors: ReadonlyArray<string>;
+  readonly icon?: string;
+  readonly cmd: string | null;
+  readonly args: ReadonlyArray<string>;
 };
 
 export type AcpDiscoveryResult = {
-  readonly goose: GooseStatus;
-  readonly connectors: ReadonlyArray<AcpConnectorState>;
+  readonly agents: ReadonlyArray<AcpConnectorState>;
+  readonly platformKey: AcpPlatformKey | null;
+  readonly registryPath: string;
 };
 
 // ---------------------------------------------------------------------------
 // Binary detection
 // ---------------------------------------------------------------------------
-
-const CONNECTOR_BINARIES: ReadonlyArray<{
-  id: AcpConnectorId;
-  binary: string;
-  label: string;
-}> = [
-  { id: 'claude-code', binary: 'claude', label: 'Claude Code' },
-  { id: 'codex', binary: 'codex', label: 'Codex' },
-  { id: 'opencode', binary: 'opencode', label: 'OpenCode' },
-];
 
 const execAsync = (
   command: string,
@@ -77,7 +74,6 @@ const which = async (binary: string): Promise<boolean> => {
     await execAsync('which', [binary]);
     return true;
   } catch {
-    // Windows fallback
     try {
       await execAsync('where', [binary]);
       return true;
@@ -87,94 +83,119 @@ const which = async (binary: string): Promise<boolean> => {
   }
 };
 
-const getGooseVersion = async (): Promise<string | null> => {
+const isAccessible = async (path: string): Promise<boolean> => {
   try {
-    const { stdout } = await execAsync('goose', ['--version']);
-    const version = stdout.trim();
-    return version.length > 0 ? version : null;
+    await access(path, constants.X_OK);
+    return true;
   } catch {
-    return null;
+    return false;
   }
 };
 
 /**
- * Check whether a Goose `profiles.yaml` exists and references the given
- * provider name. This is a lightweight heuristic — it does not parse YAML
- * but simply checks for the provider string.
+ * Resolve whether a binary command is available on the system.
+ * Checks absolute paths directly, otherwise uses which/where.
  */
-const isConfiguredInGoose = async (providerName: string): Promise<boolean> => {
-  const configDir =
-    process.env['XDG_CONFIG_HOME'] ??
-    `${process.env['HOME'] ?? '/root'}/.config`;
-  const profilesPath = `${configDir}/goose/profiles.yaml`;
-
-  try {
-    await access(profilesPath, constants.R_OK);
-    const { readFile } = await import('node:fs/promises');
-    const content = await readFile(profilesPath, 'utf-8');
-    return content.includes(providerName);
-  } catch {
-    return false;
+const isBinaryAvailable = async (cmd: string): Promise<boolean> => {
+  if (cmd.startsWith('/') || cmd.startsWith('./') || cmd.includes('\\')) {
+    return isAccessible(cmd);
   }
+  return which(cmd);
 };
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
+export type DiscoverAcpConnectorsOptions = RegistryManagerOptions;
+
 /**
- * Discover Goose installation and available ACP coding-agent connectors.
+ * Discover available ACP agents from the registry.
  *
- * Runs concurrently: checks Goose binary + each connector binary in
- * parallel. Total latency ≈ max(single check) rather than sum.
+ * Reads `~/.tinker/acp/registry.json`, resolves the current platform's
+ * binary entries, and checks whether each binary is accessible.
+ * Returns enriched connector states for the UI.
  */
-export const discoverAcpConnectors = async (): Promise<AcpDiscoveryResult> => {
-  const [gooseInstalled, gooseVersion] = await Promise.all([
-    which('goose'),
-    getGooseVersion(),
-  ]);
+export const discoverAcpConnectors = async (
+  options: DiscoverAcpConnectorsOptions = {},
+): Promise<AcpDiscoveryResult> => {
+  const registryManager: RegistryManager = createRegistryManager(options);
+  const registry = await registryManager.read();
+  const platformKey = registryManager.getCurrentPlatformKey();
 
-  const goose: GooseStatus = gooseInstalled
-    ? { installed: true, version: gooseVersion, message: null }
-    : {
-        installed: false,
-        version: null,
-        message:
-          'Goose is not installed. Install it with: curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash',
-      };
+  if (platformKey === null) {
+    return {
+      agents: registry.agents.map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
+        status: 'unavailable' as const,
+        message: `Unsupported platform: ${process.platform}/${process.arch}`,
+        version: agent.version,
+        authors: agent.authors,
+        ...(agent.icon !== undefined ? { icon: agent.icon } : {}),
+        cmd: null,
+        args: [],
+      })),
+      platformKey: null,
+      registryPath: registryManager.getRegistryPath(),
+    };
+  }
 
-  const connectorChecks = CONNECTOR_BINARIES.map(
-    async ({ id, binary, label }): Promise<AcpConnectorState> => {
-      if (!gooseInstalled) {
+  const agentChecks = registry.agents.map(
+    async (agent: AcpRegistryAgent): Promise<AcpConnectorState> => {
+      const platformBinary = agent.distribution.binary[platformKey];
+
+      if (!platformBinary) {
         return {
-          id,
+          id: agent.id,
+          name: agent.name,
+          description: agent.description,
           status: 'unavailable',
-          message: `${label} requires Goose. Install Goose first.`,
+          message: `No binary configured for platform ${platformKey}.`,
+          version: agent.version,
+          authors: agent.authors,
+          ...(agent.icon !== undefined ? { icon: agent.icon } : {}),
+          cmd: null,
+          args: [],
         };
       }
 
-      const found = await which(binary);
-      if (!found) {
+      const available = await isBinaryAvailable(platformBinary.cmd);
+      if (!available) {
         return {
-          id,
+          id: agent.id,
+          name: agent.name,
+          description: agent.description,
           status: 'not-installed',
-          message: `${label} binary not found. Install it to enable delegation.`,
+          message: `Binary "${platformBinary.cmd}" not found. Install it to enable this agent.`,
+          version: agent.version,
+          authors: agent.authors,
+          ...(agent.icon !== undefined ? { icon: agent.icon } : {}),
+          cmd: platformBinary.cmd,
+          args: [...platformBinary.args],
         };
-      }
-
-      const configured = await isConfiguredInGoose(id);
-      if (configured) {
-        return { id, status: 'configured', message: null };
       }
 
       return {
-        id,
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
         status: 'detected',
-        message: `${label} is installed but not configured as a Goose ACP provider.`,
+        message: null,
+        version: agent.version,
+        authors: agent.authors,
+        ...(agent.icon !== undefined ? { icon: agent.icon } : {}),
+        cmd: platformBinary.cmd,
+        args: [...platformBinary.args],
       };
     },
   );
 
-  const connectors = await Promise.all(connectorChecks);
-  return { goose, connectors };
+  const agents = await Promise.all(agentChecks);
+  return {
+    agents,
+    platformKey,
+    registryPath: registryManager.getRegistryPath(),
+  };
 };
