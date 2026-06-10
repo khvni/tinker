@@ -206,10 +206,9 @@ async fn find_live_matching(
     if !process_alive(manifest.pid) {
       continue;
     }
-    // TODO(TIN-192): integration-level coverage for the `/health` probe
-    // belongs in `apps/desktop/src-tauri/tests/`. Unit tests here assert the
-    // pure predicates (manifest empty, dead pid, key mismatch) and leave the
-    // HTTP stub to integration scope.
+    // Integration-level `/health` probe coverage lives in
+    // `apps/desktop/src-tauri/tests/opencode_health_test.rs`. Unit tests here
+    // assert the pure predicates (manifest empty, dead pid, key mismatch).
     if wait_for_health(&manifest.base_url, OPENCODE_SERVER_USERNAME, &manifest.secret)
       .await
       .is_err()
