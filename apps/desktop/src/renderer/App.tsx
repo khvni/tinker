@@ -194,12 +194,6 @@ const resolveUserMemoryPath = async (sessions: SSOStatus, options?: { emit?: boo
   return syncActiveMemoryPath(pickCurrentUserId(sessions), options);
 };
 
-const syncCurrentUserMemoryPath = async (
-  sessions: SSOStatus,
-  options?: { emit?: boolean },
-): Promise<void> => {
-  await resolveUserMemoryPath(sessions, options);
-};
 
 const selectSessionFolder = async (): Promise<string | null> => {
   const picked = await openFolderPicker();
@@ -635,7 +629,7 @@ export const App = (): JSX.Element => {
         const sessions = await readAuthStatusWrapped();
         await migrateLocalUserIdentity('local-user', GUEST_USER_ID);
         await syncStoredUsers(sessions);
-        await syncCurrentUserMemoryPath(sessions, { emit: false });
+        await resolveUserMemoryPath(sessions, { emit: false });
         const storedVaultPath = window.localStorage.getItem(VAULT_PATH_KEY);
 
         // Skills live per-user at `<memory_root>/<user-id>/.tinker/skills/`, so
