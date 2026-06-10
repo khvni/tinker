@@ -225,6 +225,27 @@ const SEED_AGENTS: ReadonlyArray<AcpRegistryAgent> = [
     env: {},
     authDelegation: { selfManaged: true, loginHint: '/login' },
   },
+  {
+    id: 'monkeybot',
+    name: 'Monkeybot',
+    version: '0.1.0',
+    description: 'Computer-use agent you can teach by recording yourself performing tasks.',
+    repository: 'https://github.com/khvni/monkeybot',
+    authors: ['khvni'],
+    license: 'MIT',
+    distribution: {
+      binary: {
+        'darwin-aarch64': { archive: '', cmd: 'monkeybot', args: ['acp'] },
+        'darwin-x86_64': { archive: '', cmd: 'monkeybot', args: ['acp'] },
+        'linux-aarch64': { archive: '', cmd: 'monkeybot', args: ['acp'] },
+        'linux-x86_64': { archive: '', cmd: 'monkeybot', args: ['acp'] },
+        'windows-aarch64': { archive: '', cmd: 'monkeybot.exe', args: ['acp'] },
+        'windows-x86_64': { archive: '', cmd: 'monkeybot.exe', args: ['acp'] },
+      },
+    },
+    env: {},
+    authDelegation: { selfManaged: true, loginHint: null },
+  },
 ];
 
 // ---------------------------------------------------------------------------

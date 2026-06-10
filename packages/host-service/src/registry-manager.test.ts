@@ -44,12 +44,13 @@ describe('createRegistryManager', () => {
   it('exposes seed agents', () => {
     const manager = createRegistryManager({ registryPath: TEST_PATH });
     const seeds = manager.getSeedAgents();
-    expect(seeds.length).toBeGreaterThanOrEqual(4);
+    expect(seeds.length).toBeGreaterThanOrEqual(5);
     const ids = seeds.map((a) => a.id);
     expect(ids).toContain('goose');
     expect(ids).toContain('claude-code');
     expect(ids).toContain('codex');
     expect(ids).toContain('opencode');
+    expect(ids).toContain('monkeybot');
   });
 
   describe('read', () => {
