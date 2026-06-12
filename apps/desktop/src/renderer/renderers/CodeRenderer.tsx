@@ -1,8 +1,24 @@
 import { useEffect, useState, type JSX } from 'react';
+import DOMPurify from 'dompurify';
 import { Badge } from '@tinker/design';
 import { readTextFile } from '../electron-shims-fs.js';
 import { getCodeLanguage, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
 import { highlightCode, MAX_HIGHLIGHTABLE_CODE_LENGTH } from './code-highlighter.js';
+
+/**
+ * Sanitize highlighted code HTML.
+ *
+ * highlight.js with `ignoreIllegals: true` may emit style tags or malformed
+ * markup when processing certain inputs. This strips <style> elements and
+ * style/ event-handler attributes as a defence-in-depth measure — the CSP
+ * already blocks script execution, but inline styles in highlighted code are
+ * still a CSS injection surface.
+ */
+export const sanitizeHighlightedCode = (html: string): string =>
+  DOMPurify.sanitize(html, {
+    FORBID_TAGS: ['style'],
+    FORBID_ATTR: ['style'],
+  });
 
 export const CodeRenderer = ({ params }: { params?: FilePaneParams }): JSX.Element => {
   const path = params?.path;
@@ -32,7 +48,7 @@ export const CodeRenderer = ({ params }: { params?: FilePaneParams }): JSX.Eleme
           if (text.length <= MAX_HIGHLIGHTABLE_CODE_LENGTH) {
             const html = await highlightCode(text, language);
             if (active) {
-              setHighlightedHtml(html);
+              setHighlightedHtml(html ? sanitizeHighlightedCode(html) : null);
             }
           }
         }
