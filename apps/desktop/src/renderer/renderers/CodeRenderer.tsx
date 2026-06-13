@@ -1,4 +1,5 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useMemo, useState, type JSX } from 'react';
+import DOMPurify from 'dompurify';
 import { Badge } from '@tinker/design';
 import { readTextFile } from '../electron-shims-fs.js';
 import { getCodeLanguage, getPanelTitleForPath, type FilePaneParams } from './file-utils.js';
@@ -10,6 +11,11 @@ export const CodeRenderer = ({ params }: { params?: FilePaneParams }): JSX.Eleme
   const [error, setError] = useState<string | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const language = path ? getCodeLanguage(path, params?.mime) : 'plaintext';
+
+  const sanitizedHighlightedHtml = useMemo(
+    () => (highlightedHtml ? DOMPurify.sanitize(highlightedHtml) : null),
+    [highlightedHtml],
+  );
 
   useEffect(() => {
     if (!path) {
@@ -62,11 +68,11 @@ export const CodeRenderer = ({ params }: { params?: FilePaneParams }): JSX.Eleme
 
       {error ? <p className="tinker-muted">{error}</p> : null}
       {!error ? (
-        <pre className={`tinker-code-block${highlightedHtml ? ' tinker-code-block--highlighted' : ''}`}>
-          {highlightedHtml ? (
+        <pre className={`tinker-code-block${sanitizedHighlightedHtml ? ' tinker-code-block--highlighted' : ''}`}>
+          {sanitizedHighlightedHtml ? (
             <code
               className={`tinker-code-content hljs language-${language}`}
-              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizedHighlightedHtml }}
             />
           ) : (
             <code className={`tinker-code-content language-${language}`}>{content}</code>
