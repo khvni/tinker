@@ -61,6 +61,7 @@ export {
   type RegistryManagerOptions,
 } from './registry-manager.js';
 export type {
+  ContextSourceProvider,
   GitCredentialProvider,
   HealthCheckResponse,
   HostAppHandle,

@@ -7,6 +7,8 @@
  * - Host identity is intrinsic and never accepted as config (see `identity.ts`).
  */
 
+import type { ContextSource } from '@tinker/shared-types';
+
 export type HostConfig = {
   /** Absolute path to the SQLite database file. */
   dbPath: string;
@@ -50,11 +52,17 @@ export type IntegrationCredentialWriter = {
   delete(account: string): Promise<void>;
 };
 
+/** Returns context-enabled notes (and future context source types) for Goose. */
+export type ContextSourceProvider = {
+  listEnabled(): Promise<ContextSource[]>;
+};
+
 export type HostProviders = {
   hostAuth: HostAuthProvider;
   credentials: GitCredentialProvider;
   modelResolver: ModelProviderResolver;
   secretsWriter: IntegrationCredentialWriter;
+  contextSources?: ContextSourceProvider;
 };
 
 export type HealthCheckResponse = {

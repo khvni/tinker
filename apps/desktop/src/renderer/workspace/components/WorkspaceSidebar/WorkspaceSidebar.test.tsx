@@ -21,6 +21,7 @@ describe('WorkspaceSidebar', () => {
         activeRailItem="chat"
         onOpenChat={noop}
         onOpenMemory={noop}
+        onOpenNotes={noop}
         onOpenSettings={noop}
         onOpenAccount={noop}
         onOpenConnections={noop}
@@ -28,7 +29,7 @@ describe('WorkspaceSidebar', () => {
     );
 
     expect(markup).toContain('aria-label="Workspace navigation"');
-    for (const label of ['Chats', 'Memory', 'Connections', 'New tab', 'Settings', 'Account']) {
+    for (const label of ['Chats', 'Memory', 'Notes', 'Connections', 'New tab', 'Settings', 'Account']) {
       expect(markup).toContain(`aria-label="${label}"`);
     }
     expect(markup).toContain('>K<');
@@ -46,6 +47,7 @@ describe('WorkspaceSidebar', () => {
         activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
+        onOpenNotes={noop}
         onOpenSettings={noop}
         onOpenAccount={noop}
         onOpenConnections={noop}
@@ -64,6 +66,7 @@ describe('WorkspaceSidebar', () => {
     const root = createRoot(container);
     const onOpenChat = vi.fn();
     const onOpenMemory = vi.fn();
+    const onOpenNotes = vi.fn();
     const onOpenSettings = vi.fn();
     const onOpenAccount = vi.fn();
     const onOpenConnections = vi.fn();
@@ -77,6 +80,7 @@ describe('WorkspaceSidebar', () => {
           activeRailItem={null}
           onOpenChat={onOpenChat}
           onOpenMemory={onOpenMemory}
+          onOpenNotes={onOpenNotes}
           onOpenSettings={onOpenSettings}
           onOpenAccount={onOpenAccount}
           onOpenConnections={onOpenConnections}
@@ -115,6 +119,7 @@ describe('WorkspaceSidebar', () => {
     const cases: ReadonlyArray<{ readonly kind: WorkspaceRailItem; readonly activeLabel: string }> = [
       { kind: 'chat', activeLabel: 'Chats' },
       { kind: 'memory', activeLabel: 'Memory' },
+      { kind: 'notes', activeLabel: 'Notes' },
       { kind: 'connections', activeLabel: 'Connections' },
       { kind: 'settings', activeLabel: 'Settings' },
     ];
@@ -128,6 +133,7 @@ describe('WorkspaceSidebar', () => {
           activeRailItem={kind}
           onOpenChat={noop}
           onOpenMemory={noop}
+          onOpenNotes={noop}
           onOpenSettings={noop}
           onOpenAccount={noop}
           onOpenConnections={noop}
@@ -137,7 +143,7 @@ describe('WorkspaceSidebar', () => {
       const activePattern = new RegExp(`<button[^>]*aria-label="${activeLabel}"[^>]*aria-current="page"`);
       expect(markup).toMatch(activePattern);
 
-      for (const otherLabel of ['Chats', 'Memory', 'Connections', 'Settings'].filter((label) => label !== activeLabel)) {
+      for (const otherLabel of ['Chats', 'Memory', 'Notes', 'Connections', 'Settings'].filter((label) => label !== activeLabel)) {
         const otherPattern = new RegExp(`<button[^>]*aria-label="${otherLabel}"[^>]*aria-current="page"`);
         expect(markup).not.toMatch(otherPattern);
       }
@@ -151,6 +157,7 @@ describe('WorkspaceSidebar', () => {
         activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
+        onOpenNotes={noop}
         onOpenSettings={noop}
         onOpenAccount={noop}
         onOpenConnections={noop}
@@ -168,6 +175,7 @@ describe('WorkspaceSidebar', () => {
         activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
+        onOpenNotes={noop}
         onOpenSettings={noop}
         onOpenAccount={noop}
         onOpenConnections={noop}
@@ -189,6 +197,7 @@ describe('WorkspaceSidebar', () => {
         activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
+        onOpenNotes={noop}
         onOpenSettings={noop}
         onOpenAccount={noop}
         onOpenConnections={noop}
@@ -213,6 +222,7 @@ describe('WorkspaceSidebar', () => {
           activeRailItem={null}
           onOpenChat={noop}
           onOpenMemory={noop}
+          onOpenNotes={noop}
           onOpenSettings={noop}
           onOpenAccount={noop}
           onOpenConnections={noop}
@@ -249,6 +259,7 @@ describe('WorkspaceSidebar', () => {
         activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
+        onOpenNotes={noop}
         onOpenSettings={noop}
         onOpenAccount={noop}
         onOpenConnections={noop}
@@ -268,13 +279,14 @@ describe('WorkspaceSidebar', () => {
         activeRailItem={null}
         onOpenChat={noop}
         onOpenMemory={noop}
+        onOpenNotes={noop}
         onOpenSettings={noop}
         onOpenAccount={noop}
         onOpenConnections={noop}
       />,
     );
 
-    const labels = ['Chats', 'Connections', 'Memory', 'New tab', 'Settings'];
+    const labels = ['Chats', 'Connections', 'Memory', 'Notes', 'New tab', 'Settings'];
     for (const label of labels) {
       const pattern = new RegExp(`<button[^>]*aria-label="${label}"[^>]*title="${label}"`);
       expect(markup).toMatch(pattern);

@@ -23,6 +23,7 @@ import { getPanelTitleForPath, isAbsolutePath } from '../renderers/file-utils.js
 import { ChatPaneRuntimeContext } from './chat-pane-runtime.js';
 import { ConnectionsRoute } from './components/ConnectionsRoute/index.js';
 import { MemoryRoute } from './components/MemoryRoute/index.js';
+import { NotesRoute } from './components/NotesRoute/index.js';
 import { RegisteredChatPane } from './components/RegisteredChatPane/index.js';
 import { SessionSwitcher } from './components/SessionSwitcher/index.js';
 import { SettingsRoute } from './components/SettingsRoute/index.js';
@@ -111,7 +112,7 @@ const requirePaneData = <K extends TinkerPaneKind>(
   return data as Extract<TinkerPaneData, { readonly kind: K }>;
 };
 
-type WorkspaceRoute = 'chat' | 'memory' | 'connections' | 'settings';
+type WorkspaceRoute = 'chat' | 'memory' | 'notes' | 'connections' | 'settings';
 
 const toPersistedRoute = (route: WorkspaceRoute): WorkspacePreferences['activeRoute'] =>
   route === 'chat' ? 'workspace' : route;
@@ -482,7 +483,7 @@ export const Workspace = ({
           ...createDefaultWorkspacePreferences(),
           ...(savedLayout?.preferences ?? {}),
         };
-        const hydratedRoute = nextPreferences.activeRoute === 'workspace' ? 'chat' : nextPreferences.activeRoute;
+        const hydratedRoute = nextPreferences.activeRoute === 'workspace' ? 'chat' : nextPreferences.activeRoute as WorkspaceRoute;
         activeRouteRef.current = hydratedRoute;
         setActiveRoute(hydratedRoute);
         workspacePreferencesRef.current = nextPreferences;
@@ -536,6 +537,10 @@ export const Workspace = ({
 
   const openMemoryPane = useCallback((): void => {
     navigateTo('memory');
+  }, [navigateTo]);
+
+  const openNotesPane = useCallback((): void => {
+    navigateTo('notes');
   }, [navigateTo]);
 
   const openConnectionsSection = useCallback((): void => {
@@ -835,6 +840,8 @@ export const Workspace = ({
     switch (activeRoute) {
       case 'memory':
         return <MemoryRoute />;
+      case 'notes':
+        return <NotesRoute />;
       case 'connections':
         return <ConnectionsRoute />;
       case 'settings':
@@ -872,6 +879,7 @@ export const Workspace = ({
           activeRailItem={activeRoute === 'chat' ? 'chat' : activeRoute}
           onOpenChat={openChatRoute}
           onOpenMemory={openMemoryPane}
+          onOpenNotes={openNotesPane}
           onOpenSettings={openSettingsPane}
           onOpenAccount={openSettingsPane}
           onOpenConnections={openConnectionsSection}

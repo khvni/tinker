@@ -25,7 +25,7 @@ export type WorkspacePreferences = {
   autoOpenAgentWrittenFiles: boolean;
   isLeftRailVisible: boolean;
   isRightInspectorVisible: boolean;
-  activeRoute: 'workspace' | 'memory' | 'settings' | 'connections';
+  activeRoute: 'workspace' | 'memory' | 'notes' | 'settings' | 'connections';
   customMcps: ReadonlyArray<CustomMcpEntry>;
 };
 
