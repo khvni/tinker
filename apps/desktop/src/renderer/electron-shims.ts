@@ -1,14 +1,7 @@
 /**
- * Shim layer that maps the Tauri API surface used by the renderer to
- * `window.tinker` (Electron preload) or falls back to the real Tauri
- * imports when running inside a Tauri shell.
- *
- * This lets the renderer source migrate incrementally: callers import
- * from this module instead of `@tauri-apps/*`, and the implementation
- * dispatches to whichever runtime is available.
+ * Electron-only shim layer. Now that Tauri has been removed, these helpers
+ * simply delegate to `window.tinker` (Electron preload).
  */
-
-import { isElectronRuntime } from './runtime.js';
 
 const api = (): NonNullable<typeof window.tinker> => {
   const tinker = window.tinker;
@@ -18,66 +11,36 @@ const api = (): NonNullable<typeof window.tinker> => {
   return tinker;
 };
 
-// ── @tauri-apps/api/core ───────────────────────────────────────────
+// ── core ───────────────────────────────────────────────────────────
 export const invoke = <T = unknown>(command: string, args?: Record<string, unknown>): Promise<T> => {
-  if (isElectronRuntime()) {
-    return api().invoke<T>(command, args);
-  }
-  // Lazy-import Tauri for backwards compat during migration
-  return import('@tauri-apps/api/core').then((m) => m.invoke<T>(command, args));
+  return api().invoke<T>(command, args);
 };
 
-// ── @tauri-apps/api/path ───────────────────────────────────────────
+// ── path ───────────────────────────────────────────────────────────
 export const homeDir = async (): Promise<string> => {
-  if (isElectronRuntime()) {
-    return api().homeDir();
-  }
-  const m = await import('@tauri-apps/api/path');
-  return m.homeDir();
+  return api().homeDir();
 };
 
 export const join = async (...segments: string[]): Promise<string> => {
-  if (isElectronRuntime()) {
-    return api().joinPath(...segments);
-  }
-  const m = await import('@tauri-apps/api/path');
-  return m.join(...segments);
+  return api().joinPath(...segments);
 };
 
-// ── @tauri-apps/plugin-shell ───────────────────────────────────────
+// ── shell ──────────────────────────────────────────────────────────
 export const openExternal = async (url: string): Promise<void> => {
-  if (isElectronRuntime()) {
-    return api().openExternal(url);
-  }
-  const m = await import('@tauri-apps/plugin-shell');
-  return m.open(url);
+  return api().openExternal(url);
 };
 
-// ── @tauri-apps/plugin-notification ────────────────────────────────
+// ── notification ───────────────────────────────────────────────────
 export const isPermissionGranted = async (): Promise<boolean> => {
-  if (isElectronRuntime()) {
-    return api().isNotificationPermissionGranted();
-  }
-  const m = await import('@tauri-apps/plugin-notification');
-  return m.isPermissionGranted();
+  return api().isNotificationPermissionGranted();
 };
 
 export const requestPermission = async (): Promise<string> => {
-  if (isElectronRuntime()) {
-    // Electron handles notification permissions at OS level
-    return 'granted';
-  }
-  const m = await import('@tauri-apps/plugin-notification');
-  const result = await m.requestPermission();
-  return String(result);
+  return 'granted';
 };
 
 export const sendNotification = async (options: string | { title: string; body?: string }): Promise<void> => {
-  if (isElectronRuntime()) {
-    const title = typeof options === 'string' ? options : options.title;
-    const body = typeof options === 'string' ? undefined : options.body;
-    return api().sendNotification(title, body);
-  }
-  const m = await import('@tauri-apps/plugin-notification');
-  m.sendNotification(options);
+  const title = typeof options === 'string' ? options : options.title;
+  const body = typeof options === 'string' ? undefined : options.body;
+  return api().sendNotification(title, body);
 };

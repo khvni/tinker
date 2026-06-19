@@ -1,4 +1,4 @@
-import { exists, mkdir, readDir, readTextFile, stat, watch, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readDir, readTextFile, stat, watch, writeTextFile } from './node-fs.js';
 import type { VaultConfig, VaultNote, VaultService } from '@tinker/shared-types';
 import {
   deriveNoteTitle,

@@ -300,74 +300,99 @@ const hoisted = vi.hoisted(() => {
   return { setRoot, dataPath, reset, fakeDatabase, ensureAbsolute };
 });
 
-vi.mock('@tauri-apps/api/path', () => ({
-  dataDir: async (): Promise<string> => hoisted.dataPath(),
-  join: async (...segments: string[]): Promise<string> => pathPosix.join(...segments),
-}));
-
-vi.mock('@tauri-apps/plugin-fs', () => {
-  type DirEntry = { name: string; isDirectory: boolean; isFile: boolean; isSymlink: boolean };
-  type WriteOptions = { append?: boolean; create?: boolean };
-  type RemoveOptions = { recursive?: boolean };
-  type StatResult = { mtime: Date | null };
-
-  const exists = async (path: string): Promise<boolean> => {
-    try {
-      await fsp.access(hoisted.ensureAbsolute(path));
-      return true;
-    } catch {
-      return false;
-    }
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      homedir: () => hoisted.dataPath(),
+    },
+    homedir: () => hoisted.dataPath(),
   };
-
-  const mkdir = async (path: string, options?: { recursive?: boolean }): Promise<void> => {
-    await fsp.mkdir(hoisted.ensureAbsolute(path), { recursive: options?.recursive ?? false });
-  };
-
-  const writeTextFile = async (path: string, contents: string, options?: WriteOptions): Promise<void> => {
-    const absolute = hoisted.ensureAbsolute(path);
-    if (options?.append) {
-      await fsp.appendFile(absolute, contents, 'utf8');
-      return;
-    }
-    await fsp.writeFile(absolute, contents, 'utf8');
-  };
-
-  const readTextFile = async (path: string): Promise<string> => {
-    return fsp.readFile(hoisted.ensureAbsolute(path), 'utf8');
-  };
-
-  const readDir = async (path: string): Promise<DirEntry[]> => {
-    const entries = await fsp.readdir(hoisted.ensureAbsolute(path), { withFileTypes: true });
-    return entries.map((entry) => ({
-      name: entry.name,
-      isDirectory: entry.isDirectory(),
-      isFile: entry.isFile(),
-      isSymlink: entry.isSymbolicLink(),
-    }));
-  };
-
-  const stat = async (path: string): Promise<StatResult> => {
-    const info = await fsp.stat(hoisted.ensureAbsolute(path));
-    return { mtime: info.mtime };
-  };
-
-  const copyFile = async (source: string, destination: string): Promise<void> => {
-    await fsp.copyFile(hoisted.ensureAbsolute(source), hoisted.ensureAbsolute(destination));
-  };
-
-  const remove = async (path: string, options?: RemoveOptions): Promise<void> => {
-    await fsp.rm(hoisted.ensureAbsolute(path), { recursive: options?.recursive ?? false, force: true });
-  };
-
-  return { exists, mkdir, writeTextFile, readTextFile, readDir, stat, copyFile, remove };
 });
 
-vi.mock('@tauri-apps/plugin-sql', () => {
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, (...args: unknown[]) => unknown>;
+  const wrap = (fn: (...args: unknown[]) => unknown) => {
+    return (path: string, ...rest: unknown[]) => {
+      return fn(hoisted.ensureAbsolute(path), ...rest);
+    };
+  };
+  const wrapCopy = (fn: (...args: unknown[]) => unknown) => {
+    return (src: string, dest: string, ...rest: unknown[]) => {
+      return fn(hoisted.ensureAbsolute(src), hoisted.ensureAbsolute(dest), ...rest);
+    };
+  };
   return {
+    ...actual,
     default: {
-      load: async (): Promise<unknown> => hoisted.fakeDatabase,
+      ...actual,
+      access: wrap(actual['access'] as (...a: unknown[]) => unknown),
+      mkdir: wrap(actual['mkdir'] as (...a: unknown[]) => unknown),
+      readFile: wrap(actual['readFile'] as (...a: unknown[]) => unknown),
+      writeFile: wrap(actual['writeFile'] as (...a: unknown[]) => unknown),
+      appendFile: wrap(actual['appendFile'] as (...a: unknown[]) => unknown),
+      readdir: wrap(actual['readdir'] as (...a: unknown[]) => unknown),
+      stat: wrap(actual['stat'] as (...a: unknown[]) => unknown),
+      copyFile: wrapCopy(actual['copyFile'] as (...a: unknown[]) => unknown),
+      rm: wrap(actual['rm'] as (...a: unknown[]) => unknown),
     },
+    access: wrap(actual['access'] as (...a: unknown[]) => unknown),
+    mkdir: wrap(actual['mkdir'] as (...a: unknown[]) => unknown),
+    readFile: wrap(actual['readFile'] as (...a: unknown[]) => unknown),
+    writeFile: wrap(actual['writeFile'] as (...a: unknown[]) => unknown),
+    appendFile: wrap(actual['appendFile'] as (...a: unknown[]) => unknown),
+    readdir: wrap(actual['readdir'] as (...a: unknown[]) => unknown),
+    stat: wrap(actual['stat'] as (...a: unknown[]) => unknown),
+    copyFile: wrapCopy(actual['copyFile'] as (...a: unknown[]) => unknown),
+    rm: wrap(actual['rm'] as (...a: unknown[]) => unknown),
+  };
+});
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    default: actual,
+    watch: (_path: string, ..._rest: unknown[]) => {
+      return { close: () => {} };
+    },
+  };
+});
+
+vi.mock('better-sqlite3', () => ({
+  default: class {
+    pragma() { return undefined; }
+    prepare() {
+      return { run: (..._args: unknown[]) => ({ changes: 0, lastInsertRowid: 0 }), all: (..._args: unknown[]) => [] };
+    }
+    close() {}
+  },
+}));
+
+vi.mock('electron', () => ({
+  app: { getPath: () => '/tmp' },
+}));
+
+vi.mock('../../../../packages/memory/src/database.js', () => ({
+  getDatabase: async () => hoisted.fakeDatabase,
+  DATABASE_SCHEMA: [],
+  ensureSessionTableColumns: async () => {},
+  ensureRelationshipTableColumns: async () => {},
+  ensureEntityTableColumns: async () => {},
+  ensureJobTableColumns: async () => {},
+  ensureLayoutTableShape: async () => {},
+}));
+
+vi.mock('@tinker/memory', async (importOriginal) => {
+  const actual = await importOriginal();
+
+  const getDatabase = async () => hoisted.fakeDatabase;
+
+  return {
+    ...(actual as Record<string, unknown>),
+    getDatabase,
   };
 });
 

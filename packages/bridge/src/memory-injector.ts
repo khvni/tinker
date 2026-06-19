@@ -1,5 +1,5 @@
 import type { OpencodeClient } from '@opencode-ai/sdk/v2/client';
-import { readDir, readTextFile, stat } from '@tauri-apps/plugin-fs';
+import fs from 'node:fs/promises';
 
 const MAX_MEMORY_FILE_COUNT = 5;
 const MAX_MEMORY_FILE_BYTES = 100 * 1024;
@@ -41,25 +41,22 @@ export const readRecentMemoryFiles = async (
   memoryDirectory: string,
   logger: MemoryInjectorLogger = defaultLogger,
 ): Promise<MemoryFile[]> => {
-  const entries = await readDir(memoryDirectory);
+  const dirEntries = await fs.readdir(memoryDirectory, { withFileTypes: true });
   const candidates = await Promise.all(
-    entries
-      .filter((entry) => entry.isFile && isMarkdownFileName(entry.name))
+    dirEntries
+      .filter((entry) => entry.isFile() && isMarkdownFileName(entry.name))
       .map(async (entry) => {
         const name = entry.name;
-        if (!name) {
-          return null;
-        }
 
         try {
-          const path = joinPath(memoryDirectory, name);
-          const info = await stat(path);
+          const filePath = joinPath(memoryDirectory, name);
+          const info = await fs.stat(filePath);
 
           return {
             name,
-            path,
+            path: filePath,
             modifiedAt: info.mtime?.getTime() ?? 0,
-            size: typeof info.size === 'number' ? info.size : 0,
+            size: info.size,
           };
         } catch (error) {
           logger(`Skipping memory file metadata read for "${joinPath(memoryDirectory, name)}": ${String(error)}`);
@@ -93,7 +90,7 @@ export const readRecentMemoryFiles = async (
     }
 
     try {
-      const text = await readTextFile(candidate.path);
+      const text = await fs.readFile(candidate.path, 'utf-8');
       recentFiles.push({
         name: candidate.name,
         path: candidate.path,

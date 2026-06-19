@@ -15,9 +15,9 @@ const {
 } = vi.hoisted(() => ({
   mockCopyFile: vi.fn<(source: string, destination: string) => Promise<void>>(),
   mockCreateSettingsStore: vi.fn(),
-  mockDataDir: vi.fn<() => Promise<string>>(),
+  mockDataDir: vi.fn<() => string>(),
   mockExists: vi.fn<(path: string) => Promise<boolean>>(),
-  mockJoin: vi.fn<(...paths: string[]) => Promise<string>>(),
+  mockJoin: vi.fn<(...paths: string[]) => string>(),
   mockMkdir: vi.fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>(),
   mockReadDir: vi.fn<(path: string) => Promise<Array<{ name: string; isDirectory: boolean; isFile: boolean; isSymlink: boolean }>>>(),
   mockRemove: vi.fn<(path: string, options?: { recursive?: boolean }) => Promise<void>>(),
@@ -26,12 +26,12 @@ const {
   mockWriteTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(),
 }));
 
-vi.mock('@tauri-apps/api/path', () => ({
+vi.mock('./path-utils.js', () => ({
   dataDir: mockDataDir,
   join: mockJoin,
 }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('./node-fs.js', () => ({
   copyFile: mockCopyFile,
   exists: mockExists,
   mkdir: mockMkdir,
@@ -137,7 +137,7 @@ describe('default memory root resolution', () => {
       get: mockSettingsGet,
       set: mockSettingsSet,
     });
-    mockJoin.mockImplementation(async (...parts: string[]) => {
+    mockJoin.mockImplementation((...parts: string[]) => {
       return parts.join('/').replace(/\/+/gu, '/');
     });
     mockMkdir.mockResolvedValue();
@@ -150,32 +150,32 @@ describe('default memory root resolution', () => {
   });
 
   it('resolves the linux default root under ~/.local/share/tinker/memory', async () => {
-    mockDataDir.mockResolvedValue('/home/alice/.local/share');
-    mockJoin.mockResolvedValue('/home/alice/.local/share/tinker/memory');
+    mockDataDir.mockReturnValue('/home/alice/.local/share');
+    mockJoin.mockReturnValue('/home/alice/.local/share/tinker/memory');
 
     await expect(resolveDefaultMemoryRoot('linux')).resolves.toBe('/home/alice/.local/share/tinker/memory');
     expect(mockJoin).toHaveBeenCalledWith('/home/alice/.local/share', 'tinker', 'memory');
   });
 
   it('resolves the macOS default root under ~/Library/Application Support/Tinker/memory', async () => {
-    mockDataDir.mockResolvedValue('/Users/alice/Library/Application Support');
-    mockJoin.mockResolvedValue('/Users/alice/Library/Application Support/Tinker/memory');
+    mockDataDir.mockReturnValue('/Users/alice/Library/Application Support');
+    mockJoin.mockReturnValue('/Users/alice/Library/Application Support/Tinker/memory');
 
     await expect(resolveDefaultMemoryRoot('darwin')).resolves.toBe('/Users/alice/Library/Application Support/Tinker/memory');
     expect(mockJoin).toHaveBeenCalledWith('/Users/alice/Library/Application Support', 'Tinker', 'memory');
   });
 
   it('resolves the Windows default root under %APPDATA%/Tinker/memory', async () => {
-    mockDataDir.mockResolvedValue('C:\\Users\\Alice\\AppData\\Roaming');
-    mockJoin.mockResolvedValue('C:\\Users\\Alice\\AppData\\Roaming\\Tinker\\memory');
+    mockDataDir.mockReturnValue('C:\\Users\\Alice\\AppData\\Roaming');
+    mockJoin.mockReturnValue('C:\\Users\\Alice\\AppData\\Roaming\\Tinker\\memory');
 
     await expect(resolveDefaultMemoryRoot('win32')).resolves.toBe('C:\\Users\\Alice\\AppData\\Roaming\\Tinker\\memory');
     expect(mockJoin).toHaveBeenCalledWith('C:\\Users\\Alice\\AppData\\Roaming', 'Tinker', 'memory');
   });
 
   it('creates the directory with recursive mkdir semantics', async () => {
-    mockDataDir.mockResolvedValue('/home/alice/.local/share');
-    mockJoin.mockResolvedValue('/home/alice/.local/share/tinker/memory');
+    mockDataDir.mockReturnValue('/home/alice/.local/share');
+    mockJoin.mockReturnValue('/home/alice/.local/share/tinker/memory');
     mockMkdir.mockResolvedValue();
 
     await expect(ensureDefaultMemoryRoot('linux')).resolves.toBe('/home/alice/.local/share/tinker/memory');
@@ -183,7 +183,7 @@ describe('default memory root resolution', () => {
   });
 
   it('seeds memory_root once when no setting exists', async () => {
-    mockDataDir.mockResolvedValue('/home/alice/.local/share');
+    mockDataDir.mockReturnValue('/home/alice/.local/share');
     mockSettingsGet.mockResolvedValue(null);
 
     await expect(getMemoryRoot('linux')).resolves.toBe('/home/alice/.local/share/tinker/memory');
@@ -252,7 +252,7 @@ describe('default memory root resolution', () => {
   });
 
   it('validates that a candidate memory root is writable', async () => {
-    mockJoin.mockResolvedValueOnce('/tmp/new-memory/.tinker-memory-root-probe-test.tmp');
+    mockJoin.mockReturnValueOnce('/tmp/new-memory/.tinker-memory-root-probe-test.tmp');
     mockExists.mockResolvedValue(true);
 
     await expect(validateMemoryRootWritable('/tmp/new-memory')).resolves.toBeUndefined();

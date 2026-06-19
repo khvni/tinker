@@ -1,4 +1,4 @@
-import { copyFile, exists, mkdir, readTextFile, remove, stat, writeTextFile } from '@tauri-apps/plugin-fs';
+import { copyFile, exists, mkdir, readTextFile, remove, stat, writeTextFile } from './node-fs.js';
 import type { RoleProfile, Skill, SkillDraft, SkillGitConfig, SkillSearchResult, SkillStore } from '@tinker/shared-types';
 import { DEFAULT_SKILL_VERSION, SKILLS_VAULT_DIRECTORY } from '@tinker/shared-types';
 import { getDatabase } from './database.js';

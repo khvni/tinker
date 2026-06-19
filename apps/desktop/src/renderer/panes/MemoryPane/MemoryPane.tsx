@@ -24,7 +24,7 @@ import {
   dismissMemoryEntry,
   readMemoryDiff,
 } from './memory-commands.js';
-import { isTauriRuntime } from '../../runtime.js';
+import { isDesktopRuntime } from '../../runtime.js';
 import './MemoryPane.css';
 
 type LoadState =
@@ -107,7 +107,7 @@ const findSelectionByPath = (
 
 export const MemoryPane = (): JSX.Element => {
   const { currentUserId } = useMemoryPaneRuntime();
-  const nativeRuntime = isTauriRuntime();
+  const nativeRuntime = isDesktopRuntime();
   const browserPreview = !nativeRuntime;
 
   const [reloadToken, setReloadToken] = useState(0);

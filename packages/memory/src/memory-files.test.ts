@@ -9,7 +9,7 @@ const { mockGetActiveMemoryPath, mockReadDir, mockReadTextFile, mockStat } = vi.
   mockStat: vi.fn<(path: string) => Promise<{ mtime?: Date }>>(),
 }));
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
+vi.mock('./node-fs.js', () => ({
   readDir: mockReadDir,
   readTextFile: mockReadTextFile,
   stat: mockStat,

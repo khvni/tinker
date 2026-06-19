@@ -1,4 +1,4 @@
-import { readDir } from '@tauri-apps/plugin-fs';
+import { readDir } from './node-fs.js';
 import { dump, load } from 'js-yaml';
 
 type PathStyle = 'posix' | 'windows';

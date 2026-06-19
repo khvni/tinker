@@ -1,13 +1,12 @@
-import Database from '@tauri-apps/plugin-sql';
+import BetterSqlite3 from 'better-sqlite3';
+import path from 'node:path';
 import { DEFAULT_SESSION_MODE } from '@tinker/shared-types';
 
-const DEFAULT_SQL_URL = 'sqlite:tinker.db';
+const DEFAULT_DB_NAME = 'tinker.db';
 const LAYOUT_STATE_COLUMN = 'workspace_state_json';
 const LEGACY_LAYOUT_COLUMN = `dock${'view_model_json'}`;
 const LEGACY_LAYOUT_TABLE = 'layouts_legacy';
 const LEGACY_LAYOUT_BRAND = `Dock${'view'}`;
-
-let databasePromise: Promise<Database> | null = null;
 
 type TableInfoRow = {
   name: string;
@@ -15,6 +14,17 @@ type TableInfoRow = {
 
 type CountRow = {
   count: number;
+};
+
+export type QueryResult = {
+  rowsAffected: number;
+  lastInsertId?: number;
+};
+
+export type Database = {
+  execute(sql: string, params?: unknown[]): Promise<QueryResult>;
+  select<T>(sql: string, params?: unknown[]): Promise<T>;
+  close(): Promise<void>;
 };
 
 export const DATABASE_SCHEMA = [
@@ -144,6 +154,38 @@ export const DATABASE_SCHEMA = [
   )`,
 ];
 
+const toNamedParams = (params?: unknown[]): Record<string, unknown> | undefined => {
+  if (!params || params.length === 0) return undefined;
+  const named: Record<string, unknown> = {};
+  for (let i = 0; i < params.length; i++) {
+    named[String(i + 1)] = params[i] === undefined ? null : params[i];
+  }
+  return named;
+};
+
+const createDatabaseWrapper = (db: BetterSqlite3.Database): Database => {
+  return {
+    async execute(sql: string, params?: unknown[]): Promise<QueryResult> {
+      const stmt = db.prepare(sql);
+      const named = toNamedParams(params);
+      const result = named ? stmt.run(named) : stmt.run();
+      const queryResult: QueryResult = { rowsAffected: result.changes };
+      if (typeof result.lastInsertRowid === 'number') {
+        queryResult.lastInsertId = result.lastInsertRowid;
+      }
+      return queryResult;
+    },
+    async select<T>(sql: string, params?: unknown[]): Promise<T> {
+      const stmt = db.prepare(sql);
+      const named = toNamedParams(params);
+      return (named ? stmt.all(named) : stmt.all()) as T;
+    },
+    async close(): Promise<void> {
+      db.close();
+    },
+  };
+};
+
 export const ensureSessionTableColumns = async (
   database: Pick<Database, 'execute' | 'select'>,
 ): Promise<void> => {
@@ -227,9 +269,42 @@ const ensureLayoutTableShape = async (database: Database): Promise<void> => {
   }
 };
 
-export const getDatabase = async (sqlUrl = DEFAULT_SQL_URL): Promise<Database> => {
+const resolveDbPath = async (dbName = DEFAULT_DB_NAME): Promise<string> => {
+  try {
+    const moduleName = 'electron';
+    const electron = await (import(/* @vite-ignore */ moduleName) as Promise<{ app: { getPath: (name: string) => string } }>);
+    const userData = electron.app.getPath('userData');
+    return path.join(userData, dbName);
+  } catch (error: unknown) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as Record<string, unknown>)['code'] === 'MODULE_NOT_FOUND'
+    ) {
+      return path.join(process.cwd(), dbName);
+    }
+    if (
+      error instanceof Error &&
+      (error.message.includes('Cannot find module') || error.message.includes('is not defined'))
+    ) {
+      return path.join(process.cwd(), dbName);
+    }
+    throw error;
+  }
+};
+
+let databasePromise: Promise<Database> | null = null;
+
+export const getDatabase = async (dbPath?: string): Promise<Database> => {
   if (!databasePromise) {
-    databasePromise = Database.load(sqlUrl).then(async (database) => {
+    databasePromise = (async () => {
+      const resolvedPath = dbPath ?? await resolveDbPath();
+      const raw = new BetterSqlite3(resolvedPath);
+      raw.pragma('journal_mode = WAL');
+      raw.pragma('foreign_keys = ON');
+      const database = createDatabaseWrapper(raw);
+
       for (const statement of DATABASE_SCHEMA) {
         await database.execute(statement);
       }
@@ -239,8 +314,12 @@ export const getDatabase = async (sqlUrl = DEFAULT_SQL_URL): Promise<Database> =
       await ensureJobTableColumns(database);
       await ensureLayoutTableShape(database);
       return database;
-    });
+    })();
   }
 
   return databasePromise;
+};
+
+export const resetDatabase = (): void => {
+  databasePromise = null;
 };

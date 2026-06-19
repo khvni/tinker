@@ -1,8 +1,11 @@
-import { exists, mkdir } from '@tauri-apps/plugin-fs';
-import { Command } from '@tauri-apps/plugin-shell';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { exists, mkdir } from './node-fs.js';
 import type { SkillGitConfig, SkillSyncReport } from '@tinker/shared-types';
 import { SKILLS_VAULT_DIRECTORY } from '@tinker/shared-types';
 import { resolveVaultPath } from './vault-utils.js';
+
+const execFileAsync = promisify(execFile);
 
 const DEFAULT_AUTHOR_NAME = 'Tinker';
 const DEFAULT_AUTHOR_EMAIL = 'tinker@local';
@@ -13,14 +16,28 @@ type GitResult = {
   stderr: string;
 };
 
+const isExecError = (error: unknown): error is { code: number; stdout: string; stderr: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  typeof (error as Record<string, unknown>)['code'] === 'number' &&
+  'stdout' in error &&
+  'stderr' in error;
+
 const runGit = async (args: string[], cwd: string): Promise<GitResult> => {
-  const command = Command.create('git', args, { cwd });
-  const output = await command.execute();
-  return {
-    code: output.code,
-    stdout: output.stdout.trim(),
-    stderr: output.stderr.trim(),
-  };
+  try {
+    const { stdout, stderr } = await execFileAsync('git', args, { cwd });
+    return { code: 0, stdout: stdout.trim(), stderr: stderr.trim() };
+  } catch (error: unknown) {
+    if (isExecError(error)) {
+      return {
+        code: error.code,
+        stdout: error.stdout.trim(),
+        stderr: error.stderr.trim(),
+      };
+    }
+    return { code: 1, stdout: '', stderr: String(error) };
+  }
 };
 
 const runGitChecked = async (args: string[], cwd: string): Promise<GitResult> => {
