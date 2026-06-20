@@ -55,8 +55,19 @@ const registerIpcHandlers = (): void => {
     join(...segments),
   );
 
+  const SAFE_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+
   ipcMain.handle('tinker:openExternal', async (_event, url: string) => {
-    await shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (!SAFE_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+        console.error(`[main] Blocked openExternal with unsafe protocol: ${parsed.protocol} — ${url}`);
+        return;
+      }
+      await shell.openExternal(url);
+    } catch {
+      console.error(`[main] Blocked openExternal with invalid URL: ${url}`);
+    }
   });
 
   ipcMain.handle('tinker:openFolderPicker', async (event) => {
