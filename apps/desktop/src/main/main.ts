@@ -55,7 +55,22 @@ const registerIpcHandlers = (): void => {
     join(...segments),
   );
 
+  const SAFE_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'mailto:', 'tel:']);
+
+  const guardUrl = (url: string): void => {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid URL');
+    }
+    if (!SAFE_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+      throw new Error(`Disallowed URL protocol: ${parsed.protocol}`);
+    }
+  };
+
   ipcMain.handle('tinker:openExternal', async (_event, url: string) => {
+    guardUrl(url);
     await shell.openExternal(url);
   });
 
