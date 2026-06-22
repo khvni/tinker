@@ -48,6 +48,21 @@ const createWindow = (): BrowserWindow => {
   return window;
 };
 
+// Allowed URL schemes for shell.openExternal
+const ALLOWED_URL_SCHEMES = new Set(['https:', 'http:']);
+
+const guardUrl = (url: string): void => {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Invalid URL');
+  }
+  if (!ALLOWED_URL_SCHEMES.has(parsed.protocol)) {
+    throw new Error(`URL scheme "${parsed.protocol}" not allowed`);
+  }
+};
+
 const registerIpcHandlers = (): void => {
   ipcMain.handle('tinker:homeDir', () => homedir());
 
@@ -56,6 +71,7 @@ const registerIpcHandlers = (): void => {
   );
 
   ipcMain.handle('tinker:openExternal', async (_event, url: string) => {
+    guardUrl(url);
     await shell.openExternal(url);
   });
 
