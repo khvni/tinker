@@ -15,6 +15,23 @@ const WINDOW_HEIGHT = 900;
 const MIN_WIDTH = 960;
 const MIN_HEIGHT = 600;
 
+/** Schemes permitted for tinker:openExternal — prevents javascript: and file: traversal. */
+const ALLOWED_URL_SCHEMES = new Set(['https:', 'http:', 'mailto:']);
+
+/** Returns url if its scheme is allowed; otherwise throws. Guard runs at the main layer even if the renderer already validated. */
+const guardUrl = (url: string): string => {
+  let protocol: string;
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+  if (!ALLOWED_URL_SCHEMES.has(protocol)) {
+    throw new Error(`Refusing to open URL with disallowed scheme: ${protocol}`);
+  }
+  return url;
+};
+
 const createWindow = (): BrowserWindow => {
   const preloadPath = join(__dirname, 'preload.mjs');
 
@@ -56,7 +73,7 @@ const registerIpcHandlers = (): void => {
   );
 
   ipcMain.handle('tinker:openExternal', async (_event, url: string) => {
-    await shell.openExternal(url);
+    await shell.openExternal(guardUrl(url));
   });
 
   ipcMain.handle('tinker:openFolderPicker', async (event) => {
