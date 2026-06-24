@@ -1,3 +1,4 @@
+import { guardUrl } from '../renderer/security-guard.js';
 import { app, BrowserWindow, ipcMain, shell, dialog, Notification } from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,6 +57,7 @@ const registerIpcHandlers = (): void => {
   );
 
   ipcMain.handle('tinker:openExternal', async (_event, url: string) => {
+    guardUrl(url);
     await shell.openExternal(url);
   });
 
