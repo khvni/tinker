@@ -29,6 +29,21 @@ const sendConnectionToRenderer = (): void => {
 };
 
 const createWindow = (): void => {
+  // Allowed URL schemes for shell:openExternal
+  const ALLOWED_URL_SCHEMES = new Set(['https:', 'http:']);
+
+  const guardUrl = (url: string): void => {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid URL');
+    }
+    if (!ALLOWED_URL_SCHEMES.has(parsed.protocol)) {
+      throw new Error(`URL scheme "${parsed.protocol}" not allowed`);
+    }
+  };
+
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -58,6 +73,7 @@ const createWindow = (): void => {
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
+    guardUrl(url);
     void shell.openExternal(url);
     return { action: 'deny' };
   });
