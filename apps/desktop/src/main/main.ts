@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Notification } from 'electron';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { readFile, writeFile, access, stat } from 'node:fs/promises';
@@ -49,6 +49,30 @@ const createWindow = (): BrowserWindow => {
 };
 
 const registerIpcHandlers = (): void => {
+  // Allowed URL schemes for shell:openExternal
+  const ALLOWED_URL_SCHEMES = new Set(['https:', 'http:']);
+
+  const guardUrl = (url: string): void => {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid URL');
+    }
+    if (!ALLOWED_URL_SCHEMES.has(parsed.protocol)) {
+      throw new Error(`URL scheme "${parsed.protocol}" not allowed`);
+    }
+  };
+
+  // Guard against path traversal attacks
+  const guardFsPath = (filePath: string): void => {
+    const resolved = resolve(filePath);
+    // Path traversal check: ensure no segment starts with '..'
+    if (resolved.includes('..')) {
+      throw new Error('Path traversal not allowed');
+    }
+  };
+
   ipcMain.handle('tinker:homeDir', () => homedir());
 
   ipcMain.handle('tinker:joinPath', (_event, ...segments: string[]) =>
@@ -56,6 +80,7 @@ const registerIpcHandlers = (): void => {
   );
 
   ipcMain.handle('tinker:openExternal', async (_event, url: string) => {
+    guardUrl(url);
     await shell.openExternal(url);
   });
 
@@ -69,19 +94,23 @@ const registerIpcHandlers = (): void => {
   });
 
   ipcMain.handle('tinker:readFile', async (_event, filePath: string) => {
+    guardFsPath(filePath);
     const buffer = await readFile(filePath);
     return buffer;
   });
 
   ipcMain.handle('tinker:readTextFile', async (_event, filePath: string) => {
+    guardFsPath(filePath);
     return readFile(filePath, 'utf-8');
   });
 
   ipcMain.handle('tinker:writeTextFile', async (_event, filePath: string, content: string) => {
+    guardFsPath(filePath);
     await writeFile(filePath, content, 'utf-8');
   });
 
   ipcMain.handle('tinker:exists', async (_event, filePath: string) => {
+    guardFsPath(filePath);
     try {
       await access(filePath);
       return true;
@@ -91,6 +120,7 @@ const registerIpcHandlers = (): void => {
   });
 
   ipcMain.handle('tinker:stat', async (_event, filePath: string) => {
+    guardFsPath(filePath);
     const info = await stat(filePath);
     return {
       isFile: info.isFile(),
